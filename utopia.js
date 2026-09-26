@@ -5,16 +5,16 @@
     window.UTOPIA_PLUGIN = true;
 
     var API_BASE = 'https://utp.to/api';
-    var CORS_PROXY = 'https://api.allorigins.win/raw?url=';
+    var CORS_PROXY = 'https://api.codetabs.com/v1/proxy?quest=';
     var PER_PAGE = 30;
 
     // =========================================================
-    // 0. Стилі (із підтримкою сенсорного скролу)
+    // 0. Стилі
     // =========================================================
     function injectStyles() {
         if (document.getElementById('utopia-styles')) return;
         var css = '' +
-            '.utopia-wrap{padding:1.2em 1.5em; touch-action: pan-y;}' +
+            '.utopia-wrap{padding:1.2em 1.5em; padding-bottom:4em;}' +
             '.utopia-header{display:flex;justify-content:space-between;align-items:flex-start;' +
             'flex-wrap:wrap;gap:1em;margin-bottom:1.2em;padding-bottom:1em;' +
             'border-bottom:1px solid rgba(255,255,255,0.1);}' +
@@ -27,7 +27,7 @@
             'box-shadow:0 0 0 2px rgba(255,255,255,0.35) inset;}' +
             '.utopia-item{display:flex;justify-content:space-between;align-items:center;gap:1em;' +
             'padding:1em 1.1em;margin-bottom:0.5em;border-radius:0.7em;background:rgba(255,255,255,0.04);' +
-            'transition:background .15s,transform .15s; user-select: none;}' +
+            'transition:background .15s,transform .15s; user-select:none;}' +
             '.utopia-item.focus{background:rgba(255,255,255,0.16);transform:scale(1.015);' +
             'box-shadow:0 0 0 2px rgba(255,255,255,0.35) inset;}' +
             '.utopia-item__left{flex:1;min-width:0;}' +
@@ -117,7 +117,7 @@
     }
 
     // =========================================================
-    // 4. Мережа та парсинг
+    // 4. Мережа та парсинг (з глибоким пошуком)
     // =========================================================
     function parseArrayFromData(data) {
         if (!data) return [];
@@ -130,12 +130,18 @@
         return [];
     }
 
-    function extractProp(obj, propNames) {
+    function deepFind(obj, keys) {
         if (!obj || typeof obj !== 'object') return null;
-        for (var i = 0; i < propNames.length; i++) {
-            var name = propNames[i];
-            if (obj[name] !== undefined && obj[name] !== null && obj[name] !== '') {
-                return obj[name];
+        for (var i = 0; i < keys.length; i++) {
+            var k = keys[i];
+            if (obj[k] !== undefined && obj[k] !== null && obj[k] !== '') {
+                return obj[k];
+            }
+        }
+        for (var p in obj) {
+            if (obj.hasOwnProperty(p) && typeof obj[p] === 'object' && obj[p] !== null) {
+                var res = deepFind(obj[p], keys);
+                if (res !== null) return res;
             }
         }
         return null;
@@ -144,24 +150,26 @@
     function normalizeItem(raw) {
         if (!raw || typeof raw !== 'object') return {};
 
-        var name = extractProp(raw, ['name', 'title', 'filename', 'torrent_name', 'display_name']) || 'Без назви';
-        var size = extractProp(raw, ['size', 'size_bytes', 'length', 'bytes']) || 0;
-        var seeds = extractProp(raw, ['seeders', 'seeds', 'seed']) || 0;
-        var peers = extractProp(raw, ['leechers', 'peers', 'leech']) || 0;
+        var name = deepFind(raw, ['name', 'title', 'filename', 'torrent_name', 'display_name', 'raw_title']) || 'Без назви';
+        var size = deepFind(raw, ['size', 'size_bytes', 'length', 'bytes']) || 0;
+        var seeds = deepFind(raw, ['seeders', 'seeds', 'seed']) || 0;
+        var peers = deepFind(raw, ['leechers', 'peers', 'leech']) || 0;
         
-        var magnet = extractProp(raw, ['magnet', 'magnet_uri', 'magnet_url', 'download_url', 'link', 'url', 'file']);
-        var hash = extractProp(raw, ['info_hash', 'hash', 'btih', 'guid']);
+        var magnet = deepFind(raw, ['magnet', 'magnet_uri', 'magnet_url', 'download_url', 'link', 'url', 'file']);
+        var hash = deepFind(raw, ['info_hash', 'hash', 'btih', 'guid']);
 
         if (!magnet && hash) {
             magnet = 'magnet:?xt=urn:btih:' + hash + '&dn=' + encodeURIComponent(name);
         }
+
+        if (typeof magnet !== 'string') magnet = '';
 
         return {
             name: String(name),
             size: parseFloat(size) || 0,
             seeds: parseInt(seeds, 10) || 0,
             peers: parseInt(peers, 10) || 0,
-            magnet: magnet ? String(magnet) : ''
+            magnet: magnet
         };
     }
 
@@ -214,13 +222,16 @@
             'Accept': 'application/json'
         };
 
+        // 1. Спроба прямого запиту
         sendRequest(targetUrl, headers, function (data) {
             var items = parseArrayFromData(data).map(normalizeItem);
             saveToCache(query, page, items);
             onSuccess(items, false);
         }, function (errCode) {
+            // 2. Якщо впало через CORS (Web) або 403, робимо запит через новий проксі
             if (errCode === 'network' || errCode === 'forbidden') {
                 var proxyUrl = CORS_PROXY + encodeURIComponent(targetUrl);
+                // На проксі НЕ передаємо заголовок Authorization, щоб уникнути блокування OPTIONS
                 sendRequest(proxyUrl, {}, function (data) {
                     var items = parseArrayFromData(data).map(normalizeItem);
                     saveToCache(query, page, items);
@@ -314,10 +325,14 @@
 
         this.create = function () {
             header.find('.utopia-header__title').text(query);
-            header.find('.utopia-sort-btn').on('hover:enter', showSortMenu);
+            header.find('.utopia-sort-btn').on('click hover:enter', showSortMenu);
             wrap.append(header);
             listBox.appendTo(wrap);
             scroll.append(wrap);
+            
+            // Вмикаємо нативний скрол для сенсорних екранів
+            scroll.render().addClass('layer--wheight');
+            
             return this.render();
         };
 
@@ -371,7 +386,7 @@
                 '</div>'
             );
             box.find('.utopia-state__text').text(errorMessage(code));
-            box.find('.utopia-retry').on('hover:enter', function () {
+            box.find('.utopia-retry').on('click hover:enter', function () {
                 loadPage(page || 1);
             });
             listBox.append(box);
