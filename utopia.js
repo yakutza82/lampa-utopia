@@ -1,16 +1,15 @@
 (function () {
     'use strict';
 
-    // ---- Захист від повторного підключення плагіна ----
     if (window.UTOPIA_PLUGIN) return;
     window.UTOPIA_PLUGIN = true;
 
-    // ---- Базові налаштування ----
     var API_BASE = 'https://utp.to/api';
+    var CORS_PROXY = 'https://corsproxy.io/?';
     var PER_PAGE = 30;
 
     // =========================================================
-    // 0. Стилі інтерфейсу (додаються в <head> один раз)
+    // 0. Стилі
     // =========================================================
     function injectStyles() {
         if (document.getElementById('utopia-styles')) return;
@@ -53,7 +52,7 @@
     }
 
     // =========================================================
-    // 1. Робота зі сховищем (API-ключ)
+    // 1. Сховище
     // =========================================================
     function getKey() {
         return Lampa.Storage.get('utopia_api_key', '');
@@ -63,7 +62,7 @@
     }
 
     // =========================================================
-    // 2. Налаштування: поле ключа + автоматична перевірка
+    // 2. Налаштування
     // =========================================================
     function initSettings() {
         Lampa.SettingsApi.addComponent({
@@ -77,7 +76,7 @@
             param: { name: 'utopia_api_key', type: 'input', values: '', default: '' },
             field: {
                 name: 'API ключ UTOPIA',
-                description: 'Встав ключ доступу до utp.to. Після вводу плагін одразу перевірить, чи він робочий.'
+                description: 'Встав ключ доступу до utp.to.'
             },
             onChange: function (value) {
                 var key = (value || '').trim();
@@ -97,10 +96,10 @@
     }
 
     // =========================================================
-    // 3. Кеш результатів пошуку
+    // 3. Кеш
     // =========================================================
     var CACHE = {};
-    var CACHE_TTL = 10 * 60 * 1000; // 10 хвилин
+    var CACHE_TTL = 10 * 60 * 1000;
 
     function cacheKey(query, page) {
         return String(query).toLowerCase() + '::' + page;
@@ -118,8 +117,66 @@
     }
 
     // =========================================================
-    // 4. Запит до API (через Lampa.Reguest)
+    // 4. Мережевий шар (із підтримкою CORS у Web та універсальним парсингом)
     // =========================================================
+    function parseArrayFromData(data) {
+        if (!data) return [];
+        if (Array.isArray(data)) return data;
+        if (Array.isArray(data.data)) return data.data;
+        if (Array.isArray(data.results)) return data.results;
+        if (Array.isArray(data.torrents)) return data.torrents;
+        if (Array.isArray(data.items)) return data.items;
+        if (data.data && Array.isArray(data.data.data)) return data.data.data;
+        return [];
+    }
+
+    function normalizeItem(raw) {
+        if (!raw || typeof raw !== 'object') return {};
+        
+        var name = raw.title || raw.name || raw.filename || raw.torrent_name || raw.display_name || 'Без назви';
+        var size = raw.size || raw.size_bytes || raw.length || raw.bytes || 0;
+        var seeds = raw.seeders != null ? raw.seeders : (raw.seeds != null ? raw.seeds : (raw.seed != null ? raw.seed : 0));
+        var peers = raw.leechers != null ? raw.leechers : (raw.peers != null ? raw.peers : (raw.leech != null ? raw.leech : 0));
+        
+        var magnet = raw.magnet || raw.magnet_uri || raw.magnet_url || raw.download_url || raw.link || raw.url || '';
+        
+        if (!magnet && raw.info_hash) {
+            magnet = 'magnet:?xt=urn:btih:' + raw.info_hash + '&dn=' + encodeURIComponent(name);
+        } else if (!magnet && raw.hash) {
+            magnet = 'magnet:?xt=urn:btih:' + raw.hash + '&dn=' + encodeURIComponent(name);
+        }
+
+        return {
+            name: name,
+            size: size,
+            seeds: parseInt(seeds, 10) || 0,
+            peers: parseInt(peers, 10) || 0,
+            magnet: magnet
+        };
+    }
+
+    function sendRequest(url, headers, onSuccess, onError) {
+        var network = new Lampa.Reguest();
+        network.timeout(15000);
+
+        network.native(url, function (response) {
+            var data = response;
+            if (typeof response === 'string') {
+                try { data = JSON.parse(response); } catch (e) {}
+            }
+            if (data) {
+                onSuccess(data);
+            } else {
+                if (onError) onError('parse_error');
+            }
+        }, function (xhr) {
+            var status = xhr ? xhr.status : 0;
+            if (status === 401) onError('unauthorized');
+            else if (status === 403) onError('forbidden');
+            else onError(status === 0 ? 'network' : 'http_' + status);
+        }, false, { headers: headers });
+    }
+
     function request(query, page, onSuccess, onError) {
         page = page || 1;
         var cached = getFromCache(query, page);
@@ -135,56 +192,40 @@
         }
 
         var cleanKey = encodeURIComponent(key);
-        var url = API_BASE + '/torrents/filter' +
-                  '?name=' + encodeURIComponent(query) +
-                  '&perPage=' + PER_PAGE +
-                  '&page=' + page +
-                  '&api_key=' + cleanKey +
-                  '&token=' + cleanKey;
-
-        var network = new Lampa.Reguest();
-        network.timeout(15000);
+        var targetUrl = API_BASE + '/torrents/filter' +
+                        '?name=' + encodeURIComponent(query) +
+                        '&perPage=' + PER_PAGE +
+                        '&page=' + page +
+                        '&api_key=' + cleanKey +
+                        '&token=' + cleanKey;
 
         var headers = {
             'Authorization': 'Bearer ' + key,
             'Accept': 'application/json'
         };
 
-        network.native(url, function (response) {
-            var data = response;
-            if (typeof response === 'string') {
-                try {
-                    data = JSON.parse(response);
-                } catch (e) {
-                    if (onError) onError('parse_error');
-                    return;
-                }
-            }
-
-            if (data) {
-                saveToCache(query, page, data);
-                onSuccess(data, false);
+        // Спочатку нативний прямий запит
+        sendRequest(targetUrl, headers, function (data) {
+            var items = parseArrayFromData(data).map(normalizeItem);
+            saveToCache(query, page, items);
+            onSuccess(items, false);
+        }, function (errCode) {
+            // Якщо у Web-версії заблоковано через CORS (код network) — пробуємо проксі
+            if (errCode === 'network') {
+                var proxyUrl = CORS_PROXY + encodeURIComponent(targetUrl);
+                sendRequest(proxyUrl, {}, function (data) {
+                    var items = parseArrayFromData(data).map(normalizeItem);
+                    saveToCache(query, page, items);
+                    onSuccess(items, false);
+                }, onError);
             } else {
-                if (onError) onError('parse_error');
+                if (onError) onError(errCode);
             }
-        }, function (xhr) {
-            var status = xhr ? xhr.status : 0;
-            if (status === 0) {
-                if (onError) onError('network');
-            } else if (status === 401) {
-                if (onError) onError('unauthorized');
-            } else if (status === 403) {
-                if (onError) onError('forbidden');
-            } else {
-                if (onError) onError('http_' + status);
-            }
-        }, false, {
-            headers: headers
         });
     }
 
     // =========================================================
-    // 5. Допоміжні функції відображення
+    // 5. Допоміжні функції
     // =========================================================
     function formatSize(bytes) {
         if (!bytes) return '';
@@ -220,17 +261,11 @@
     function sortItems(items, mode) {
         var arr = items.slice();
         if (mode === 'seeds') {
-            arr.sort(function (a, b) {
-                return (parseInt(b.seeders != null ? b.seeders : b.seeds, 10) || 0) - (parseInt(a.seeders != null ? a.seeders : a.seeds, 10) || 0);
-            });
+            arr.sort(function (a, b) { return b.seeds - a.seeds; });
         } else if (mode === 'size_desc') {
-            arr.sort(function (a, b) {
-                return (parseFloat(b.size) || 0) - (parseFloat(a.size) || 0);
-            });
+            arr.sort(function (a, b) { return (parseFloat(b.size) || 0) - (parseFloat(a.size) || 0); });
         } else if (mode === 'size_asc') {
-            arr.sort(function (a, b) {
-                return (parseFloat(a.size) || 0) - (parseFloat(b.size) || 0);
-            });
+            arr.sort(function (a, b) { return (parseFloat(a.size) || 0) - (parseFloat(b.size) || 0); });
         }
         return arr;
     }
@@ -243,7 +278,7 @@
     };
 
     // =========================================================
-    // 6. Компонент — екран зі списком знайдених торентів
+    // 6. Компонент екрана
     // =========================================================
     function TorrentsComponent(object) {
         var scroll = new Lampa.Scroll({ mask: true, over: true, step: 200 });
@@ -371,12 +406,6 @@
             listBox.empty();
             var sorted = sortItems(items, sortMode);
             sorted.forEach(function (item) {
-                var name = item.name || 'Без назви';
-                var size = item.size ? formatSize(item.size) : '';
-                var seeds = item.seeders != null ? item.seeders : item.seeds;
-                var peers = item.leechers != null ? item.leechers : item.peers;
-                var magnet = item.magnet || item.magnet_uri || '';
-
                 var row = $(
                     '<div class="utopia-item selector">' +
                     '<div class="utopia-item__left">' +
@@ -386,16 +415,16 @@
                     '<div class="utopia-item__badges"></div>' +
                     '</div>'
                 );
-                row.find('.utopia-item__title').text(name);
-                row.find('.utopia-item__meta').text(size || 'Розмір невідомий');
-                row.find('.utopia-item__badges').html(badge(seeds, '▲') + '&nbsp;&nbsp;' + badge(peers, '▼'));
+                row.find('.utopia-item__title').text(item.name);
+                row.find('.utopia-item__meta').text(item.size ? formatSize(item.size) : 'Розмір невідомий');
+                row.find('.utopia-item__badges').html(badge(item.seeds, '▲') + '&nbsp;&nbsp;' + badge(item.peers, '▼'));
 
                 row.on('hover:enter', function () {
-                    if (!magnet) {
+                    if (!item.magnet) {
                         Lampa.Noty.show('UTOPIA: немає magnet-посилання для цього торента');
                         return;
                     }
-                    Lampa.Torrent.play({ url: magnet, name: name });
+                    Lampa.Torrent.play({ url: item.magnet, name: item.name });
                 });
 
                 listBox.append(row);
@@ -436,14 +465,12 @@
                 Lampa.Loading.start('utopia_search_more', 'UTOPIA: завантаження...');
             }
 
-            request(query, targetPage, function (data, fromCache) {
+            request(query, targetPage, function (pageItems, fromCache) {
                 loading = false;
                 Lampa.Loading.stop('utopia_search');
                 Lampa.Loading.stop('utopia_search_more');
 
-                var pageItems = (data && data.data) || [];
                 page = targetPage;
-
                 if (isFirst) items = [];
                 items = items.concat(pageItems);
 
@@ -484,7 +511,7 @@
     Lampa.Component.add('utopia_torrents', TorrentsComponent);
 
     // =========================================================
-    // 7. Кнопка на картці фільму/серіалу
+    // 7. Кнопка на картці
     // =========================================================
     function addButtonToCard(root, object) {
         if (root.find('.utopia-search-btn').length) return;
@@ -531,7 +558,7 @@
     }
 
     // =========================================================
-    // 8. Ініціалізація плагіна
+    // 8. Ініціалізація
     // =========================================================
     function init() {
         injectStyles();
