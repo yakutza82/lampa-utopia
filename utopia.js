@@ -4,34 +4,71 @@
     if (window.UTOPIA_PLUGIN) return;
     window.UTOPIA_PLUGIN = true;
 
+    var API = 'https://utp.to/api/torrents/filter';
+
     function getKey() {
         return Lampa.Storage.get('utopia_api_key', '');
     }
 
-    function saveKey() {
-        var key = prompt('UTOPIA API Key');
+    function testApi() {
+        var key = getKey();
 
         if (!key) {
-            Lampa.Noty.show('Ключ не введено');
+            Lampa.Noty.show('UTOPIA: API ключ не знайдений');
             return;
         }
 
-        try {
-            Lampa.Storage.set('utopia_api_key', key.trim());
-            Lampa.Noty.show('UTOPIA: ключ збережено');
-        } catch (e) {
-            console.log('[UTOPIA] Storage error', e);
-            Lampa.Noty.show('UTOPIA: помилка збереження');
-        }
+        var network = new Lampa.Reguest();
+
+        network.silent(
+            API + '?name=Avatar&perPage=5',
+
+            function (data) {
+                console.log('[UTOPIA] RESPONSE:', data);
+
+                var count = 0;
+
+                try {
+                    if (typeof data === 'string') {
+                        data = JSON.parse(data);
+                    }
+
+                    if (data && data.data) {
+                        count = data.data.length;
+                    }
+                } catch (e) {
+                    console.log('[UTOPIA] JSON error:', e);
+                }
+
+                Lampa.Noty.show(
+                    'UTOPIA: знайдено релізів — ' + count
+                );
+            },
+
+            function (error) {
+                console.log('[UTOPIA] ERROR:', error);
+
+                Lampa.Noty.show(
+                    'UTOPIA: помилка API'
+                );
+            },
+
+            false,
+
+            {
+                dataType: 'json',
+                headers: {
+                    'Authorization': 'Bearer ' + key,
+                    'Accept': 'application/json'
+                }
+            }
+        );
     }
 
     setTimeout(function () {
-        if (!getKey()) {
-            saveKey();
-        } else {
-            Lampa.Noty.show('UTOPIA: ключ вже збережений');
-        }
+        testApi();
     }, 1500);
 
-    console.log('[UTOPIA] loaded');
+    console.log('[UTOPIA] API test loaded');
+
 })();
