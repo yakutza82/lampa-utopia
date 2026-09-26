@@ -1,52 +1,58 @@
 (function () {
     'use strict';
 
-    // ---- Захист від повторного підключення плагіна ----
     if (window.UTOPIA_PLUGIN) return;
     window.UTOPIA_PLUGIN = true;
 
-    // ---- Базові налаштування ----
     var API_BASE = 'https://utp.to/api';
     var PER_PAGE = 30;
 
+    // Публічні трекери для формування magnet з BTIH hash
+    var TRACKERS = [
+        'udp://tracker.opentrackr.org:1337/announce',
+        'udp://open.demonii.com:1337/announce',
+        'udp://tracker.openbittorrent.com:80',
+        'udp://open.stealth.si:80/announce',
+        'udp://exodus.desync.com:6969',
+        'udp://tracker.torrent.eu.org:451/announce'
+    ];
+
     // =========================================================
-    // 0. Стилі інтерфейсу (додаються в <head> один раз)
+    // 0. Стилі
     // =========================================================
     function injectStyles() {
         if (document.getElementById('utopia-styles')) return;
-
-        var css = ''
-            + '.utopia-wrap{padding:1.2em 1.5em;}'
-            + '.utopia-header{display:flex;justify-content:space-between;align-items:flex-start;'
-            + 'flex-wrap:wrap;gap:1em;margin-bottom:1.2em;padding-bottom:1em;'
-            + 'border-bottom:1px solid rgba(255,255,255,0.1);}'
-            + '.utopia-header__title{font-size:1.4em;font-weight:700;line-height:1.3;}'
-            + '.utopia-header__meta{opacity:0.6;font-size:0.9em;margin-top:0.3em;}'
-            + '.utopia-header__actions{display:flex;gap:0.6em;flex-wrap:wrap;}'
-            + '.utopia-btn{padding:0.6em 1.1em;border-radius:0.6em;background:rgba(255,255,255,0.08);'
-            + 'cursor:pointer;font-size:0.9em;white-space:nowrap;transition:background .15s,transform .15s;}'
-            + '.utopia-btn.focus{background:rgba(255,255,255,0.22);transform:scale(1.05);'
-            + 'box-shadow:0 0 0 2px rgba(255,255,255,0.35) inset;}'
-            + '.utopia-item{display:flex;justify-content:space-between;align-items:center;gap:1em;'
-            + 'padding:1em 1.1em;margin-bottom:0.5em;border-radius:0.7em;background:rgba(255,255,255,0.04);'
-            + 'transition:background .15s,transform .15s;}'
-            + '.utopia-item.focus{background:rgba(255,255,255,0.16);transform:scale(1.015);'
-            + 'box-shadow:0 0 0 2px rgba(255,255,255,0.35) inset;}'
-            + '.utopia-item__left{flex:1;min-width:0;}'
-            + '.utopia-item__title{font-weight:600;margin-bottom:0.35em;overflow:hidden;'
-            + 'text-overflow:ellipsis;white-space:nowrap;}'
-            + '.utopia-item__meta{opacity:0.6;font-size:0.85em;}'
-            + '.utopia-item__badges{display:flex;gap:0.9em;white-space:nowrap;flex-shrink:0;'
-            + 'font-size:0.95em;font-weight:700;}'
-            + '.utopia-more{text-align:center;padding:1em;margin:0.6em 0 1em;border-radius:0.7em;'
-            + 'background:rgba(255,255,255,0.05);cursor:pointer;font-weight:600;transition:background .15s;}'
-            + '.utopia-more.focus{background:rgba(255,255,255,0.18);}'
-            + '.utopia-state{text-align:center;padding:3.5em 1.5em;opacity:0.85;}'
-            + '.utopia-state__icon{font-size:2.4em;margin-bottom:0.4em;}'
-            + '.utopia-state__title{font-size:1.15em;font-weight:600;margin-bottom:0.4em;}'
-            + '.utopia-state__text{opacity:0.65;font-size:0.9em;margin-bottom:1.2em;}'
-            + '.utopia-state .utopia-btn{display:inline-block;}';
-
+        var css = '' +
+            '.utopia-wrap{padding:1.2em 1.5em; padding-bottom:5em; touch-action: pan-y;}' +
+            '.utopia-header{display:flex;justify-content:space-between;align-items:flex-start;' +
+            'flex-wrap:wrap;gap:1em;margin-bottom:1.2em;padding-bottom:1em;' +
+            'border-bottom:1px solid rgba(255,255,255,0.1);}' +
+            '.utopia-header__title{font-size:1.4em;font-weight:700;line-height:1.3;}' +
+            '.utopia-header__meta{opacity:0.6;font-size:0.9em;margin-top:0.3em;}' +
+            '.utopia-header__actions{display:flex;gap:0.6em;flex-wrap:wrap;}' +
+            '.utopia-btn{padding:0.6em 1.1em;border-radius:0.6em;background:rgba(255,255,255,0.08);' +
+            'cursor:pointer;font-size:0.9em;white-space:nowrap;transition:background .15s,transform .15s;}' +
+            '.utopia-btn.focus{background:rgba(255,255,255,0.22);transform:scale(1.05);' +
+            'box-shadow:0 0 0 2px rgba(255,255,255,0.35) inset;}' +
+            '.utopia-item{display:flex;justify-content:space-between;align-items:center;gap:1em;' +
+            'padding:1em 1.1em;margin-bottom:0.5em;border-radius:0.7em;background:rgba(255,255,255,0.04);' +
+            'transition:background .15s,transform .15s; user-select:none; cursor:pointer;}' +
+            '.utopia-item.focus{background:rgba(255,255,255,0.16);transform:scale(1.015);' +
+            'box-shadow:0 0 0 2px rgba(255,255,255,0.35) inset;}' +
+            '.utopia-item__left{flex:1;min-width:0;}' +
+            '.utopia-item__title{font-weight:600;margin-bottom:0.35em;overflow:hidden;' +
+            'text-overflow:ellipsis;white-space:nowrap;}' +
+            '.utopia-item__meta{opacity:0.6;font-size:0.85em;}' +
+            '.utopia-item__badges{display:flex;gap:0.9em;white-space:nowrap;flex-shrink:0;' +
+            'font-size:0.95em;font-weight:700;}' +
+            '.utopia-more{text-align:center;padding:1.2em;margin:1em 0 2em;border-radius:0.7em;' +
+            'background:rgba(255,255,255,0.08);cursor:pointer;font-weight:700;transition:background .15s;}' +
+            '.utopia-more.focus{background:rgba(255,255,255,0.22);}' +
+            '.utopia-state{text-align:center;padding:3.5em 1.5em;opacity:0.85;}' +
+            '.utopia-state__icon{font-size:2.4em;margin-bottom:0.4em;}' +
+            '.utopia-state__title{font-size:1.15em;font-weight:600;margin-bottom:0.4em;}' +
+            '.utopia-state__text{opacity:0.65;font-size:0.9em;margin-bottom:1.2em;}' +
+            '.utopia-state .utopia-btn{display:inline-block;}';
         var style = document.createElement('style');
         style.id = 'utopia-styles';
         style.type = 'text/css';
@@ -55,18 +61,17 @@
     }
 
     // =========================================================
-    // 1. Робота зі сховищем (API-ключ)
+    // 1. Сховище
     // =========================================================
     function getKey() {
         return Lampa.Storage.get('utopia_api_key', '');
     }
-
     function hasKey() {
         return !!getKey();
     }
 
     // =========================================================
-    // 2. Налаштування: поле ключа + автоматична перевірка
+    // 2. Налаштування
     // =========================================================
     function initSettings() {
         Lampa.SettingsApi.addComponent({
@@ -77,15 +82,10 @@
 
         Lampa.SettingsApi.addParam({
             component: 'utopia',
-            param: {
-                name: 'utopia_api_key',
-                type: 'input',
-                values: '',
-                default: ''
-            },
+            param: { name: 'utopia_api_key', type: 'input', values: '', default: '' },
             field: {
                 name: 'API ключ UTOPIA',
-                description: 'Встав ключ доступу до utp.to. Після вводу плагін одразу перевірить, чи він робочий.'
+                description: 'Встав ключ доступу до utp.to.'
             },
             onChange: function (value) {
                 var key = (value || '').trim();
@@ -97,42 +97,15 @@
 
     function verifyKey(key) {
         Lampa.Noty.show('UTOPIA: перевіряю ключ...');
-
-        var url = API_BASE + '/torrents/filter?name=test&perPage=1';
-        var xhr = new XMLHttpRequest();
-
-        xhr.open('GET', url, true);
-        xhr.setRequestHeader('Authorization', 'Bearer ' + key);
-        xhr.setRequestHeader('Accept', 'application/json');
-        xhr.timeout = 15000;
-
-        xhr.onreadystatechange = function () {
-            if (xhr.readyState !== 4) return;
-
-            if (xhr.status >= 200 && xhr.status < 300) {
-                Lampa.Noty.show('✅ UTOPIA: ключ робочий, зв\'язок є');
-            } else if (xhr.status === 401) {
-                Lampa.Noty.show('❌ UTOPIA: неправильний ключ (401)');
-            } else if (xhr.status === 403) {
-                Lampa.Noty.show('❌ UTOPIA: доступ заборонено (403)');
-            } else {
-                Lampa.Noty.show('⚠️ UTOPIA: сервер відповів з кодом ' + xhr.status);
-            }
-        };
-
-        xhr.onerror = function () {
-            Lampa.Noty.show('⚠️ UTOPIA: помилка мережі / CORS під час перевірки');
-        };
-
-        xhr.ontimeout = function () {
-            Lampa.Noty.show('⚠️ UTOPIA: перевищено час очікування під час перевірки');
-        };
-
-        xhr.send();
+        request('test', 1, function () {
+            Lampa.Noty.show('✅ UTOPIA: ключ робочий, зв\'язок є');
+        }, function (code) {
+            Lampa.Noty.show('⚠️ UTOPIA: ' + errorMessage(code));
+        });
     }
 
     // =========================================================
-    // 3. Кеш результатів пошуку
+    // 3. Кеш
     // =========================================================
     var CACHE = {};
     var CACHE_TTL = 10 * 60 * 1000;
@@ -149,103 +122,175 @@
     }
 
     function saveToCache(query, page, data) {
-        CACHE[cacheKey(query, page)] = {
-            data: data,
-            time: Date.now()
-        };
+        CACHE[cacheKey(query, page)] = { data: data, time: Date.now() };
     }
 
     // =========================================================
-    // 4. Запит до API
+    // 4. Глибокий пошук та збірка Magnet
     // =========================================================
+    function parseArrayFromData(data) {
+        if (!data) return [];
+        if (Array.isArray(data)) return data;
+        if (Array.isArray(data.data)) return data.data;
+        if (Array.isArray(data.results)) return data.results;
+        if (Array.isArray(data.torrents)) return data.torrents;
+        if (Array.isArray(data.items)) return data.items;
+        if (data.data && Array.isArray(data.data.data)) return data.data.data;
+        return [];
+    }
+
+    function deepFind(obj, keys) {
+        if (!obj || typeof obj !== 'object') return null;
+        for (var i = 0; i < keys.length; i++) {
+            var k = keys[i];
+            if (obj[k] !== undefined && obj[k] !== null && obj[k] !== '') {
+                return obj[k];
+            }
+        }
+        for (var p in obj) {
+            if (obj.hasOwnProperty(p) && typeof obj[p] === 'object' && obj[p] !== null) {
+                var res = deepFind(obj[p], keys);
+                if (res !== null) return res;
+            }
+        }
+        return null;
+    }
+
+    function buildMagnetUrl(hash, name) {
+        if (!hash) return '';
+        var cleanHash = String(hash).replace(/[^a-fA-F0-9]/g, '');
+        if (cleanHash.length < 32) return '';
+
+        var trParams = TRACKERS.map(function (t) {
+            return '&tr=' + encodeURIComponent(t);
+        }).join('');
+
+        return 'magnet:?xt=urn:btih:' + cleanHash + '&dn=' + encodeURIComponent(name || 'torrent') + trParams;
+    }
+
+    function normalizeItem(raw) {
+        if (!raw || typeof raw !== 'object') return {};
+
+        var name = deepFind(raw, ['name', 'title', 'filename', 'torrent_name', 'display_name', 'raw_title']) || 'Без назви';
+        var size = deepFind(raw, ['size', 'size_bytes', 'length', 'bytes']) || 0;
+        var seeds = deepFind(raw, ['seeders', 'seeds', 'seed']) || 0;
+        var peers = deepFind(raw, ['leechers', 'peers', 'leech']) || 0;
+
+        var magnet = deepFind(raw, ['magnet', 'magnet_uri', 'magnet_url', 'download_url']);
+        var hash = deepFind(raw, ['info_hash', 'hash', 'btih', 'guid', 'id', 'torrent_id']);
+
+        // Якщо маємо пряме magnet-посилання
+        if (typeof magnet === 'string' && magnet.indexOf('magnet:') === 0) {
+            // використовувати готовий magnet
+        } else {
+            // інакше пробуємо зібрати його з хешу/ідентифікатора
+            magnet = buildMagnetUrl(hash, name);
+        }
+
+        return {
+            name: String(name),
+            size: parseFloat(size) || 0,
+            seeds: parseInt(seeds, 10) || 0,
+            peers: parseInt(peers, 10) || 0,
+            magnet: magnet || ''
+        };
+    }
+
+    function sendRequest(url, headers, onSuccess, onError) {
+        var network = new Lampa.Reguest();
+        network.timeout(15000);
+
+        network.native(url, function (response) {
+            var data = response;
+            if (typeof response === 'string') {
+                try { data = JSON.parse(response); } catch (e) {}
+            }
+            if (data) {
+                onSuccess(data);
+            } else {
+                if (onError) onError('parse_error');
+            }
+        }, function (xhr) {
+            var status = xhr ? xhr.status : 0;
+            if (status === 401) onError('unauthorized');
+            else if (status === 403) onError('forbidden');
+            else onError(status === 0 ? 'network' : 'http_' + status);
+        }, false, { headers: headers });
+    }
+
     function request(query, page, onSuccess, onError) {
         page = page || 1;
-
         var cached = getFromCache(query, page);
-
         if (cached) {
             onSuccess(cached, true);
             return;
         }
 
         var key = getKey();
-
         if (!key) {
             if (onError) onError('no_key');
             return;
         }
 
-        var url = API_BASE + '/torrents/filter'
-            + '?name=' + encodeURIComponent(query)
-            + '&perPage=' + PER_PAGE
-            + '&page=' + page;
+        var cleanKey = encodeURIComponent(key);
+        var targetUrl = API_BASE + '/torrents/filter' +
+                        '?name=' + encodeURIComponent(query) +
+                        '&perPage=' + PER_PAGE +
+                        '&page=' + page +
+                        '&api_key=' + cleanKey +
+                        '&token=' + cleanKey;
 
-        var xhr = new XMLHttpRequest();
+        var headers = {
+            'Authorization': 'Bearer ' + key,
+            'Accept': 'application/json'
+        };
 
-        xhr.open('GET', url, true);
-        xhr.setRequestHeader('Authorization', 'Bearer ' + key);
-        xhr.setRequestHeader('Accept', 'application/json');
-        xhr.timeout = 15000;
-
-        xhr.onreadystatechange = function () {
-            if (xhr.readyState !== 4) return;
-
-            if (xhr.status >= 200 && xhr.status < 300) {
-                try {
-                    var data = JSON.parse(xhr.responseText);
-
-                    saveToCache(query, page, data);
-                    onSuccess(data, false);
-                } catch (e) {
-                    if (onError) onError('parse_error');
-                }
-            } else if (xhr.status === 401) {
-                if (onError) onError('unauthorized');
-            } else if (xhr.status === 403) {
-                if (onError) onError('forbidden');
+        // 1. Прямий нативний запит для Android/TV
+        sendRequest(targetUrl, headers, function (data) {
+            var items = parseArrayFromData(data).map(normalizeItem);
+            saveToCache(query, page, items);
+            onSuccess(items, false);
+        }, function (errCode) {
+            // 2. Якщо запущено у Web і спрацював CORS/403, пробуємо завантаження через CORS проксі
+            if (errCode === 'network' || errCode === 'forbidden') {
+                var proxy1 = 'https://corsproxy.io/?' + encodeURIComponent(targetUrl);
+                sendRequest(proxy1, {}, function (data) {
+                    var items = parseArrayFromData(data).map(normalizeItem);
+                    saveToCache(query, page, items);
+                    onSuccess(items, false);
+                }, function () {
+                    var proxy2 = 'https://api.allorigins.win/raw?url=' + encodeURIComponent(targetUrl);
+                    sendRequest(proxy2, {}, function (data) {
+                        var items = parseArrayFromData(data).map(normalizeItem);
+                        saveToCache(query, page, items);
+                        onSuccess(items, false);
+                    }, onError);
+                });
             } else {
-                if (onError) onError('http_' + xhr.status);
+                if (onError) onError(errCode);
             }
-        };
-
-        xhr.onerror = function () {
-            if (onError) onError('network');
-        };
-
-        xhr.ontimeout = function () {
-            if (onError) onError('timeout');
-        };
-
-        xhr.send();
+        });
     }
 
     // =========================================================
-    // 5. Допоміжні функції відображення
+    // 5. Допоміжні функції
     // =========================================================
     function formatSize(bytes) {
         if (!bytes) return '';
-
         var units = ['Б', 'КБ', 'МБ', 'ГБ', 'ТБ'];
         var i = 0;
         var n = parseFloat(bytes);
-
         while (n >= 1024 && i < units.length - 1) {
             n /= 1024;
             i++;
         }
-
         return n.toFixed(1) + ' ' + units[i];
     }
 
     function badge(value, icon) {
         var n = parseInt(value, 10);
-
-        if (isNaN(n)) {
-            return '<span style="opacity:0.4;">' + icon + ' ?</span>';
-        }
-
+        if (isNaN(n)) return '<span style="opacity:0.4;">' + icon + ' ?</span>';
         var color = n >= 10 ? '#4CAF50' : (n >= 1 ? '#FFC107' : '#F44336');
-
         return '<span style="color:' + color + ';">' + icon + ' ' + n + '</span>';
     }
 
@@ -253,33 +298,23 @@
         var map = {
             no_key: 'Спочатку вкажи API ключ у налаштуваннях плагіна UTOPIA.',
             unauthorized: 'Неправильний API ключ (401). Перевір його в налаштуваннях.',
-            forbidden: 'Доступ заборонено (403).',
+            forbidden: 'Заблоковано сервером/браузером (403 або CORS).',
             parse_error: 'Сервер повернув некоректну відповідь.',
-            network: 'Проблема з мережею або CORS.',
+            network: 'Помилка мережі або CORS (заблоковано сервером/браузером).',
             timeout: 'Сервер не відповів вчасно.'
         };
-
         return map[code] || ('Сталася помилка (' + code + ').');
     }
 
     function sortItems(items, mode) {
         var arr = items.slice();
-
         if (mode === 'seeds') {
-            arr.sort(function (a, b) {
-                return (parseInt(b.seeders != null ? b.seeders : b.seeds, 10) || 0)
-                     - (parseInt(a.seeders != null ? a.seeders : a.seeds, 10) || 0);
-            });
+            arr.sort(function (a, b) { return b.seeds - a.seeds; });
         } else if (mode === 'size_desc') {
-            arr.sort(function (a, b) {
-                return (parseFloat(b.size) || 0) - (parseFloat(a.size) || 0);
-            });
+            arr.sort(function (a, b) { return (parseFloat(b.size) || 0) - (parseFloat(a.size) || 0); });
         } else if (mode === 'size_asc') {
-            arr.sort(function (a, b) {
-                return (parseFloat(a.size) || 0) - (parseFloat(b.size) || 0);
-            });
+            arr.sort(function (a, b) { return (parseFloat(a.size) || 0) - (parseFloat(b.size) || 0); });
         }
-
         return arr;
     }
 
@@ -291,32 +326,23 @@
     };
 
     // =========================================================
-    // 6. Компонент — екран зі списком знайдених торентів
+    // 6. Компонент екрана
     // =========================================================
     function TorrentsComponent(object) {
-        var scroll = new Lampa.Scroll({
-            mask: true,
-            over: true,
-            step: 200
-        });
-
+        var scroll = new Lampa.Scroll({ mask: true, over: true, step: 200 });
         var wrap = $('<div class="utopia-wrap"></div>');
-
         var header = $(
-            '<div class="utopia-header">'
-                + '<div>'
-                    + '<div class="utopia-header__title"></div>'
-                    + '<div class="utopia-header__meta"></div>'
-                + '</div>'
-                + '<div class="utopia-header__actions">'
-                    + '<div class="utopia-btn selector utopia-sort-btn">↕ Сортування</div>'
-                + '</div>'
-            + '</div>'
+            '<div class="utopia-header">' +
+            '<div>' +
+            '<div class="utopia-header__title"></div>' +
+            '<div class="utopia-header__meta"></div>' +
+            '</div>' +
+            '<div class="utopia-header__actions">' +
+            '<div class="utopia-btn selector utopia-sort-btn">↕ Сортування</div>' +
+            '</div>' +
+            '</div>'
         );
-
         var listBox = $('<div class="utopia-list"></div>');
-        var moreButton = null;
-
         var page = 1;
         var items = [];
         var sortMode = 'default';
@@ -327,27 +353,23 @@
 
         this.create = function () {
             header.find('.utopia-header__title').text(query);
-            header.find('.utopia-sort-btn').on('hover:enter', showSortMenu);
-
+            header.find('.utopia-sort-btn').on('click hover:enter', showSortMenu);
             wrap.append(header);
             listBox.appendTo(wrap);
             scroll.append(wrap);
 
+            scroll.render().addClass('layer--wheight');
             return this.render();
         };
 
-        this.render = function () {
-            return scroll.render();
-        };
+        this.render = function () { return scroll.render(); };
 
         this.start = function () {
             if (Lampa.Activity.active().activity !== this.activity) return;
-
             if (!hasKey()) {
                 renderNoKeyState();
                 return;
             }
-
             if (!items.length) loadPage(1);
 
             Lampa.Controller.add('content', {
@@ -355,23 +377,12 @@
                     Lampa.Controller.collectionSet(scroll.render());
                     Lampa.Controller.collectionFocus(false, scroll.render());
                 },
-                up: function () {
-                    Lampa.Navigator.move('up');
-                },
-                down: function () {
-                    Lampa.Navigator.move('down');
-                },
-                left: function () {
-                    Lampa.Navigator.move('left');
-                },
-                right: function () {
-                    Lampa.Navigator.move('right');
-                },
-                back: function () {
-                    Lampa.Activity.backward();
-                }
+                up: function () { Lampa.Navigator.move('up'); },
+                down: function () { Lampa.Navigator.move('down'); },
+                left: function () { Lampa.Navigator.move('left'); },
+                right: function () { Lampa.Navigator.move('right'); },
+                back: function () { Lampa.Activity.backward(); }
             });
-
             Lampa.Controller.toggle('content');
         };
 
@@ -381,47 +392,41 @@
 
         function renderNoKeyState() {
             listBox.empty();
-
             listBox.append(
-                $('<div class="utopia-state">'
-                    + '<div class="utopia-state__icon">🔑</div>'
-                    + '<div class="utopia-state__title">Ключ не вказано</div>'
-                    + '<div class="utopia-state__text">Щоб шукати торренти на UTOPIA, спочатку додай API ключ у налаштуваннях плагіна.</div>'
-                + '</div>')
+                $('<div class="utopia-state">' +
+                '<div class="utopia-state__icon">🔑</div>' +
+                '<div class="utopia-state__title">Ключ не вказано</div>' +
+                '<div class="utopia-state__text">Щоб шукати торренти на UTOPIA, спочатку додай API ключ у налаштуваннях плагіна.</div>' +
+                '</div>')
             );
         }
 
         function renderErrorState(code) {
             listBox.empty();
-
             var box = $(
-                '<div class="utopia-state">'
-                    + '<div class="utopia-state__icon">⚠️</div>'
-                    + '<div class="utopia-state__title">Не вдалося завантажити результати</div>'
-                    + '<div class="utopia-state__text"></div>'
-                    + '<div class="utopia-btn selector utopia-retry">Спробувати ще раз</div>'
-                + '</div>'
+                '<div class="utopia-state">' +
+                '<div class="utopia-state__icon">⚠️</div>' +
+                '<div class="utopia-state__title">Не вдалося завантажити результати</div>' +
+                '<div class="utopia-state__text"></div>' +
+                '<div class="utopia-btn selector utopia-retry">Спробувати ще раз</div>' +
+                '</div>'
             );
-
             box.find('.utopia-state__text').text(errorMessage(code));
-
-            box.find('.utopia-retry').on('hover:enter', function () {
+            box.find('.utopia-retry').on('click hover:enter', function () {
                 loadPage(page || 1);
             });
-
             listBox.append(box);
             Lampa.Controller.enable('content');
         }
 
         function renderEmptyState() {
             listBox.empty();
-
             listBox.append(
-                $('<div class="utopia-state">'
-                    + '<div class="utopia-state__icon">🔍</div>'
-                    + '<div class="utopia-state__title">Нічого не знайдено</div>'
-                    + '<div class="utopia-state__text">Спробуй перевірити пізніше — можливо, підходящих роздач поки немає.</div>'
-                + '</div>')
+                $('<div class="utopia-state">' +
+                '<div class="utopia-state__icon">🔍</div>' +
+                '<div class="utopia-state__title">Нічого не знайдено</div>' +
+                '<div class="utopia-state__text">Спробуй перевірити пізніше — можливо, підходящих роздач поки немає.</div>' +
+                '</div>')
             );
         }
 
@@ -432,7 +437,6 @@
                     mode: mode
                 };
             });
-
             Lampa.Select.show({
                 title: 'Сортування результатів',
                 items: options,
@@ -449,84 +453,47 @@
 
         function renderList() {
             listBox.empty();
-
             var sorted = sortItems(items, sortMode);
-
             sorted.forEach(function (item) {
-                var name = item.name || 'Без назви';
-                var size = item.size ? formatSize(item.size) : '';
-                var seeds = item.seeders != null ? item.seeders : item.seeds;
-                var peers = item.leechers != null ? item.leechers : item.peers;
-
-                // UTOPIA повертає download_link, а magnet_link у цьому API може бути null
-                var torrentUrl = item.download_link || '';
-
                 var row = $(
-                    '<div class="utopia-item selector">'
-                        + '<div class="utopia-item__left">'
-                            + '<div class="utopia-item__title"></div>'
-                            + '<div class="utopia-item__meta"></div>'
-                        + '</div>'
-                        + '<div class="utopia-item__badges"></div>'
-                    + '</div>'
+                    '<div class="utopia-item selector">' +
+                    '<div class="utopia-item__left">' +
+                    '<div class="utopia-item__title"></div>' +
+                    '<div class="utopia-item__meta"></div>' +
+                    '</div>' +
+                    '<div class="utopia-item__badges"></div>' +
+                    '</div>'
                 );
+                row.find('.utopia-item__title').text(item.name);
+                row.find('.utopia-item__meta').text(item.size ? formatSize(item.size) : 'Розмір невідомий');
+                row.find('.utopia-item__badges').html(badge(item.seeds, '▲') + '&nbsp;&nbsp;' + badge(item.peers, '▼'));
 
-                row.find('.utopia-item__title').text(name);
-                row.find('.utopia-item__meta').text(size || 'Розмір невідомий');
-
-                row.find('.utopia-item__badges').html(
-                    badge(seeds, '▲') + '&nbsp;&nbsp;' + badge(peers, '▼')
-                );
-
-                row.on('hover:enter', function () {
-                    if (!torrentUrl) {
-                        Lampa.Noty.show('UTOPIA: немає посилання на torrent-файл');
+                row.on('click hover:enter', function () {
+                    if (!item.magnet) {
+                        Lampa.Noty.show('UTOPIA: немає magnet-посилання для цього торента');
                         return;
                     }
-
-                    console.log('[UTOPIA] Torrent URL:', torrentUrl);
-
-                    Lampa.Torrent.play({
-                        url: torrentUrl,
-                        name: name
-                    });
+                    Lampa.Torrent.play({ url: item.magnet, name: item.name });
                 });
 
                 listBox.append(row);
             });
 
-            if (moreButton) listBox.append(moreButton);
-
-            setMeta(
-                'Знайдено: ' + items.length +
-                (sortMode !== 'default' ? ' · ' + SORT_LABELS[sortMode] : '')
-            );
-
-            Lampa.Controller.enable('content');
-        }
-
-        function addMoreButton() {
-            moreButton = $('<div class="utopia-more selector">Показати ще ↓</div>');
-
-            moreButton.on('hover:enter', function () {
-                if (!loading) loadPage(page + 1);
-            });
-
-            listBox.append(moreButton);
-        }
-
-        function removeMoreButton() {
-            if (moreButton) {
-                moreButton.remove();
-                moreButton = null;
+            if (items.length >= page * PER_PAGE) {
+                var moreButton = $('<div class="utopia-more selector">Показати ще ↓</div>');
+                moreButton.on('click hover:enter', function () {
+                    if (!loading) loadPage(page + 1);
+                });
+                listBox.append(moreButton);
             }
+
+            setMeta('Знайдено: ' + items.length + (sortMode !== 'default' ? ' · ' + SORT_LABELS[sortMode] : ''));
+            Lampa.Controller.enable('content');
         }
 
         function loadPage(targetPage) {
             if (loading) return;
-
             loading = true;
-
             var isFirst = targetPage === 1;
 
             if (isFirst) {
@@ -534,23 +501,17 @@
                 setMeta('Пошук триває...');
                 Lampa.Loading.start('utopia_search', 'UTOPIA: пошук...');
             } else {
-                removeMoreButton();
                 setMeta('Завантажую ще результати...');
                 Lampa.Loading.start('utopia_search_more', 'UTOPIA: завантаження...');
             }
 
-            request(query, targetPage, function (data, fromCache) {
+            request(query, targetPage, function (pageItems, fromCache) {
                 loading = false;
-
                 Lampa.Loading.stop('utopia_search');
                 Lampa.Loading.stop('utopia_search_more');
 
-                var pageItems = (data && data.data) || [];
-
                 page = targetPage;
-
                 if (isFirst) items = [];
-
                 items = items.concat(pageItems);
 
                 if (!items.length) {
@@ -558,21 +519,10 @@
                     return;
                 }
 
-                removeMoreButton();
-
-                if (pageItems.length >= PER_PAGE) {
-                    addMoreButton();
-                }
-
                 renderList();
-
-                if (fromCache) {
-                    setMeta('Знайдено: ' + items.length + ' · дані з кешу');
-                }
-
+                if (fromCache) setMeta('Знайдено: ' + items.length + ' · дані з кешу');
             }, function (code) {
                 loading = false;
-
                 Lampa.Loading.stop('utopia_search');
                 Lampa.Loading.stop('utopia_search_more');
 
@@ -580,19 +530,14 @@
                     renderErrorState(code);
                 } else {
                     Lampa.Noty.show('UTOPIA: ' + errorMessage(code));
-                    addMoreButton();
-                    Lampa.Controller.enable('content');
+                    renderList();
                 }
             });
         }
 
-        this.back = function () {
-            Lampa.Activity.backward();
-        };
-
+        this.back = function () { Lampa.Activity.backward(); };
         this.pause = function () {};
         this.stop = function () {};
-
         this.destroy = function () {
             scroll.destroy();
             wrap.remove();
@@ -602,27 +547,24 @@
     Lampa.Component.add('utopia_torrents', TorrentsComponent);
 
     // =========================================================
-    // 7. Кнопка на картці фільму/серіалу
+    // 7. Кнопка на картці
     // =========================================================
     function addButtonToCard(root, object) {
         if (root.find('.utopia-search-btn').length) return;
-
         var title = (object.movie && (object.movie.title || object.movie.name)) || '';
-
         if (!title) return;
 
         var button = $(
-            '<div class="full-start__button selector utopia-search-btn" data-subtitle="UTOPIA">'
-                + '<span>🧲 UTOPIA — торенти</span>'
-            + '</div>'
+            '<div class="full-start__button selector utopia-search-btn" data-subtitle="UTOPIA">' +
+            '<span>🧲 UTOPIA — торенти</span>' +
+            '</div>'
         );
 
-        button.on('hover:enter', function () {
+        button.on('click hover:enter', function () {
             if (!hasKey()) {
                 Lampa.Noty.show('UTOPIA: спочатку вкажи API ключ у налаштуваннях плагіна');
                 return;
             }
-
             Lampa.Activity.push({
                 url: '',
                 title: 'UTOPIA: ' + title,
@@ -633,23 +575,14 @@
         });
 
         var anchor = root.find('.view--torrent');
-
         if (anchor.length) {
             anchor.after(button);
             return;
         }
 
         var target = root.find('.full-start-new__buttons');
-
-        if (!target.length) {
-            target = root.find('.full-start__buttons');
-        }
-
-        if (target.length) {
-            target.append(button);
-        } else {
-            console.log('[UTOPIA] Не знайдено місце для кнопки на картці фільму');
-        }
+        if (!target.length) target = root.find('.full-start__buttons');
+        if (target.length) target.append(button);
     }
 
     function initCardButton() {
@@ -661,7 +594,7 @@
     }
 
     // =========================================================
-    // 8. Ініціалізація плагіна
+    // 8. Ініціалізація
     // =========================================================
     function init() {
         injectStyles();
