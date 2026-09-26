@@ -1,84 +1,37 @@
 (function () {
     'use strict';
 
-    if (!window.Lampa) return;
     if (window.UTOPIA_PLUGIN) return;
-
     window.UTOPIA_PLUGIN = true;
-
-    var API = 'https://utp.to/api/torrents/filter';
 
     function getKey() {
         return Lampa.Storage.get('utopia_api_key', '');
     }
 
-    function setKey() {
-        var key = prompt('Введіть UTOPIA API Key');
-
-        if (!key) return;
-
-        key = key.trim();
-
-        Lampa.Storage.set('utopia_api_key', key);
-
-        Lampa.Notifier.show({
-            title: 'UTOPIA',
-            text: 'API ключ збережено',
-            time: 3000
-        });
-    }
-
-    function test() {
-        var key = getKey();
+    function saveKey() {
+        var key = prompt('UTOPIA API Key');
 
         if (!key) {
-            setKey();
+            Lampa.Noty.show('Ключ не введено');
             return;
         }
 
-        var request = new Lampa.Reguest();
-
-        request.silent(
-            API + '?name=Avatar&perPage=5',
-            function (data) {
-                console.log('[UTOPIA] API response:', data);
-
-                var count = data &&
-                    data.data ?
-                    data.data.length :
-                    0;
-
-                Lampa.Notifier.show({
-                    title: 'UTOPIA',
-                    text: 'Знайдено релізів: ' + count,
-                    time: 5000
-                });
-            },
-            function (error) {
-                console.error('[UTOPIA] API error:', error);
-
-                Lampa.Notifier.show({
-                    title: 'UTOPIA',
-                    text: 'Помилка API',
-                    time: 5000
-                });
-            },
-            {
-                headers: {
-                    'Authorization': 'Bearer ' + key,
-                    'Accept': 'application/json'
-                }
-            }
-        );
+        try {
+            Lampa.Storage.set('utopia_api_key', key.trim());
+            Lampa.Noty.show('UTOPIA: ключ збережено');
+        } catch (e) {
+            console.log('[UTOPIA] Storage error', e);
+            Lampa.Noty.show('UTOPIA: помилка збереження');
+        }
     }
 
     setTimeout(function () {
-        if (getKey()) {
-            test();
+        if (!getKey()) {
+            saveKey();
         } else {
-            setKey();
+            Lampa.Noty.show('UTOPIA: ключ вже збережений');
         }
-    }, 1000);
+    }, 1500);
 
-    console.log('[UTOPIA] Plugin initialized');
+    console.log('[UTOPIA] loaded');
 })();
