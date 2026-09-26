@@ -686,7 +686,7 @@
         if (!title) return;
 
         var button = $(
-            '<div class="full-start__button selector utopia-search-btn" data-subtitle="UTOPIA">' +
+            '<div class="full-start__button selector utopia-search-btn">' +
             '<span>\ud83e\uddf2 UTOPIA - торенти</span>' +
             '</div>'
         );
