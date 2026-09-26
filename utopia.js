@@ -5,8 +5,17 @@
     window.UTOPIA_PLUGIN = true;
 
     var API_BASE = 'https://utp.to/api';
-    var CORS_PROXY = 'https://corsproxy.io/?';
     var PER_PAGE = 30;
+
+    // Публічні трекери для формування magnet з BTIH hash
+    var TRACKERS = [
+        'udp://tracker.opentrackr.org:1337/announce',
+        'udp://open.demonii.com:1337/announce',
+        'udp://tracker.openbittorrent.com:80',
+        'udp://open.stealth.si:80/announce',
+        'udp://exodus.desync.com:6969',
+        'udp://tracker.torrent.eu.org:451/announce'
+    ];
 
     // =========================================================
     // 0. Стилі
@@ -117,7 +126,7 @@
     }
 
     // =========================================================
-    // 4. Глибокий пошук полів JSON та парсинг
+    // 4. Глибокий пошук та збірка Magnet
     // =========================================================
     function parseArrayFromData(data) {
         if (!data) return [];
@@ -147,6 +156,18 @@
         return null;
     }
 
+    function buildMagnetUrl(hash, name) {
+        if (!hash) return '';
+        var cleanHash = String(hash).replace(/[^a-fA-F0-9]/g, '');
+        if (cleanHash.length < 32) return '';
+
+        var trParams = TRACKERS.map(function (t) {
+            return '&tr=' + encodeURIComponent(t);
+        }).join('');
+
+        return 'magnet:?xt=urn:btih:' + cleanHash + '&dn=' + encodeURIComponent(name || 'torrent') + trParams;
+    }
+
     function normalizeItem(raw) {
         if (!raw || typeof raw !== 'object') return {};
 
@@ -154,28 +175,16 @@
         var size = deepFind(raw, ['size', 'size_bytes', 'length', 'bytes']) || 0;
         var seeds = deepFind(raw, ['seeders', 'seeds', 'seed']) || 0;
         var peers = deepFind(raw, ['leechers', 'peers', 'leech']) || 0;
-        
+
         var magnet = deepFind(raw, ['magnet', 'magnet_uri', 'magnet_url', 'download_url']);
-        var hash = deepFind(raw, ['info_hash', 'hash', 'btih', 'guid']);
+        var hash = deepFind(raw, ['info_hash', 'hash', 'btih', 'guid', 'id', 'torrent_id']);
 
-        // Якщо маємо хеш або ідентифікатор, будуємо надійне Magnet-посилання
-        if (!magnet && hash) {
-            var cleanHash = String(hash).replace(/[^a-fA-F0-9]/g, '');
-            if (cleanHash.length >= 32) {
-                var trackers = [
-                    'udp://tracker.opentrackr.org:1337/announce',
-                    'udp://open.demonii.com:1337/announce',
-                    'udp://tracker.openbittorrent.com:80',
-                    'udp://open.stealth.si:80/announce',
-                    'udp://exodus.desync.com:6969'
-                ].map(function(t){ return '&tr=' + encodeURIComponent(t); }).join('');
-
-                magnet = 'magnet:?xt=urn:btih:' + cleanHash + '&dn=' + encodeURIComponent(name) + trackers;
-            }
-        }
-
-        if (typeof magnet !== 'string' || magnet.indexOf('magnet:') !== 0) {
-            magnet = '';
+        // Якщо маємо пряме magnet-посилання
+        if (typeof magnet === 'string' && magnet.indexOf('magnet:') === 0) {
+            // використовувати готовий magnet
+        } else {
+            // інакше пробуємо зібрати його з хешу/ідентифікатора
+            magnet = buildMagnetUrl(hash, name);
         }
 
         return {
@@ -183,7 +192,7 @@
             size: parseFloat(size) || 0,
             seeds: parseInt(seeds, 10) || 0,
             peers: parseInt(peers, 10) || 0,
-            magnet: magnet
+            magnet: magnet || ''
         };
     }
 
@@ -236,20 +245,27 @@
             'Accept': 'application/json'
         };
 
-        // 1. Прямий нативний запит для офіційного додатка (Android / TV)
+        // 1. Прямий нативний запит для Android/TV
         sendRequest(targetUrl, headers, function (data) {
             var items = parseArrayFromData(data).map(normalizeItem);
             saveToCache(query, page, items);
             onSuccess(items, false);
         }, function (errCode) {
-            // 2. Якщо запущено у Web-версії і спрацював CORS / 403, проксіюємо запит
+            // 2. Якщо запущено у Web і спрацював CORS/403, пробуємо завантаження через CORS проксі
             if (errCode === 'network' || errCode === 'forbidden') {
-                var proxyUrl = CORS_PROXY + encodeURIComponent(targetUrl);
-                sendRequest(proxyUrl, {}, function (data) {
+                var proxy1 = 'https://corsproxy.io/?' + encodeURIComponent(targetUrl);
+                sendRequest(proxy1, {}, function (data) {
                     var items = parseArrayFromData(data).map(normalizeItem);
                     saveToCache(query, page, items);
                     onSuccess(items, false);
-                }, onError);
+                }, function () {
+                    var proxy2 = 'https://api.allorigins.win/raw?url=' + encodeURIComponent(targetUrl);
+                    sendRequest(proxy2, {}, function (data) {
+                        var items = parseArrayFromData(data).map(normalizeItem);
+                        saveToCache(query, page, items);
+                        onSuccess(items, false);
+                    }, onError);
+                });
             } else {
                 if (onError) onError(errCode);
             }
@@ -341,7 +357,7 @@
             wrap.append(header);
             listBox.appendTo(wrap);
             scroll.append(wrap);
-            
+
             scroll.render().addClass('layer--wheight');
             return this.render();
         };
