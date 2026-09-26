@@ -117,7 +117,7 @@
     }
 
     // =========================================================
-    // 4. Мережевий шар (із підтримкою CORS у Web та універсальним парсингом)
+    // 4. Мережевий шар та глибокий парсинг JSON
     // =========================================================
     function parseArrayFromData(data) {
         if (!data) return [];
@@ -130,28 +130,49 @@
         return [];
     }
 
+    // Рекурсивний шукач значення за можливими назвами ключів
+    function deepFind(obj, keys) {
+        if (!obj || typeof obj !== 'object') return null;
+        for (var i = 0; i < keys.length; i++) {
+            var k = keys[i];
+            if (obj[k] !== undefined && obj[k] !== null && obj[k] !== '') {
+                return obj[k];
+            }
+        }
+        for (var p in obj) {
+            if (obj.hasOwnProperty(p) && typeof obj[p] === 'object' && obj[p] !== null) {
+                var res = deepFind(obj[p], keys);
+                if (res !== null) return res;
+            }
+        }
+        return null;
+    }
+
     function normalizeItem(raw) {
         if (!raw || typeof raw !== 'object') return {};
-        
-        var name = raw.title || raw.name || raw.filename || raw.torrent_name || raw.display_name || 'Без назви';
-        var size = raw.size || raw.size_bytes || raw.length || raw.bytes || 0;
-        var seeds = raw.seeders != null ? raw.seeders : (raw.seeds != null ? raw.seeds : (raw.seed != null ? raw.seed : 0));
-        var peers = raw.leechers != null ? raw.leechers : (raw.peers != null ? raw.peers : (raw.leech != null ? raw.leech : 0));
-        
-        var magnet = raw.magnet || raw.magnet_uri || raw.magnet_url || raw.download_url || raw.link || raw.url || '';
-        
-        if (!magnet && raw.info_hash) {
-            magnet = 'magnet:?xt=urn:btih:' + raw.info_hash + '&dn=' + encodeURIComponent(name);
-        } else if (!magnet && raw.hash) {
-            magnet = 'magnet:?xt=urn:btih:' + raw.hash + '&dn=' + encodeURIComponent(name);
+
+        // Якщо елемент є просто строкою з посиланням/назвою
+        if (typeof raw === 'string') {
+            return { name: raw, size: 0, seeds: 0, peers: 0, magnet: '' };
+        }
+
+        var name = deepFind(raw, ['title', 'name', 'filename', 'torrent_name', 'display_name', 'label', 'raw_title']) || 'Без назви';
+        var size = deepFind(raw, ['size', 'size_bytes', 'length', 'bytes', 'file_size']) || 0;
+        var seeds = deepFind(raw, ['seeders', 'seeds', 'seed', 'seed_count']) || 0;
+        var peers = deepFind(raw, ['leechers', 'peers', 'leech', 'peer_count']) || 0;
+        var magnet = deepFind(raw, ['magnet', 'magnet_uri', 'magnet_url', 'download_url', 'link', 'url']) || '';
+
+        var infoHash = deepFind(raw, ['info_hash', 'hash', 'btih']);
+        if (!magnet && infoHash) {
+            magnet = 'magnet:?xt=urn:btih:' + infoHash + '&dn=' + encodeURIComponent(name);
         }
 
         return {
-            name: name,
-            size: size,
+            name: String(name),
+            size: parseFloat(size) || 0,
             seeds: parseInt(seeds, 10) || 0,
             peers: parseInt(peers, 10) || 0,
-            magnet: magnet
+            magnet: String(magnet)
         };
     }
 
@@ -204,13 +225,11 @@
             'Accept': 'application/json'
         };
 
-        // Спочатку нативний прямий запит
         sendRequest(targetUrl, headers, function (data) {
             var items = parseArrayFromData(data).map(normalizeItem);
             saveToCache(query, page, items);
             onSuccess(items, false);
         }, function (errCode) {
-            // Якщо у Web-версії заблоковано через CORS (код network) — пробуємо проксі
             if (errCode === 'network') {
                 var proxyUrl = CORS_PROXY + encodeURIComponent(targetUrl);
                 sendRequest(proxyUrl, {}, function (data) {
