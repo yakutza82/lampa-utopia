@@ -566,12 +566,21 @@
             });
         });
 
-        // Сучасні збірки Lampa використовують клас .full-start-new__buttons,
-        // старіші теми — .full-start__buttons. Пробуємо обидва варіанти.
+        // Перевірений спосіб з офіційного плагіна "Онлайн" — вставити кнопку
+        // одразу ПІСЛЯ елемента .view--torrent (там, де вже стоять
+        // "Торренти", "Онлайн", "Трейлери", "Shorts").
+        var anchor = root.find('.view--torrent');
+
+        if (anchor.length) {
+            anchor.after(button);
+            return;
+        }
+
+        // Резервні варіанти на випадок іншої теми/старішої збірки Lampa
         var target = root.find('.full-start-new__buttons');
         if (!target.length) target = root.find('.full-start__buttons');
         if (target.length) target.append(button);
-        else console.log('[UTOPIA] Не знайдено контейнер кнопок картки фільму');
+        else console.log('[UTOPIA] Не знайдено місце для кнопки на картці фільму');
     }
 
     function initCardButton() {
