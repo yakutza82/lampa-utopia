@@ -5,16 +5,16 @@
     window.UTOPIA_PLUGIN = true;
 
     var API_BASE = 'https://utp.to/api';
-    var CORS_PROXY = 'https://corsproxy.io/?';
+    var CORS_PROXY = 'https://api.allorigins.win/raw?url=';
     var PER_PAGE = 30;
 
     // =========================================================
-    // 0. Стилі
+    // 0. Стилі (із підтримкою сенсорного скролу)
     // =========================================================
     function injectStyles() {
         if (document.getElementById('utopia-styles')) return;
         var css = '' +
-            '.utopia-wrap{padding:1.2em 1.5em;}' +
+            '.utopia-wrap{padding:1.2em 1.5em; touch-action: pan-y;}' +
             '.utopia-header{display:flex;justify-content:space-between;align-items:flex-start;' +
             'flex-wrap:wrap;gap:1em;margin-bottom:1.2em;padding-bottom:1em;' +
             'border-bottom:1px solid rgba(255,255,255,0.1);}' +
@@ -27,7 +27,7 @@
             'box-shadow:0 0 0 2px rgba(255,255,255,0.35) inset;}' +
             '.utopia-item{display:flex;justify-content:space-between;align-items:center;gap:1em;' +
             'padding:1em 1.1em;margin-bottom:0.5em;border-radius:0.7em;background:rgba(255,255,255,0.04);' +
-            'transition:background .15s,transform .15s;}' +
+            'transition:background .15s,transform .15s; user-select: none;}' +
             '.utopia-item.focus{background:rgba(255,255,255,0.16);transform:scale(1.015);' +
             'box-shadow:0 0 0 2px rgba(255,255,255,0.35) inset;}' +
             '.utopia-item__left{flex:1;min-width:0;}' +
@@ -117,7 +117,7 @@
     }
 
     // =========================================================
-    // 4. Мережевий шар та глибокий парсинг JSON
+    // 4. Мережа та парсинг
     // =========================================================
     function parseArrayFromData(data) {
         if (!data) return [];
@@ -130,19 +130,12 @@
         return [];
     }
 
-    // Рекурсивний шукач значення за можливими назвами ключів
-    function deepFind(obj, keys) {
+    function extractProp(obj, propNames) {
         if (!obj || typeof obj !== 'object') return null;
-        for (var i = 0; i < keys.length; i++) {
-            var k = keys[i];
-            if (obj[k] !== undefined && obj[k] !== null && obj[k] !== '') {
-                return obj[k];
-            }
-        }
-        for (var p in obj) {
-            if (obj.hasOwnProperty(p) && typeof obj[p] === 'object' && obj[p] !== null) {
-                var res = deepFind(obj[p], keys);
-                if (res !== null) return res;
+        for (var i = 0; i < propNames.length; i++) {
+            var name = propNames[i];
+            if (obj[name] !== undefined && obj[name] !== null && obj[name] !== '') {
+                return obj[name];
             }
         }
         return null;
@@ -151,20 +144,16 @@
     function normalizeItem(raw) {
         if (!raw || typeof raw !== 'object') return {};
 
-        // Якщо елемент є просто строкою з посиланням/назвою
-        if (typeof raw === 'string') {
-            return { name: raw, size: 0, seeds: 0, peers: 0, magnet: '' };
-        }
+        var name = extractProp(raw, ['name', 'title', 'filename', 'torrent_name', 'display_name']) || 'Без назви';
+        var size = extractProp(raw, ['size', 'size_bytes', 'length', 'bytes']) || 0;
+        var seeds = extractProp(raw, ['seeders', 'seeds', 'seed']) || 0;
+        var peers = extractProp(raw, ['leechers', 'peers', 'leech']) || 0;
+        
+        var magnet = extractProp(raw, ['magnet', 'magnet_uri', 'magnet_url', 'download_url', 'link', 'url', 'file']);
+        var hash = extractProp(raw, ['info_hash', 'hash', 'btih', 'guid']);
 
-        var name = deepFind(raw, ['title', 'name', 'filename', 'torrent_name', 'display_name', 'label', 'raw_title']) || 'Без назви';
-        var size = deepFind(raw, ['size', 'size_bytes', 'length', 'bytes', 'file_size']) || 0;
-        var seeds = deepFind(raw, ['seeders', 'seeds', 'seed', 'seed_count']) || 0;
-        var peers = deepFind(raw, ['leechers', 'peers', 'leech', 'peer_count']) || 0;
-        var magnet = deepFind(raw, ['magnet', 'magnet_uri', 'magnet_url', 'download_url', 'link', 'url']) || '';
-
-        var infoHash = deepFind(raw, ['info_hash', 'hash', 'btih']);
-        if (!magnet && infoHash) {
-            magnet = 'magnet:?xt=urn:btih:' + infoHash + '&dn=' + encodeURIComponent(name);
+        if (!magnet && hash) {
+            magnet = 'magnet:?xt=urn:btih:' + hash + '&dn=' + encodeURIComponent(name);
         }
 
         return {
@@ -172,7 +161,7 @@
             size: parseFloat(size) || 0,
             seeds: parseInt(seeds, 10) || 0,
             peers: parseInt(peers, 10) || 0,
-            magnet: String(magnet)
+            magnet: magnet ? String(magnet) : ''
         };
     }
 
@@ -230,7 +219,7 @@
             saveToCache(query, page, items);
             onSuccess(items, false);
         }, function (errCode) {
-            if (errCode === 'network') {
+            if (errCode === 'network' || errCode === 'forbidden') {
                 var proxyUrl = CORS_PROXY + encodeURIComponent(targetUrl);
                 sendRequest(proxyUrl, {}, function (data) {
                     var items = parseArrayFromData(data).map(normalizeItem);
@@ -438,7 +427,7 @@
                 row.find('.utopia-item__meta').text(item.size ? formatSize(item.size) : 'Розмір невідомий');
                 row.find('.utopia-item__badges').html(badge(item.seeds, '▲') + '&nbsp;&nbsp;' + badge(item.peers, '▼'));
 
-                row.on('hover:enter', function () {
+                row.on('click hover:enter', function () {
                     if (!item.magnet) {
                         Lampa.Noty.show('UTOPIA: немає magnet-посилання для цього торента');
                         return;
@@ -456,7 +445,7 @@
 
         function addMoreButton() {
             moreButton = $('<div class="utopia-more selector">Показати ще ↓</div>');
-            moreButton.on('hover:enter', function () {
+            moreButton.on('click hover:enter', function () {
                 if (!loading) loadPage(page + 1);
             });
             listBox.append(moreButton);
@@ -543,7 +532,7 @@
             '</div>'
         );
 
-        button.on('hover:enter', function () {
+        button.on('click hover:enter', function () {
             if (!hasKey()) {
                 Lampa.Noty.show('UTOPIA: спочатку вкажи API ключ у налаштуваннях плагіна');
                 return;
