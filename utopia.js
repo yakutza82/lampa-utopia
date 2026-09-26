@@ -53,7 +53,15 @@
             '.utopia-state__icon{font-size:2.4em;margin-bottom:0.4em;}' +
             '.utopia-state__title{font-size:1.15em;font-weight:600;margin-bottom:0.4em;}' +
             '.utopia-state__text{opacity:0.65;font-size:0.9em;margin-bottom:1.2em;}' +
-            '.utopia-state .utopia-btn{display:inline-block;}';
+            '.utopia-state .utopia-btn{display:inline-block;}' +
+            '.utopia-debug-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.88);z-index:99999;' +
+            'display:flex;align-items:center;justify-content:center;padding:2em;}' +
+            '.utopia-debug-box{background:#161616;border-radius:1em;padding:1.5em;max-width:92%;' +
+            'max-height:85%;display:flex;flex-direction:column;gap:1em;}' +
+            '.utopia-debug-title{font-weight:700;font-size:1.1em;}' +
+            '.utopia-debug-pre{white-space:pre-wrap;word-break:break-word;font-size:0.78em;' +
+            'opacity:0.9;overflow:auto;max-height:55vh;background:rgba(255,255,255,0.05);' +
+            'padding:1em;border-radius:0.6em;margin:0;}';
         var style = document.createElement('style');
         style.id = 'utopia-styles';
         style.type = 'text/css';
@@ -225,7 +233,8 @@
             size: parseFloat(size) || 0,
             seeds: parseInt(seeds, 10) || 0,
             peers: parseInt(peers, 10) || 0,
-            magnet: magnet || ''
+            magnet: magnet || '',
+            __raw: raw
         };
     }
 
@@ -373,6 +382,7 @@
             '</div>' +
             '<div class="utopia-header__actions">' +
             '<div class="utopia-btn selector utopia-sort-btn">\u2195 Сортування</div>' +
+            '<div class="utopia-btn selector utopia-debug-btn">\ud83d\udc1e Діагностика</div>' +
             '</div>' +
             '</div>'
         );
@@ -395,11 +405,69 @@
 
         injectStyles();
 
+        // Прив'язує елемент до системи скрола: коли елемент отримує фокус
+        // (стрілками на пульті), скрол-контейнер підлаштовується, щоб його
+        // було видно. Без цього фокус рухається, а видима область - ні.
+        function bindScrollFollow(el) {
+            el.on('hover:focus', function (e) {
+                scroll.update($(e.target), true);
+            });
+            return el;
+        }
+
+        // Показує повний "сирий" об'єкт на екрані (для діагностики),
+        // щоб можна було сфотографувати/скопіювати та надіслати розробнику.
+        function showDebugOverlay(title, data) {
+            var overlay = $('<div class="utopia-debug-overlay"></div>');
+            var box = $('<div class="utopia-debug-box"></div>');
+            var titleEl = $('<div class="utopia-debug-title"></div>').text(title);
+            var pre = $('<pre class="utopia-debug-pre"></pre>').text(
+                (function () {
+                    try { return JSON.stringify(data, null, 2); }
+                    catch (e) { return String(data); }
+                })()
+            );
+            var closeBtn = $('<div class="utopia-btn selector utopia-debug-close">Закрити</div>');
+            bindScrollFollow(closeBtn);
+
+            box.append(titleEl).append(pre).append(closeBtn);
+            overlay.append(box);
+            wrap.append(overlay);
+
+            function close() {
+                overlay.remove();
+                Lampa.Controller.toggle('content');
+            }
+
+            closeBtn.on('click hover:enter', close);
+
+            Lampa.Controller.add('utopia_debug', {
+                toggle: function () {
+                    Lampa.Controller.collectionSet(overlay);
+                    Lampa.Controller.collectionFocus(closeBtn[0], overlay);
+                },
+                up: function () { Navigator.move('up'); },
+                down: function () { Navigator.move('down'); },
+                left: function () { Navigator.move('left'); },
+                right: function () { Navigator.move('right'); },
+                back: close
+            });
+            Lampa.Controller.toggle('utopia_debug');
+        }
+
         this.create = function () {
             header.find('.utopia-header__title').text(primaryQuery);
             if (altQuery) header.find('.utopia-header__original').text(altQuery);
 
-            header.find('.utopia-sort-btn').on('click hover:enter', showSortMenu);
+            bindScrollFollow(header.find('.utopia-sort-btn')).on('click hover:enter', showSortMenu);
+            bindScrollFollow(header.find('.utopia-debug-btn')).on('click hover:enter', function () {
+                showDebugOverlay('Дані картки фільму (object)', {
+                    search: object.search,
+                    search_original: object.search_original,
+                    movie: object.movie
+                });
+            });
+
             wrap.append(header);
             listBox.appendTo(wrap);
             scroll.append(wrap);
@@ -425,7 +493,10 @@
                 },
                 up: function () { Navigator.move('up'); },
                 down: function () { Navigator.move('down'); },
-                left: function () { Navigator.move('left'); },
+                left: function () {
+                    if (Navigator.canmove('left')) Navigator.move('left');
+                    else Lampa.Controller.toggle('menu');
+                },
                 right: function () { Navigator.move('right'); },
                 back: function () { Lampa.Activity.backward(); }
             });
@@ -458,7 +529,7 @@
                 '</div>'
             );
             box.find('.utopia-state__text').text(errorMessage(code));
-            box.find('.utopia-retry').on('click hover:enter', function () {
+            bindScrollFollow(box.find('.utopia-retry')).on('click hover:enter', function () {
                 loadPage(page || 1);
             });
             listBox.append(box);
@@ -516,18 +587,19 @@
 
                 row.on('click hover:enter', function () {
                     if (!item.magnet) {
-                        Lampa.Noty.show('UTOPIA: немає magnet-посилання для цього торента');
+                        showDebugOverlay('Немає magnet - дані цього торента', item.__raw || item);
                         return;
                     }
                     Lampa.Torrent.play({ url: item.magnet, name: item.name });
                 });
 
+                bindScrollFollow(row);
                 listBox.append(row);
             });
 
             if (items.length >= page * PER_PAGE) {
                 var moreButton = $('<div class="utopia-more selector">Показати ще \u2193</div>');
-                moreButton.on('click hover:enter', function () {
+                bindScrollFollow(moreButton).on('click hover:enter', function () {
                     if (!loading) loadPage(page + 1);
                 });
                 listBox.append(moreButton);
