@@ -566,8 +566,12 @@
             });
         });
 
-        var target = root.find('.full-start__buttons');
+        // Сучасні збірки Lampa використовують клас .full-start-new__buttons,
+        // старіші теми — .full-start__buttons. Пробуємо обидва варіанти.
+        var target = root.find('.full-start-new__buttons');
+        if (!target.length) target = root.find('.full-start__buttons');
         if (target.length) target.append(button);
+        else console.log('[UTOPIA] Не знайдено контейнер кнопок картки фільму');
     }
 
     function initCardButton() {
