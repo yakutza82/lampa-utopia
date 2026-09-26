@@ -1,17 +1,14 @@
 (function () {
     'use strict';
 
-    // ---- Захист від повторного підключення плагіна ----
     if (window.UTOPIA_PLUGIN) return;
     window.UTOPIA_PLUGIN = true;
 
-    // ---- Базові налаштування ----
     var API_BASE = 'https://utp.to/api';
-    var CORS_PROXY = 'https://corsproxy.io/?'; // CORS-проксі для обходу обмежень браузера
     var PER_PAGE = 30;
 
     // =========================================================
-    // 0. Стилі інтерфейсу
+    // 0. Стилі
     // =========================================================
     function injectStyles() {
         if (document.getElementById('utopia-styles')) return;
@@ -54,14 +51,14 @@
     }
 
     // =========================================================
-    // 1. Робота зі сховищем
+    // 1. Сховище
     // =========================================================
     function getKey() {
-        return Lampa.Storage.get('utopia_api_key', ''); }
-    function useProxy() {
-        return Lampa.Storage.get('utopia_use_proxy', true); }
+        return Lampa.Storage.get('utopia_api_key', '');
+    }
     function hasKey() {
-        return !!getKey(); }
+        return !!getKey();
+    }
 
     // =========================================================
     // 2. Налаштування
@@ -86,15 +83,6 @@
                 if (key) verifyKey(key);
             }
         });
-
-        Lampa.SettingsApi.addParam({
-            component: 'utopia',
-            param: { name: 'utopia_use_proxy', type: 'trigger', default: true },
-            field: {
-                name: 'Використовувати CORS-проксі',
-                description: 'Допомагає уникнути помилки мережі/CORS на Tizen, WebOS та у браузерах.'
-            }
-        });
     }
 
     function verifyKey(key) {
@@ -107,7 +95,7 @@
     }
 
     // =========================================================
-    // 3. Кеш результатів
+    // 3. Кеш
     // =========================================================
     var CACHE = {};
     var CACHE_TTL = 10 * 60 * 1000;
@@ -128,38 +116,8 @@
     }
 
     // =========================================================
-    // 4. Мережевий шар (із підтримкою проксі)
+    // 4. Мережевий шар (Lampa.Reguest)
     // =========================================================
-    function sendHttpRequest(targetUrl, key, onSuccess, onError) {
-        var xhr = new XMLHttpRequest();
-        xhr.open('GET', targetUrl, true);
-        xhr.setRequestHeader('Authorization', 'Bearer ' + key);
-        xhr.setRequestHeader('Accept', 'application/json');
-        xhr.timeout = 15000;
-
-        xhr.onreadystatechange = function () {
-            if (xhr.readyState !== 4) return;
-            if (xhr.status >= 200 && xhr.status < 300) {
-                try {
-                    var data = JSON.parse(xhr.responseText);
-                    onSuccess(data);
-                } catch (e) {
-                    if (onError) onError('parse_error');
-                }
-            } else if (xhr.status === 401) {
-                if (onError) onError('unauthorized');
-            } else if (xhr.status === 403) {
-                if (onError) onError('forbidden');
-            } else {
-                if (onError) onError('http_' + xhr.status);
-            }
-        };
-
-        xhr.onerror = function () { if (onError) onError('network'); };
-        xhr.ontimeout = function () { if (onError) onError('timeout'); };
-        xhr.send();
-    }
-
     function request(query, page, onSuccess, onError) {
         page = page || 1;
         var cached = getFromCache(query, page);
@@ -174,23 +132,39 @@
             return;
         }
 
-        var endpoint = API_BASE + '/torrents/filter?name=' + encodeURIComponent(query) + '&perPage=' + PER_PAGE + '&page=' + page;
-        var finalUrl = useProxy() ? CORS_PROXY + encodeURIComponent(endpoint) : endpoint;
+        var url = API_BASE + '/torrents/filter?name=' + encodeURIComponent(query) + '&perPage=' + PER_PAGE + '&page=' + page;
 
-        sendHttpRequest(finalUrl, key, function(data) {
-            saveToCache(query, page, data);
-            onSuccess(data, false);
-        }, function(errCode) {
-            // Якщо direct-запит впав через CORS/мережу і проксі ще не був увімкнений — робимо fallback спробу через проксі
-            if (errCode === 'network' && !useProxy()) {
-                var proxyUrl = CORS_PROXY + encodeURIComponent(endpoint);
-                sendHttpRequest(proxyUrl, key, function(data) {
-                    saveToCache(query, page, data);
-                    onSuccess(data, false);
-                }, onError);
-            } else {
-                if (onError) onError(errCode);
+        var network = new Lampa.Reguest();
+        network.timeout(15000);
+
+        var headers = {
+            'Authorization': 'Bearer ' + key,
+            'Accept': 'application/json'
+        };
+
+        network.native(url, function (data) {
+            if (typeof data === 'string') {
+                try { data = JSON.parse(data); } catch (e) {}
             }
+            if (data) {
+                saveToCache(query, page, data);
+                onSuccess(data, false);
+            } else {
+                if (onError) onError('parse_error');
+            }
+        }, function (xhr) {
+            var status = xhr ? xhr.status : 0;
+            if (status === 401) {
+                if (onError) onError('unauthorized');
+            } else if (status === 403) {
+                if (onError) onError('forbidden');
+            } else if (status === 0) {
+                if (onError) onError('network');
+            } else {
+                if (onError) onError('http_' + status);
+            }
+        }, false, {
+            headers: headers
         });
     }
 
@@ -254,7 +228,7 @@
     };
 
     // =========================================================
-    // 6. Компонент екрана результатів
+    // 6. Компонент екрана
     // =========================================================
     function TorrentsComponent(object) {
         var scroll = new Lampa.Scroll({ mask: true, over: true, step: 200 });
