@@ -1,14 +1,16 @@
 (function () {
     'use strict';
 
+    // ---- Захист від повторного підключення плагіна ----
     if (window.UTOPIA_PLUGIN) return;
     window.UTOPIA_PLUGIN = true;
 
+    // ---- Базові налаштування ----
     var API_BASE = 'https://utp.to/api';
     var PER_PAGE = 30;
 
     // =========================================================
-    // 0. Стилі
+    // 0. Стилі інтерфейсу (додаються в <head> один раз)
     // =========================================================
     function injectStyles() {
         if (document.getElementById('utopia-styles')) return;
@@ -51,7 +53,7 @@
     }
 
     // =========================================================
-    // 1. Сховище
+    // 1. Робота зі сховищем (API-ключ)
     // =========================================================
     function getKey() {
         return Lampa.Storage.get('utopia_api_key', '');
@@ -61,7 +63,7 @@
     }
 
     // =========================================================
-    // 2. Налаштування
+    // 2. Налаштування: поле ключа + автоматична перевірка
     // =========================================================
     function initSettings() {
         Lampa.SettingsApi.addComponent({
@@ -75,7 +77,7 @@
             param: { name: 'utopia_api_key', type: 'input', values: '', default: '' },
             field: {
                 name: 'API ключ UTOPIA',
-                description: 'Встав ключ доступу до utp.to.'
+                description: 'Встав ключ доступу до utp.to. Після вводу плагін одразу перевірить, чи він робочий.'
             },
             onChange: function (value) {
                 var key = (value || '').trim();
@@ -87,18 +89,18 @@
 
     function verifyKey(key) {
         Lampa.Noty.show('UTOPIA: перевіряю ключ...');
-        request('test', 1, function() {
+        request('test', 1, function () {
             Lampa.Noty.show('✅ UTOPIA: ключ робочий, зв\'язок є');
-        }, function(code) {
+        }, function (code) {
             Lampa.Noty.show('⚠️ UTOPIA: ' + errorMessage(code));
         });
     }
 
     // =========================================================
-    // 3. Кеш
+    // 3. Кеш результатів пошуку
     // =========================================================
     var CACHE = {};
-    var CACHE_TTL = 10 * 60 * 1000;
+    var CACHE_TTL = 10 * 60 * 1000; // 10 хвилин
 
     function cacheKey(query, page) {
         return String(query).toLowerCase() + '::' + page;
@@ -116,7 +118,7 @@
     }
 
     // =========================================================
-    // 4. Мережевий шар (Lampa.Reguest)
+    // 4. Запит до API (через Lampa.Reguest)
     // =========================================================
     function request(query, page, onSuccess, onError) {
         page = page || 1;
@@ -132,7 +134,13 @@
             return;
         }
 
-        var url = API_BASE + '/torrents/filter?name=' + encodeURIComponent(query) + '&perPage=' + PER_PAGE + '&page=' + page;
+        var cleanKey = encodeURIComponent(key);
+        var url = API_BASE + '/torrents/filter' +
+                  '?name=' + encodeURIComponent(query) +
+                  '&perPage=' + PER_PAGE +
+                  '&page=' + page +
+                  '&api_key=' + cleanKey +
+                  '&token=' + cleanKey;
 
         var network = new Lampa.Reguest();
         network.timeout(15000);
@@ -142,10 +150,17 @@
             'Accept': 'application/json'
         };
 
-        network.native(url, function (data) {
-            if (typeof data === 'string') {
-                try { data = JSON.parse(data); } catch (e) {}
+        network.native(url, function (response) {
+            var data = response;
+            if (typeof response === 'string') {
+                try {
+                    data = JSON.parse(response);
+                } catch (e) {
+                    if (onError) onError('parse_error');
+                    return;
+                }
             }
+
             if (data) {
                 saveToCache(query, page, data);
                 onSuccess(data, false);
@@ -154,12 +169,12 @@
             }
         }, function (xhr) {
             var status = xhr ? xhr.status : 0;
-            if (status === 401) {
+            if (status === 0) {
+                if (onError) onError('network');
+            } else if (status === 401) {
                 if (onError) onError('unauthorized');
             } else if (status === 403) {
                 if (onError) onError('forbidden');
-            } else if (status === 0) {
-                if (onError) onError('network');
             } else {
                 if (onError) onError('http_' + status);
             }
@@ -169,7 +184,7 @@
     }
 
     // =========================================================
-    // 5. Допоміжні функції
+    // 5. Допоміжні функції відображення
     // =========================================================
     function formatSize(bytes) {
         if (!bytes) return '';
@@ -228,7 +243,7 @@
     };
 
     // =========================================================
-    // 6. Компонент екрана
+    // 6. Компонент — екран зі списком знайдених торентів
     // =========================================================
     function TorrentsComponent(object) {
         var scroll = new Lampa.Scroll({ mask: true, over: true, step: 200 });
@@ -469,7 +484,7 @@
     Lampa.Component.add('utopia_torrents', TorrentsComponent);
 
     // =========================================================
-    // 7. Кнопка на картці
+    // 7. Кнопка на картці фільму/серіалу
     // =========================================================
     function addButtonToCard(root, object) {
         if (root.find('.utopia-search-btn').length) return;
@@ -516,7 +531,7 @@
     }
 
     // =========================================================
-    // 8. Ініціалізація
+    // 8. Ініціалізація плагіна
     // =========================================================
     function init() {
         injectStyles();
