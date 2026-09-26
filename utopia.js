@@ -27,20 +27,20 @@
             + 'cursor:pointer;font-size:0.9em;white-space:nowrap;transition:background .15s,transform .15s;}'
             + '.utopia-btn.focus{background:rgba(255,255,255,0.22);transform:scale(1.05);'
             + 'box-shadow:0 0 0 2px rgba(255,255,255,0.35) inset;}'
-            + '.torrent-item{display:flex;justify-content:space-between;align-items:center;gap:1em;'
+            + '.utopia-item{display:flex;justify-content:space-between;align-items:center;gap:1em;'
             + 'padding:1em 1.1em;margin-bottom:0.5em;border-radius:0.7em;background:rgba(255,255,255,0.04);'
             + 'transition:background .15s,transform .15s;}'
-            + '.torrent-item.focus{background:rgba(255,255,255,0.16);transform:scale(1.015);'
+            + '.utopia-item.focus{background:rgba(255,255,255,0.16);transform:scale(1.015);'
             + 'box-shadow:0 0 0 2px rgba(255,255,255,0.35) inset;}'
-            + '.torrent-item__left{flex:1;min-width:0;}'
-            + '.torrent-item__title{font-weight:600;margin-bottom:0.35em;overflow:hidden;'
+            + '.utopia-item__left{flex:1;min-width:0;}'
+            + '.utopia-item__title{font-weight:600;margin-bottom:0.35em;overflow:hidden;'
             + 'text-overflow:ellipsis;white-space:nowrap;}'
-            + '.torrent-item__meta{opacity:0.6;font-size:0.85em;}'
-            + '.torrent-item__badges{display:flex;gap:0.9em;white-space:nowrap;flex-shrink:0;'
+            + '.utopia-item__meta{opacity:0.6;font-size:0.85em;}'
+            + '.utopia-item__badges{display:flex;gap:0.9em;white-space:nowrap;flex-shrink:0;'
             + 'font-size:0.95em;font-weight:700;}'
-            + '.torrent-more{text-align:center;padding:1em;margin:0.6em 0 1em;border-radius:0.7em;'
+            + '.utopia-more{text-align:center;padding:1em;margin:0.6em 0 1em;border-radius:0.7em;'
             + 'background:rgba(255,255,255,0.05);cursor:pointer;font-weight:600;transition:background .15s;}'
-            + '.torrent-more.focus{background:rgba(255,255,255,0.18);}'
+            + '.utopia-more.focus{background:rgba(255,255,255,0.18);}'
             + '.utopia-state{text-align:center;padding:3.5em 1.5em;opacity:0.85;}'
             + '.utopia-state__icon{font-size:2.4em;margin-bottom:0.4em;}'
             + '.utopia-state__title{font-size:1.15em;font-weight:600;margin-bottom:0.4em;}'
@@ -421,18 +421,18 @@
                 var magnet = item.magnet || item.magnet_uri || '';
 
                 var row = $(
-                    '<div class="torrent-item selector">'
-                        + '<div class="torrent-item__left">'
-                            + '<div class="torrent-item__title"></div>'
-                            + '<div class="torrent-item__meta"></div>'
+                    '<div class="utopia-item selector">'
+                        + '<div class="utopia-item__left">'
+                            + '<div class="utopia-item__title"></div>'
+                            + '<div class="utopia-item__meta"></div>'
                         + '</div>'
-                        + '<div class="torrent-item__badges"></div>'
+                        + '<div class="utopia-item__badges"></div>'
                     + '</div>'
                 );
 
-                row.find('.torrent-item__title').text(name);
-                row.find('.torrent-item__meta').text(size || 'Розмір невідомий');
-                row.find('.torrent-item__badges').html(badge(seeds, '▲') + '&nbsp;&nbsp;' + badge(peers, '▼'));
+                row.find('.utopia-item__title').text(name);
+                row.find('.utopia-item__meta').text(size || 'Розмір невідомий');
+                row.find('.utopia-item__badges').html(badge(seeds, '▲') + '&nbsp;&nbsp;' + badge(peers, '▼'));
 
                 row.on('hover:enter', function () {
                     if (!magnet) {
@@ -453,7 +453,7 @@
         }
 
         function addMoreButton() {
-            moreButton = $('<div class="torrent-more selector">Показати ще ↓</div>');
+            moreButton = $('<div class="utopia-more selector">Показати ще ↓</div>');
             moreButton.on('hover:enter', function () {
                 if (!loading) loadPage(page + 1);
             });
