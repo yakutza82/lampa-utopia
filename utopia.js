@@ -4,71 +4,95 @@
     if (window.UTOPIA_PLUGIN) return;
     window.UTOPIA_PLUGIN = true;
 
-    var API = 'https://utp.to/api/torrents/filter';
+    var API = 'https://utp.to/api/torrents/filter?name=Avatar&perPage=5';
 
     function getKey() {
         return Lampa.Storage.get('utopia_api_key', '');
     }
 
-    function testApi() {
+    function test() {
         var key = getKey();
 
         if (!key) {
-            Lampa.Noty.show('UTOPIA: API ключ не знайдений');
+            Lampa.Noty.show('UTOPIA: ключ не знайдений');
             return;
         }
 
-        var network = new Lampa.Reguest();
+        var xhr = new XMLHttpRequest();
 
-        network.silent(
-            API + '?name=Avatar&perPage=5',
+        xhr.open('GET', API, true);
 
-            function (data) {
-                console.log('[UTOPIA] RESPONSE:', data);
+        xhr.setRequestHeader(
+            'Authorization',
+            'Bearer ' + key
+        );
 
-                var count = 0;
+        xhr.setRequestHeader(
+            'Accept',
+            'application/json'
+        );
+
+        xhr.onreadystatechange = function () {
+            if (xhr.readyState !== 4) return;
+
+            console.log('[UTOPIA] HTTP:', xhr.status);
+            console.log('[UTOPIA] RESPONSE:', xhr.responseText);
+
+            if (xhr.status >= 200 && xhr.status < 300) {
 
                 try {
-                    if (typeof data === 'string') {
-                        data = JSON.parse(data);
-                    }
+                    var data = JSON.parse(xhr.responseText);
+                    var count = data.data ? data.data.length : 0;
 
-                    if (data && data.data) {
-                        count = data.data.length;
-                    }
+                    Lampa.Noty.show(
+                        'UTOPIA: API OK, знайдено ' + count
+                    );
+
                 } catch (e) {
-                    console.log('[UTOPIA] JSON error:', e);
+                    Lampa.Noty.show(
+                        'UTOPIA: відповідь отримана, але JSON помилка'
+                    );
                 }
 
-                Lampa.Noty.show(
-                    'UTOPIA: знайдено релізів — ' + count
-                );
-            },
-
-            function (error) {
-                console.log('[UTOPIA] ERROR:', error);
+            } else if (xhr.status === 401) {
 
                 Lampa.Noty.show(
-                    'UTOPIA: помилка API'
+                    'UTOPIA: HTTP 401 — неправильний API Key'
                 );
-            },
 
-            false,
+            } else if (xhr.status === 403) {
 
-            {
-                dataType: 'json',
-                headers: {
-                    'Authorization': 'Bearer ' + key,
-                    'Accept': 'application/json'
-                }
+                Lampa.Noty.show(
+                    'UTOPIA: HTTP 403 — доступ заборонено'
+                );
+
+            } else {
+
+                Lampa.Noty.show(
+                    'UTOPIA: HTTP ' + xhr.status
+                );
             }
-        );
+        };
+
+        xhr.onerror = function () {
+            console.log('[UTOPIA] XHR ERROR');
+
+            Lampa.Noty.show(
+                'UTOPIA: XHR network/CORS error'
+            );
+        };
+
+        xhr.ontimeout = function () {
+            Lampa.Noty.show(
+                'UTOPIA: timeout'
+            );
+        };
+
+        xhr.timeout = 15000;
+
+        xhr.send();
     }
 
-    setTimeout(function () {
-        testApi();
-    }, 1500);
-
-    console.log('[UTOPIA] API test loaded');
+    setTimeout(test, 1500);
 
 })();
