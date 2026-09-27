@@ -348,6 +348,7 @@
             magnet: magnet || '',
             isDirect: isDirect,
             releaseYear: releaseYear,
+            tmdbId: attrs.tmdb_id || null,
             __raw: raw
         };
     }
@@ -760,6 +761,14 @@ function getFullMovieTitle(item) {
                 '</div>'
             );
 
+if (item.tmdbId) {
+    Lampa.Api.sources.tmdb.get('tv/' + item.tmdbId, {}, function (data) {
+        showDebugOverlay('TMDB для торента', data);
+    }, function () {
+        showDebugOverlay('TMDB', 'Помилка запиту для ID ' + item.tmdbId);
+    });
+}
+
             row.find('.utopia-item__movie').text(getFullMovieTitle(item));
             row.find('.utopia-item__title').text(item.name);
             row.find('.utopia-item__meta').text(item.size ? formatSize(item.size) : 'Розмір невідомий');
@@ -963,7 +972,7 @@ function getFullMovieTitle(item) {
         if (!title) return;
 
         var button = $(
-            '<div class="full-start__button selector utopia-search-btn" data-subtitle="GPT V5">' +
+            '<div class="full-start__button selector utopia-search-btn" data-subtitle="GPT V6">' +
             '<span>\ud83e\uddf2 UTOPIA - торенти</span>' +
             '</div>'
         );
