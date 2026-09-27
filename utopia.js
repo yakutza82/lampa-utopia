@@ -80,31 +80,27 @@
 
     // Асинхронний SHA-1 для уникнення зависання UI
     function sha1HexAsync(bytes) {
-        return new Promise(function (resolve) {
-            if (window.crypto && window.crypto.subtle && window.crypto.subtle.digest) {
-                window.crypto.subtle.digest('SHA-1', bytes).then(function (hash) {
-                    var hexCodes = [];
-                    var view = new DataView(hash);
-                    for (var i = 0; i < view.byteLength; i += 4) {
-                        var value = view.getUint32(i);
-                        var stringValue = value.toString(16);
-                        var padding = '00000000';
-                        var paddedValue = (padding + stringValue).slice(-8);
-                        hexCodes.push(paddedValue);
-                    }
-                    resolve(hexCodes.join(''));
-                }).catch(function () {
-                    resolve(sha1HexSync(bytes));
-                });
-            } else {
-                setTimeout(function () {
-                    resolve(sha1HexSync(bytes));
-                }, 50);
+    if (window.crypto && window.crypto.subtle && window.crypto.subtle.digest) {
+        return window.crypto.subtle.digest('SHA-1', bytes).then(function (hash) {
+            var hexCodes = [];
+            var view = new DataView(hash);
+            for (var i = 0; i < view.byteLength; i += 4) {
+                var value = view.getUint32(i);
+                var stringValue = value.toString(16);
+                var padding = '00000000';
+                var paddedValue = (padding + stringValue).slice(-8);
+                hexCodes.push(paddedValue);
             }
+            return hexCodes.join('');
+        }).catch(function () {
+            return sha1HexSync(bytes);
         });
     }
+    return sha1HexSync(bytes);
+}
 
     function sha1HexSync(bytes) {
+    return new Promise(function (resolve) {
         var i;
         var l = bytes.length;
         var wd = new Uint32Array(80);
@@ -118,36 +114,53 @@
         var view = new DataView(newBytes.buffer);
         view.setUint32(newLen - 4, l * 8, false);
 
-        for (var chunk = 0; chunk < newLen; chunk += 64) {
-            for (i = 0; i < 16; i++) wd[i] = view.getUint32(chunk + i * 4, false);
-            for (i = 16; i < 80; i++) {
-                var w = wd[i - 3] ^ wd[i - 8] ^ wd[i - 14] ^ wd[i - 16];
-                wd[i] = (w << 1) | (w >>> 31);
+        var chunk = 0;
+        var CHUNK_BATCH = 2000; // кількість чанків за один квант часу
+
+        function processBatch() {
+            var limit = Math.min(chunk + CHUNK_BATCH * 64, newLen);
+
+            while (chunk < limit) {
+                for (i = 0; i < 16; i++) wd[i] = view.getUint32(chunk + i * 4, false);
+                for (i = 16; i < 80; i++) {
+                    var w = wd[i - 3] ^ wd[i - 8] ^ wd[i - 14] ^ wd[i - 16];
+                    wd[i] = (w << 1) | (w >>> 31);
+                }
+
+                var a = h0, b = h1, c = h2, d = h3, e = h4;
+
+                for (i = 0; i < 80; i++) {
+                    var f, k;
+                    if (i < 20) { f = (b & c) | ((~b) & d); k = 0x5A827999; }
+                    else if (i < 40) { f = b ^ c ^ d; k = 0x6ED9EBA1; }
+                    else if (i < 60) { f = (b & c) | (b & d) | (c & d); k = 0x8F1BBCDC; }
+                    else { f = b ^ c ^ d; k = 0xCA62C1D6; }
+
+                    var temp = (((a << 5) | (a >>> 27)) + f + e + k + wd[i]) >>> 0;
+                    e = d; d = c; c = (b << 30) | (b >>> 2); b = a; a = temp;
+                }
+
+                h0 = (h0 + a) >>> 0;
+                h1 = (h1 + b) >>> 0;
+                h2 = (h2 + c) >>> 0;
+                h3 = (h3 + d) >>> 0;
+                h4 = (h4 + e) >>> 0;
+
+                chunk += 64;
             }
 
-            var a = h0, b = h1, c = h2, d = h3, e = h4;
-
-            for (i = 0; i < 80; i++) {
-                var f, k;
-                if (i < 20) { f = (b & c) | ((~b) & d); k = 0x5A827999; }
-                else if (i < 40) { f = b ^ c ^ d; k = 0x6ED9EBA1; }
-                else if (i < 60) { f = (b & c) | (b & d) | (c & d); k = 0x8F1BBCDC; }
-                else { f = b ^ c ^ d; k = 0xCA62C1D6; }
-
-                var temp = (((a << 5) | (a >>> 27)) + f + e + k + wd[i]) >>> 0;
-                e = d; d = c; c = (b << 30) | (b >>> 2); b = a; a = temp;
+            if (chunk < newLen) {
+                // Віддаємо потік інтерфейсу, щоб спінер крутився і Lampa не висла
+                setTimeout(processBatch, 0);
+            } else {
+                function toHex(n) { return ('00000000' + (n >>> 0).toString(16)).slice(-8); }
+                resolve(toHex(h0) + toHex(h1) + toHex(h2) + toHex(h3) + toHex(h4));
             }
-
-            h0 = (h0 + a) >>> 0;
-            h1 = (h1 + b) >>> 0;
-            h2 = (h2 + c) >>> 0;
-            h3 = (h3 + d) >>> 0;
-            h4 = (h4 + e) >>> 0;
         }
 
-        function toHex(n) { return ('00000000' + (n >>> 0).toString(16)).slice(-8); }
-        return toHex(h0) + toHex(h1) + toHex(h2) + toHex(h3) + toHex(h4);
-    }
+        processBatch();
+    });
+}
 
     function fetchTorrentFileBytes(url, headers, onSuccess, onError) {
         var network = new Lampa.Reguest();
@@ -976,7 +989,7 @@
         if (!title) return;
 
         var button = $(
-            '<div class="full-start__button selector utopia-search-btn" data-subtitle="Gemini V7">' +
+            '<div class="full-start__button selector utopia-search-btn" data-subtitle="yakutza">' +
             '<span>\ud83e\uddf2 UTOPIA - торенти</span>' +
             '</div>'
         );
