@@ -5,7 +5,7 @@
     window.UTOPIA_PLUGIN = true;
 
     var API_BASE = 'https://utp.to/api';
-    var PER_PAGE = 99;
+    var PER_PAGE = 1;
 
     var TRACKERS = [
         'udp://tracker.opentrackr.org:1337/announce',
