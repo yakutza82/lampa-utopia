@@ -5,7 +5,7 @@
     window.UTOPIA_PLUGIN = true;
 
     var API_BASE = 'https://utp.to/api';
-    var PER_PAGE = 99;
+    var PER_PAGE = 30;
 
     // =========================================================
     // 0. Стилі
@@ -157,15 +157,17 @@
     }
 
     function normalizeItem(raw) {
-        if (!raw || typeof raw !== 'object') return {};
+    if (!raw || typeof raw !== 'object') return {};
 
-        // Реальна структура відповіді UTOPIA: { type: "torrent", id: "...", attributes: {...} }
-        var attrs = (raw.attributes && typeof raw.attributes === 'object') ? raw.attributes : raw;
+    var attrs = (raw.attributes && typeof raw.attributes === 'object') ? raw.attributes : raw;
 
-        var name = attrs.name || deepFind(raw, ['name', 'title', 'filename']) || 'Без назви';
-        var size = attrs.size != null ? attrs.size : (deepFind(raw, ['size']) || 0);
-        var seeds = attrs.seeders != null ? attrs.seeders : (deepFind(raw, ['seeders', 'seeds']) || 0);
-        var peers = attrs.leechers != null ? attrs.leechers : (deepFind(raw, ['leechers', 'peers']) || 0);
+    var name = attrs.name || deepFind(raw, ['name', 'title', 'filename']) || 'Без назви';
+    var size = attrs.size != null ? attrs.size : (deepFind(raw, ['size']) || 0);
+    var seeds = attrs.seeders != null ? attrs.seeders : (deepFind(raw, ['seeders', 'seeds']) || 0);
+    var peers = attrs.leechers != null ? attrs.leechers : (deepFind(raw, ['leechers', 'peers']) || 0);
+
+    // Пріоритет: magnet_link -> download_link
+    var downloadUrl = attrs.magnet_link || attrs.download_link || '';
 
         var magnet = '';
         var isDirect = false;
@@ -228,45 +230,43 @@
             return;
         }
 
-        var cleanKey = encodeURIComponent(key);
-        var targetUrl = API_BASE + '/torrents/filter' +
-                        '?name=' + encodeURIComponent(query) +
-                        '&perPage=' + PER_PAGE +
-                        '&page=' + page +
-                        '&api_key=' + cleanKey +
-                        '&token=' + cleanKey;
+    var cleanKey = encodeURIComponent(key);
+    // Використовуємо api_token як у вашому bash-скрипті
+    var targetUrl = API_BASE + '/torrents/filter' +
+                    '?name=' + encodeURIComponent(query) +
+                    '&categories[]=1' +
+                    '&perPage=' + PER_PAGE +
+                    '&page=' + page +
+                    '&api_token=' + cleanKey;
 
-        var headers = {
-            'Authorization': 'Bearer ' + key,
-            'Accept': 'application/json'
-        };
+    var headers = {
+        'Accept': 'application/json'
+    };
 
-        // 1. Прямий нативний запит для Android/TV
-        sendRequest(targetUrl, headers, function (data) {
-            var items = parseArrayFromData(data).map(normalizeItem);
-            saveToCache(query, page, items);
-            onSuccess(items, false);
-        }, function (errCode) {
-            // 2. Якщо запущено у Web і спрацював CORS/403, пробуємо завантаження через CORS проксі
-            if (errCode === 'network' || errCode === 'forbidden') {
-                var proxy1 = 'https://corsproxy.io/?' + encodeURIComponent(targetUrl);
-                sendRequest(proxy1, {}, function (data) {
+    sendRequest(targetUrl, headers, function (data) {
+        var items = parseArrayFromData(data).map(normalizeItem);
+        saveToCache(query, page, items);
+        onSuccess(items, false);
+    }, function (errCode) {
+        if (errCode === 'network' || errCode === 'forbidden') {
+            var proxy1 = 'https://corsproxy.io/?' + encodeURIComponent(targetUrl);
+            sendRequest(proxy1, {}, function (data) {
+                var items = parseArrayFromData(data).map(normalizeItem);
+                saveToCache(query, page, items);
+                onSuccess(items, false);
+            }, function () {
+                var proxy2 = 'https://api.allorigins.win/raw?url=' + encodeURIComponent(targetUrl);
+                sendRequest(proxy2, {}, function (data) {
                     var items = parseArrayFromData(data).map(normalizeItem);
                     saveToCache(query, page, items);
                     onSuccess(items, false);
-                }, function () {
-                    var proxy2 = 'https://api.allorigins.win/raw?url=' + encodeURIComponent(targetUrl);
-                    sendRequest(proxy2, {}, function (data) {
-                        var items = parseArrayFromData(data).map(normalizeItem);
-                        saveToCache(query, page, items);
-                        onSuccess(items, false);
-                    }, onError);
-                });
-            } else {
-                if (onError) onError(errCode);
-            }
-        });
-    }
+                }, onError);
+            });
+        } else {
+            if (onError) onError(errCode);
+        }
+    });
+}
 
     // =========================================================
     // 5. Допоміжні функції
