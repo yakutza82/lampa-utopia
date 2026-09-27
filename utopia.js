@@ -5,7 +5,7 @@
     window.UTOPIA_PLUGIN = true;
 
     var API_BASE = 'https://utp.to/api';
-    var PER_PAGE = 30;
+    var PER_PAGE = 99;
 
     // =========================================================
     // 0. Стилі
@@ -718,7 +718,7 @@
         if (!title) return;
 
         var button = $(
-            '<div class="full-start__button selector utopia-search-btn">' +
+            '<div class="full-start__button selector utopia-search-btn" data-subtitle="Gemini">' +
             '<span>\ud83e\uddf2 UTOPIA - торенти</span>' +
             '</div>'
         );
