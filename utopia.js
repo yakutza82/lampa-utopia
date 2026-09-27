@@ -768,9 +768,9 @@ if (item.tmdbId && !item.tmdbName) {
 
     Lampa.Api.sources.tmdb.get(tmdbType + item.tmdbId, {}, function (data) {
         if (data && data.name) {
-            item.tmdbName = data.name;
-            row.find('.utopia-item__movie').text(item.tmdbName);
-        }
+    item.tmdbName = data.name + (item.releaseYear ? ' (' + item.releaseYear + ')' : '');
+    row.find('.utopia-item__movie').text(item.tmdbName);
+}
     });
 }
 
@@ -977,7 +977,7 @@ if (item.tmdbId && !item.tmdbName) {
         if (!title) return;
 
         var button = $(
-            '<div class="full-start__button selector utopia-search-btn" data-subtitle="GPT V8">' +
+            '<div class="full-start__button selector utopia-search-btn" data-subtitle="Claude V5">' +
             '<span>\ud83e\uddf2 UTOPIA - торенти</span>' +
             '</div>'
         );
