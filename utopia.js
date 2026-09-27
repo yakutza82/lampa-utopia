@@ -7,6 +7,154 @@
     var API_BASE = 'https://utp.to/api';
     var PER_PAGE = 30;
 
+    var TRACKERS = [
+        'udp://tracker.opentrackr.org:1337/announce',
+        'udp://open.demonii.com:1337/announce',
+        'udp://tracker.openbittorrent.com:80',
+        'udp://open.stealth.si:80/announce',
+        'udp://exodus.desync.com:6969',
+        'udp://tracker.torrent.eu.org:451/announce'
+    ];
+
+    // =========================================================
+    // -1. Побудова робочого magnet з .torrent-файлу
+    //
+    // UTOPIA не завжди дає готовий magnet - часто натомість дає
+    // посилання на завантаження самого .torrent-файлу. Щоб все одно
+    // відкрити його одним кліком (без ручного скачування), тут:
+    // 1) вручну розбираємо bencode-структуру .torrent файлу,
+    //    щоб знайти РІВНО ті байти, де лежить секція "info";
+    // 2) рахуємо SHA-1 від цих байтів - це і є справжній BTIH-хеш;
+    // 3) збираємо з нього робочий magnet-рядок.
+    // SHA-1 порахований власноруч (не через Web Crypto), бо
+    // crypto.subtle іноді недоступний у не-https/file:// оточенні.
+    // =========================================================
+    function findInfoDictRange(buffer) {
+        var buf = new Uint8Array(buffer);
+        var pos = 0;
+
+        // Читає bencode-рядок (N:текст) починаючи з поточної позиції,
+        // повертає його текст і зсуває pos за кінець рядка.
+        function readString() {
+            var start = pos;
+            while (buf[pos] !== 0x3a) pos++; // ':'
+            var lenStr = '';
+            for (var i = start; i < pos; i++) lenStr += String.fromCharCode(buf[i]);
+            var len = parseInt(lenStr, 10);
+            pos++; // skip ':'
+            var text = '';
+            for (var j = 0; j < len; j++) text += String.fromCharCode(buf[pos + j]);
+            pos += len;
+            return text;
+        }
+
+        function skipValue() {
+            var c = buf[pos];
+            if (c === 0x69) { // 'i' - integer
+                pos++;
+                while (buf[pos] !== 0x65) pos++;
+                pos++;
+            } else if (c === 0x6c) { // 'l' - list
+                pos++;
+                while (buf[pos] !== 0x65) skipValue();
+                pos++;
+            } else if (c === 0x64) { // 'd' - dict
+                pos++;
+                while (buf[pos] !== 0x65) {
+                    readString(); // ключ
+                    skipValue();  // значення
+                }
+                pos++;
+            } else if (c >= 0x30 && c <= 0x39) { // string
+                readString();
+            } else {
+                throw new Error('bad bencode byte at ' + pos);
+            }
+        }
+
+        if (buf[pos] !== 0x64) throw new Error('.torrent файл має починатись зі словника');
+        pos++; // skip top-level 'd'
+
+        var infoRange = null;
+        while (buf[pos] !== 0x65) {
+            var key = readString();
+            if (key === 'info') {
+                var infoStart = pos;
+                skipValue();
+                infoRange = { start: infoStart, end: pos };
+            } else {
+                skipValue();
+            }
+        }
+
+        return infoRange;
+    }
+
+    function sha1Hex(bytes) {
+        function rotl(n, s) { return (n << s) | (n >>> (32 - s)); }
+
+        var ml = bytes.length * 8;
+        var withOne = new Uint8Array(((bytes.length + 9 + 63) >> 6) << 6);
+        withOne.set(bytes);
+        withOne[bytes.length] = 0x80;
+        var view = new DataView(withOne.buffer);
+        view.setUint32(withOne.length - 4, ml >>> 0, false);
+
+        var h0 = 0x67452301, h1 = 0xEFCDAB89, h2 = 0x98BADCFE, h3 = 0x10325476, h4 = 0xC3D2E1F0;
+
+        for (var chunkStart = 0; chunkStart < withOne.length; chunkStart += 64) {
+            var w = new Array(80);
+            for (var i = 0; i < 16; i++) w[i] = view.getUint32(chunkStart + i * 4, false);
+            for (i = 16; i < 80; i++) w[i] = rotl(w[i - 3] ^ w[i - 8] ^ w[i - 14] ^ w[i - 16], 1);
+
+            var a = h0, b = h1, c = h2, d = h3, e = h4;
+
+            for (i = 0; i < 80; i++) {
+                var f, k;
+                if (i < 20) { f = (b & c) | ((~b) & d); k = 0x5A827999; }
+                else if (i < 40) { f = b ^ c ^ d; k = 0x6ED9EBA1; }
+                else if (i < 60) { f = (b & c) | (b & d) | (c & d); k = 0x8F1BBCDC; }
+                else { f = b ^ c ^ d; k = 0xCA62C1D6; }
+
+                var temp = (rotl(a, 5) + f + e + k + w[i]) >>> 0;
+                e = d; d = c; c = rotl(b, 30); b = a; a = temp;
+            }
+
+            h0 = (h0 + a) >>> 0;
+            h1 = (h1 + b) >>> 0;
+            h2 = (h2 + c) >>> 0;
+            h3 = (h3 + d) >>> 0;
+            h4 = (h4 + e) >>> 0;
+        }
+
+        function toHex(n) { return ('00000000' + (n >>> 0).toString(16)).slice(-8); }
+        return toHex(h0) + toHex(h1) + toHex(h2) + toHex(h3) + toHex(h4);
+    }
+
+    function fetchTorrentFileBytes(url, headers, onSuccess, onError) {
+        var xhr = new XMLHttpRequest();
+        xhr.open('GET', url, true);
+        xhr.responseType = 'arraybuffer';
+        for (var h in headers) {
+            if (headers.hasOwnProperty(h)) {
+                try { xhr.setRequestHeader(h, headers[h]); } catch (e) {}
+            }
+        }
+        xhr.timeout = 20000;
+        xhr.onload = function () {
+            if (xhr.status >= 200 && xhr.status < 300 && xhr.response) onSuccess(xhr.response);
+            else onError(xhr.status === 0 ? 'network' : 'http_' + xhr.status);
+        };
+        xhr.onerror = function () { onError('network'); };
+        xhr.ontimeout = function () { onError('timeout'); };
+        xhr.send();
+    }
+
+    function buildMagnetFromHash(hashHex, name) {
+        var trParams = TRACKERS.map(function (t) { return '&tr=' + encodeURIComponent(t); }).join('');
+        return 'magnet:?xt=urn:btih:' + hashHex + '&dn=' + encodeURIComponent(name || 'torrent') + trParams;
+    }
+
     // =========================================================
     // 0. Стилі
     // =========================================================
@@ -31,9 +179,11 @@
             '.utopia-item.focus{background:rgba(255,255,255,0.16);transform:scale(1.015);' +
             'box-shadow:0 0 0 2px rgba(255,255,255,0.35) inset;}' +
             '.utopia-item__left{flex:1;min-width:0;}' +
-            '.utopia-item__title{font-weight:600;margin-bottom:0.35em;overflow:hidden;' +
+            '.utopia-item__movie{font-weight:700;font-size:1em;margin-bottom:0.2em;overflow:hidden;' +
             'text-overflow:ellipsis;white-space:nowrap;}' +
-            '.utopia-item__meta{opacity:0.6;font-size:0.85em;}' +
+            '.utopia-item__title{font-weight:400;opacity:0.6;font-size:0.85em;margin-bottom:0.3em;' +
+            'overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}' +
+            '.utopia-item__meta{opacity:0.5;font-size:0.78em;}' +
             '.utopia-item__badges{display:flex;gap:0.9em;white-space:nowrap;flex-shrink:0;' +
             'font-size:0.95em;font-weight:700;}' +
             '.utopia-more{text-align:center;padding:1.2em;margin:1em 0 2em;border-radius:0.7em;' +
@@ -345,6 +495,7 @@
         var items = [];
         var sortMode = 'default';
         var loading = false;
+        var moreButtonEl = null; // одна й та сама DOM-нода - переносимо, а не пересоздаємо
 
         // Основний запит - те, що прийшло з картки фільму (зазвичай
         // локалізована, наприклад українська назва). Якщо є інша (оригінальна)
@@ -556,44 +707,92 @@
             });
         }
 
+        // Показує фільм (українською/як шукали) великим текстом, а під ним -
+        // реальну назву релізу торента (вона завжди англійською/латиницею -
+        // так це називають на трекерах, тут нема звідки взяти переклад).
         function buildRow(item) {
             var row = $(
                 '<div class="utopia-item selector">' +
                 '<div class="utopia-item__left">' +
+                '<div class="utopia-item__movie"></div>' +
                 '<div class="utopia-item__title"></div>' +
                 '<div class="utopia-item__meta"></div>' +
                 '</div>' +
                 '<div class="utopia-item__badges"></div>' +
                 '</div>'
             );
+            row.find('.utopia-item__movie').text(primaryQuery);
             row.find('.utopia-item__title').text(item.name);
             row.find('.utopia-item__meta').text(item.size ? formatSize(item.size) : 'Розмір невідомий');
             row.find('.utopia-item__badges').html(badge(item.seeds, '\u25b2') + '&nbsp;&nbsp;' + badge(item.peers, '\u25bc'));
 
-            row.on('click hover:enter', function () {
-                if (!item.magnet) {
-                    showDebugOverlay('Немає magnet/download - дані цього торента', item.__raw || item);
-                    return;
-                }
-                Lampa.Torrent.play({ url: item.magnet, name: item.name });
-            });
+            row.on('click hover:enter', function () { playTorrent(item); });
 
             bindScrollFollow(row);
             return row;
         }
 
-        function removeMoreButtonEl() {
-            listBox.find('.utopia-more').remove();
+        function playTorrent(item) {
+            if (typeof item.magnet === 'string' && item.magnet.indexOf('magnet:') === 0) {
+                Lampa.Torrent.play({ url: item.magnet, name: item.name });
+                return;
+            }
+
+            if (!item.isDirect || !item.magnet) {
+                showDebugOverlay('Немає magnet/download - дані цього торента', item.__raw || item);
+                return;
+            }
+
+            // UTOPIA не дала готовий magnet - завантажуємо сам .torrent-файл
+            // і рахуємо його справжній інфо-хеш, щоб зібрати робочий magnet.
+            Lampa.Loading.start('utopia_prepare', 'UTOPIA: готуємо торент...');
+
+            var headers = { 'Authorization': 'Bearer ' + getKey() };
+
+            fetchTorrentFileBytes(item.magnet, headers, function (buffer) {
+                Lampa.Loading.stop('utopia_prepare');
+                try {
+                    var infoRange = findInfoDictRange(buffer);
+                    if (!infoRange) throw new Error('не знайдено секцію info у .torrent файлі');
+
+                    var infoBytes = new Uint8Array(buffer, infoRange.start, infoRange.end - infoRange.start);
+                    var hashHex = sha1Hex(infoBytes);
+                    var realMagnet = buildMagnetFromHash(hashHex, item.name);
+
+                    Lampa.Torrent.play({ url: realMagnet, name: item.name });
+                } catch (e) {
+                    showDebugOverlay('Помилка розбору .torrent файлу', {
+                        error: String(e),
+                        byteLength: buffer ? buffer.byteLength : 0,
+                        download_link: item.magnet
+                    });
+                }
+            }, function (code) {
+                Lampa.Loading.stop('utopia_prepare');
+                Lampa.Noty.show('UTOPIA: не вдалося завантажити .torrent файл - ' + errorMessage(code));
+            });
         }
 
-        function addMoreButtonIfNeeded() {
-            removeMoreButtonEl();
-            if (items.length >= page * PER_PAGE) {
-                var moreButton = $('<div class="utopia-more selector">Показати ще \u2193</div>');
-                bindScrollFollow(moreButton).on('click hover:enter', function () {
+        function ensureMoreButton() {
+            if (!moreButtonEl) {
+                moreButtonEl = $('<div class="utopia-more selector">Показати ще \u2193</div>');
+                bindScrollFollow(moreButtonEl).on('click hover:enter', function () {
                     if (!loading) loadPage(page + 1);
                 });
-                listBox.append(moreButton);
+            }
+            return moreButtonEl;
+        }
+
+        // Додає кнопку "Показати ще" в кінець списку, якщо є ще сторінки.
+        // Якщо кнопка вже існувала - переносимо ту саму DOM-ноду (jQuery
+        // .append на існуючому елементі перепідключає його, а не створює
+        // копію), тому фокус на ній не губиться при довантаженні.
+        function addMoreButtonIfNeeded() {
+            if (items.length >= page * PER_PAGE) {
+                listBox.append(ensureMoreButton());
+            } else if (moreButtonEl) {
+                moreButtonEl.remove();
+                moreButtonEl = null;
             }
         }
 
@@ -607,8 +806,10 @@
 
         // Повна перебудова списку - потрібна тільки при першому завантаженні
         // і при зміні сортування (бо тоді порядок ВСІХ елементів змінюється).
+        // Тут скидання фокуса/скрола очікуване і нормальне.
         function renderList() {
             listBox.empty();
+            moreButtonEl = null; // стару кнопку щойно знищено разом з рештою - створимо нову за потреби
             var sorted = sortItems(items, sortMode);
             sorted.forEach(function (item) {
                 listBox.append(buildRow(item));
@@ -618,12 +819,14 @@
             Lampa.Controller.enable('content');
         }
 
-        // Дописує лише НОВІ рядки в кінець списку, не чіпаючи вже показані -
-        // так фокус і позиція скрола лишаються на місці при "Показати ще".
+        // Дописує лише НОВІ рядки перед кнопкою "Показати ще", не чіпаючи
+        // вже показані рядки і не пересоздаючи саму кнопку - так фокус і
+        // позиція скрола лишаються на місці.
         function appendRows(newItems) {
-            removeMoreButtonEl();
             newItems.forEach(function (item) {
-                listBox.append(buildRow(item));
+                var row = buildRow(item);
+                if (moreButtonEl) row.insertBefore(moreButtonEl);
+                else listBox.append(row);
             });
             addMoreButtonIfNeeded();
             updateMetaText(false);
@@ -718,7 +921,7 @@
         if (!title) return;
 
         var button = $(
-            '<div class="full-start__button selector utopia-search-btn">' +
+            '<div class="full-start__button selector utopia-search-btn" data-subtitle="UTOPIA">' +
             '<span>\ud83e\uddf2 UTOPIA - торенти</span>' +
             '</div>'
         );
