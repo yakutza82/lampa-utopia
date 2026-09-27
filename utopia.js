@@ -696,6 +696,42 @@
             );
         }
 
+function getFullMovieTitle(item) {
+    var movie = object.movie || {};
+
+    var title = movie.title || movie.name || primaryQuery || '';
+    var original = movie.original_title || '';
+
+    title = String(title).trim();
+    original = String(original).trim();
+
+    var result = title;
+
+    if (
+        original &&
+        original.toLowerCase() !== title.toLowerCase()
+    ) {
+        result += ' / ' + original;
+    }
+
+    var year = '';
+
+    if (movie.release_date) {
+        year = String(movie.release_date).slice(0, 4);
+    } else if (movie.first_air_date) {
+        year = String(movie.first_air_date).slice(0, 4);
+    } else if (movie.year) {
+        year = String(movie.year);
+    } else if (item && item.releaseYear) {
+        year = String(item.releaseYear);
+    }
+
+    if (year && result.indexOf('(' + year + ')') === -1) {
+        result += ' (' + year + ')';
+    }
+
+    return result;
+}
         function showSortMenu() {
             var options = ['default', 'seeds', 'size_desc', 'size_asc'].map(function (mode) {
                 return {
@@ -731,7 +767,8 @@
                 '<div class="utopia-item__badges"></div>' +
                 '</div>'
             );
-            row.find('.utopia-item__movie').text(primaryQuery + (item.releaseYear ? ' (' + item.releaseYear + ')' : ''));
+            
+            row.find('.utopia-item__movie').text(getFullMovieTitle(item));
             row.find('.utopia-item__title').text(item.name);
             row.find('.utopia-item__meta').text(item.size ? formatSize(item.size) : 'Розмір невідомий');
             row.find('.utopia-item__badges').html(badge(item.seeds, '\u25b2') + '&nbsp;&nbsp;' + badge(item.peers, '\u25bc'));
@@ -932,7 +969,7 @@
         if (!title) return;
 
         var button = $(
-            '<div class="full-start__button selector utopia-search-btn" data-subtitle="Claude V5">' +
+            '<div class="full-start__button selector utopia-search-btn" data-subtitle="GPT V2">' +
             '<span>\ud83e\uddf2 UTOPIA - торенти</span>' +
             '</div>'
         );
