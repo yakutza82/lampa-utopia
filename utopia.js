@@ -185,6 +185,7 @@
         var peers = attrs.leechers != null ? attrs.leechers : (deepFind(raw, ['leechers', 'peers']) || 0);
 
         var magnet = '';
+        var isDirect = false;
         var hash = attrs.info_hash || deepFind(raw, ['info_hash', 'hash', 'btih']);
 
         if (typeof attrs.magnet_link === 'string' && attrs.magnet_link.indexOf('magnet:') === 0) {
@@ -193,6 +194,7 @@
             magnet = buildMagnetFromHash(hash, releaseName);
         } else if (attrs.download_link) {
             magnet = attrs.download_link;
+            isDirect = true;
         }
 
         return {
@@ -201,6 +203,7 @@
             seeds: parseInt(seeds, 10) || 0,
             peers: parseInt(peers, 10) || 0,
             magnet: magnet || '',
+            isDirect: isDirect,
             __raw: raw
         };
     }
@@ -209,7 +212,7 @@
         var network = new Lampa.Reguest();
         network.timeout(15000);
 
-        var safeOnError = function(code) {
+        var safeOnError = function (code) {
             if (typeof onError === 'function') onError(code);
         };
 
@@ -560,7 +563,6 @@
         }
 
         function buildRow(item) {
-            // Додано обов'язковий клас 'focusable' для скролу пульта
             var row = $(
                 '<div class="utopia-item selector focusable" tabindex="0">' +
                 '<div class="utopia-item__left">' +
@@ -572,14 +574,14 @@
                 '</div>'
             );
 
-            // Виправлено: відображаємо реальну назву торента у головній назві
+            // Головна назва — оригінальна назва торрент-релізу
             row.find('.utopia-item__title').text(item.releaseName);
-            
-            // Якщо є додатковий опис/категорія, показуємо його нижче
+
+            // Підзаголовок — запит фільму або категорія
             if (item.__raw && item.__raw.category) {
                 row.find('.utopia-item__sub').text(item.__raw.category);
             } else {
-                row.find('.utopia-item__sub').hide();
+                row.find('.utopia-item__sub').text(primaryQuery);
             }
 
             row.find('.utopia-item__meta').text(item.size ? formatSize(item.size) : 'Розмір невідомий');
@@ -590,12 +592,19 @@
                     showDebugOverlay('Немає magnet/download - дані цього торента', item.__raw || item);
                     return;
                 }
-                
-                Lampa.Torrent.play({
-                    url: item.magnet,
+
+                var torrentData = {
                     title: item.releaseName,
                     name: item.releaseName
-                });
+                };
+
+                if (item.isDirect) {
+                    torrentData.torrent = item.magnet;
+                } else {
+                    torrentData.url = item.magnet;
+                }
+
+                Lampa.Torrent.play(torrentData);
             });
 
             bindScrollFollow(row);
