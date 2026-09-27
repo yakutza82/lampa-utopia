@@ -977,7 +977,7 @@ if (item.tmdbId && !item.tmdbName) {
         if (!title) return;
 
         var button = $(
-            '<div class="full-start__button selector utopia-search-btn" data-subtitle="Claude V5">' +
+            '<div class="full-start__button selector utopia-search-btn" data-subtitle="GPT V9.3">' +
             '<span>\ud83e\uddf2 UTOPIA - торенти</span>' +
             '</div>'
         );
