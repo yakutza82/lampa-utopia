@@ -736,7 +736,7 @@
         if (!title) return;
 
         var button = $(
-            '<div class="full-start__button selector focusable utopia-search-btn">' +
+            '<div class="full-start__button selector focusable utopia-search-btn" data-subtitle="Gemini 8.30">' +
             '<span>\ud83e\uddf2 UTOPIA - торенти</span>' +
             '</div>'
         );
