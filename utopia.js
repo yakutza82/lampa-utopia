@@ -697,26 +697,32 @@
         }
 
 function getFullMovieTitle(item) {
-    var title = primaryQuery || '';
-    var original = altQuery || '';
+    var name = String(item.name || '').trim();
+    var year = item.releaseYear ? String(item.releaseYear) : '';
 
-    title = String(title).trim();
-    original = String(original).trim();
+    // Прибираємо роздільники на початку/кінці
+    name = name.replace(/^[\s._-]+|[\s._-]+$/g, '');
 
-    var result = title;
+    // Знаходимо початок технічної частини:
+    // рік, S01/S02, 1080p/2160p, WEB-DL, BluRay тощо
+    var match = name.match(
+        /(?:^|[.\s_-])(?:19|20)\d{2}(?=[.\s_-]|$)|(?:^|[.\s_-])S\d{1,2}(?=[.\s_-]|$)|(?:^|[.\s_-])(?:2160p|1080p|720p|WEB-DL|WEBRip|BluRay|BDRip|HDRip)(?=[.\s_-]|$)/i
+    );
 
-    if (
-        original &&
-        original.toLowerCase() !== title.toLowerCase()
-    ) {
-        result += ' / ' + original;
+    if (match && match.index !== undefined) {
+        name = name.substring(0, match.index);
     }
 
-    if (item && item.releaseYear) {
-        result += ' (' + item.releaseYear + ')';
+    // Точки/підкреслення/дефіси між словами -> пробіли
+    name = name.replace(/[._]+/g, ' ');
+    name = name.replace(/\s+/g, ' ').trim();
+
+    // Додаємо рік саме з release_year UTOPIA
+    if (year) {
+        name += ' (' + year + ')';
     }
 
-    return result;
+    return name;
 }
         function showSortMenu() {
             var options = ['default', 'seeds', 'size_desc', 'size_asc'].map(function (mode) {
@@ -754,7 +760,7 @@ function getFullMovieTitle(item) {
                 '</div>'
             );
 
-            row.find('.utopia-item__movie').text(item.name);
+            row.find('.utopia-item__movie').text(getFullMovieTitle(item));
             row.find('.utopia-item__title').text(item.name);
             row.find('.utopia-item__meta').text(item.size ? formatSize(item.size) : 'Розмір невідомий');
             row.find('.utopia-item__badges').html(badge(item.seeds, '\u25b2') + '&nbsp;&nbsp;' + badge(item.peers, '\u25bc'));
@@ -957,7 +963,7 @@ function getFullMovieTitle(item) {
         if (!title) return;
 
         var button = $(
-            '<div class="full-start__button selector utopia-search-btn" data-subtitle="GPT V4">' +
+            '<div class="full-start__button selector utopia-search-btn" data-subtitle="GPT V5">' +
             '<span>\ud83e\uddf2 UTOPIA - торенти</span>' +
             '</div>'
         );
