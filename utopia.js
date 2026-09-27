@@ -33,8 +33,6 @@
         var buf = new Uint8Array(buffer);
         var pos = 0;
 
-        // Читає bencode-рядок (N:текст) починаючи з поточної позиції,
-        // повертає його текст і зсуває pos за кінець рядка.
         function readString() {
             var start = pos;
             while (buf[pos] !== 0x3a) pos++; // ':'
@@ -61,8 +59,8 @@
             } else if (c === 0x64) { // 'd' - dict
                 pos++;
                 while (buf[pos] !== 0x65) {
-                    readString(); // ключ
-                    skipValue();  // значення
+                    readString();
+                    skipValue();
                 }
                 pos++;
             } else if (c >= 0x30 && c <= 0x39) { // string
@@ -330,12 +328,8 @@
         var isDirect = false;
 
         if (typeof attrs.magnet_link === 'string' && attrs.magnet_link.indexOf('magnet:') === 0) {
-            // Якщо UTOPIA все ж віддала готовий magnet - використовуємо його напряму.
             magnet = attrs.magnet_link;
         } else if (attrs.download_link) {
-            // UTOPIA зазвичай НЕ дає magnet/hash напряму (magnet_link: null),
-            // а натомість дає посилання на завантаження .torrent-файлу
-            // з вбудованою авторизацією прямо в URL.
             magnet = attrs.download_link;
             isDirect = true;
         }
@@ -404,13 +398,11 @@
             'Accept': 'application/json'
         };
 
-        // 1. Прямий нативний запит для Android/TV
         sendRequest(targetUrl, headers, function (data) {
             var items = parseArrayFromData(data).map(normalizeItem);
             saveToCache(query, page, items);
             onSuccess(items, false);
         }, function (errCode) {
-            // 2. Якщо запущено у Web і спрацював CORS/403, пробуємо завантаження через CORS проксі
             if (errCode === 'network' || errCode === 'forbidden') {
                 var proxy1 = 'https://corsproxy.io/?' + encodeURIComponent(targetUrl);
                 sendRequest(proxy1, {}, function (data) {
@@ -508,11 +500,8 @@
         var items = [];
         var sortMode = 'default';
         var loading = false;
-        var moreButtonEl = null; // одна й та сама DOM-нода - переносимо, а не пересоздаємо
+        var moreButtonEl = null;
 
-        // Основний запит - те, що прийшло з картки фільму (зазвичай
-        // локалізована, наприклад українська назва). Якщо є інша (оригінальна)
-        // назва і вона відрізняється - тримаємо її як запасний варіант пошуку.
         var primaryQuery = object.search;
         var altQuery = (object.search_original &&
             String(object.search_original).toLowerCase() !== String(primaryQuery).toLowerCase())
@@ -523,9 +512,6 @@
 
         injectStyles();
 
-        // Прив'язує елемент до системи скрола: коли елемент отримує фокус
-        // (стрілками на пульті), скрол-контейнер підлаштовується, щоб його
-        // було видно. Без цього фокус рухається, а видима область - ні.
         function bindScrollFollow(el) {
             el.on('hover:focus', function (e) {
                 scroll.update($(e.target), true);
@@ -533,11 +519,31 @@
             return el;
         }
 
-        // Показує повний "сирий" об'єкт на екрані (для діагностики),
-        // з можливістю скопіювати текст у буфер обміну або виділити вручну.
+        // Готує дані для показу в дебаг-екрані: обрізає задовгі текстові
+        // поля (типу media_info/description, які бувають на кілька тисяч
+        // символів), щоб textarea не гальмувала й не "вішала" WebView.
+        function truncateForDebug(value, depth) {
+            depth = depth || 0;
+            if (depth > 6) return '(...)';
+            if (typeof value === 'string') {
+                return value.length > 1500 ? value.slice(0, 1500) + '... (обрізано, всього ' + value.length + ' символів)' : value;
+            }
+            if (Array.isArray(value)) {
+                return value.slice(0, 20).map(function (v) { return truncateForDebug(v, depth + 1); });
+            }
+            if (value && typeof value === 'object') {
+                var out = {};
+                for (var k in value) {
+                    if (value.hasOwnProperty(k)) out[k] = truncateForDebug(value[k], depth + 1);
+                }
+                return out;
+            }
+            return value;
+        }
+
         function showDebugOverlay(title, data) {
             var jsonText = (function () {
-                try { return JSON.stringify(data, null, 2); }
+                try { return JSON.stringify(truncateForDebug(data), null, 2); }
                 catch (e) { return String(data); }
             })();
 
@@ -638,10 +644,6 @@
                 },
                 up: function () {
                     if (Navigator.canmove('up')) { Navigator.move('up'); return; }
-                    // Експериментально: пробуємо переключитись на глобальну панель
-                    // (пошук/налаштування/профіль), якщо вона зареєстрована під
-                    // назвою 'head'. Обгорнуто в try/catch, щоб точно нічого
-                    // не зламати, якщо такого контролера немає.
                     try { Lampa.Controller.toggle('head'); } catch (e) {}
                 },
                 down: function () { Navigator.move('down'); },
@@ -699,34 +701,30 @@
             );
         }
 
-function getFullMovieTitle(item) {
-    var name = String(item.name || '').trim();
-    var year = item.releaseYear ? String(item.releaseYear) : '';
+        function getFullMovieTitle(item) {
+            var name = String(item.name || '').trim();
+            var year = item.releaseYear ? String(item.releaseYear) : '';
 
-    // Прибираємо роздільники на початку/кінці
-    name = name.replace(/^[\s._-]+|[\s._-]+$/g, '');
+            name = name.replace(/^[\s._-]+|[\s._-]+$/g, '');
 
-    // Знаходимо початок технічної частини:
-    // рік, S01/S02, 1080p/2160p, WEB-DL, BluRay тощо
-    var match = name.match(
-        /(?:^|[.\s_-])(?:19|20)\d{2}(?=[.\s_-]|$)|(?:^|[.\s_-])S\d{1,2}(?=[.\s_-]|$)|(?:^|[.\s_-])(?:2160p|1080p|720p|WEB-DL|WEBRip|BluRay|BDRip|HDRip)(?=[.\s_-]|$)/i
-    );
+            var match = name.match(
+                /(?:^|[.\s_-])(?:19|20)\d{2}(?=[.\s_-]|$)|(?:^|[.\s_-])S\d{1,2}(?=[.\s_-]|$)|(?:^|[.\s_-])(?:2160p|1080p|720p|WEB-DL|WEBRip|BluRay|BDRip|HDRip)(?=[.\s_-]|$)/i
+            );
 
-    if (match && match.index !== undefined) {
-        name = name.substring(0, match.index);
-    }
+            if (match && match.index !== undefined) {
+                name = name.substring(0, match.index);
+            }
 
-    // Точки/підкреслення/дефіси між словами -> пробіли
-    name = name.replace(/[._]+/g, ' ');
-    name = name.replace(/\s+/g, ' ').trim();
+            name = name.replace(/[._]+/g, ' ');
+            name = name.replace(/\s+/g, ' ').trim();
 
-    // Додаємо рік саме з release_year UTOPIA
-    if (year) {
-        name += ' (' + year + ')';
-    }
+            if (year) {
+                name += ' (' + year + ')';
+            }
 
-    return name;
-}
+            return name;
+        }
+
         function showSortMenu() {
             var options = ['default', 'seeds', 'size_desc', 'size_asc'].map(function (mode) {
                 return {
@@ -748,9 +746,6 @@ function getFullMovieTitle(item) {
             });
         }
 
-        // Показує фільм (українською/як шукали) великим текстом, а під ним -
-        // реальну назву релізу торента (вона завжди англійською/латиницею -
-        // так це називають на трекерах, тут нема звідки взяти переклад).
         function buildRow(item) {
             var row = $(
                 '<div class="utopia-item selector">' +
@@ -763,26 +758,26 @@ function getFullMovieTitle(item) {
                 '</div>'
             );
 
-if (item.tmdbId && !item.tmdbName) {
-    var tmdbType = item.category === 'TV' ? 'tv/' : 'movie/';
+            if (item.tmdbId && !item.tmdbName) {
+                var tmdbType = item.category === 'TV' ? 'tv/' : 'movie/';
 
-    Lampa.Api.sources.tmdb.get(tmdbType + item.tmdbId, {language: 'uk-UA'}, function (data) {
-        // showDebugOverlay('TMDB DATA', data);
-        if (data && (data.title || data.name)) {
-    item.tmdbName = (data.title || data.name) + (item.releaseYear ? ' (' + item.releaseYear + ')' : '');
-    row.find('.utopia-item__movie').text(item.tmdbName);
-}
-    });
-}
+                Lampa.Api.sources.tmdb.get(tmdbType + item.tmdbId, { language: 'uk-UA' }, function (data) {
+                    if (data && (data.title || data.name)) {
+                        item.tmdbName = (data.title || data.name) + (item.releaseYear ? ' (' + item.releaseYear + ')' : '');
+                        row.find('.utopia-item__movie').text(item.tmdbName);
+                    }
+                });
+            }
 
             row.find('.utopia-item__movie').text(item.tmdbName || getFullMovieTitle(item));
             row.find('.utopia-item__title').text(item.name);
             row.find('.utopia-item__meta').text(item.size ? formatSize(item.size) : 'Розмір невідомий');
             row.find('.utopia-item__badges').html(badge(item.seeds, '\u25b2') + '&nbsp;&nbsp;' + badge(item.peers, '\u25bc'));
 
-            row.on('click hover:enter', function () {
-    showDebugOverlay('Дані конкретного торента', item.__raw);
-});
+            // ВАЖЛИВО: клік має запускати відтворення, а не дебаг-екран -
+            // дебаг лишається тільки як fallback усередині playTorrent,
+            // коли справді нема ні magnet, ні download_link.
+            row.on('click hover:enter', function () { playTorrent(item); });
 
             bindScrollFollow(row);
             return row;
@@ -799,8 +794,6 @@ if (item.tmdbId && !item.tmdbName) {
                 return;
             }
 
-            // UTOPIA не дала готовий magnet - завантажуємо сам .torrent-файл
-            // і рахуємо його справжній інфо-хеш, щоб зібрати робочий magnet.
             Lampa.Loading.start('utopia_prepare', 'UTOPIA: готуємо торент...');
 
             var headers = { 'Authorization': 'Bearer ' + getKey() };
@@ -840,10 +833,6 @@ if (item.tmdbId && !item.tmdbName) {
             return moreButtonEl;
         }
 
-        // Додає кнопку "Показати ще" в кінець списку, якщо є ще сторінки.
-        // Якщо кнопка вже існувала - переносимо ту саму DOM-ноду (jQuery
-        // .append на існуючому елементі перепідключає його, а не створює
-        // копію), тому фокус на ній не губиться при довантаженні.
         function addMoreButtonIfNeeded() {
             if (items.length >= page * PER_PAGE) {
                 listBox.append(ensureMoreButton());
@@ -861,12 +850,9 @@ if (item.tmdbId && !item.tmdbName) {
             setMeta('Знайдено: ' + items.length + metaSuffix);
         }
 
-        // Повна перебудова списку - потрібна тільки при першому завантаженні
-        // і при зміні сортування (бо тоді порядок ВСІХ елементів змінюється).
-        // Тут скидання фокуса/скрола очікуване і нормальне.
         function renderList() {
             listBox.empty();
-            moreButtonEl = null; // стару кнопку щойно знищено разом з рештою - створимо нову за потреби
+            moreButtonEl = null;
             var sorted = sortItems(items, sortMode);
             sorted.forEach(function (item) {
                 listBox.append(buildRow(item));
@@ -876,9 +862,6 @@ if (item.tmdbId && !item.tmdbName) {
             Lampa.Controller.enable('content');
         }
 
-        // Дописує лише НОВІ рядки перед кнопкою "Показати ще", не чіпаючи
-        // вже показані рядки і не пересоздаючи саму кнопку - так фокус і
-        // позиція скрола лишаються на місці.
         function appendRows(newItems) {
             newItems.forEach(function (item) {
                 var row = buildRow(item);
@@ -915,9 +898,6 @@ if (item.tmdbId && !item.tmdbName) {
                 items = items.concat(pageItems);
 
                 if (!items.length) {
-                    // Нічого не знайшлось за поточним запитом - якщо є
-                    // альтернативна (оригінальна) назва і ми її ще не пробували,
-                    // автоматично повторюємо пошук нею.
                     if (isFirst && altQuery && !usedAlt) {
                         usedAlt = true;
                         query = altQuery;
@@ -928,10 +908,6 @@ if (item.tmdbId && !item.tmdbName) {
                     return;
                 }
 
-                // Довантаження наступної сторінки при "стандартному" сортуванні -
-                // просто дописуємо нові рядки, не перебудовуючи весь список.
-                // Повна перебудова потрібна тільки для першої сторінки або
-                // якщо активне сортування (тоді порядок треба перерахувати цілком).
                 if (!isFirst && sortMode === 'default') {
                     appendRows(items.slice(previousCount));
                     if (fromCache) updateMetaText(true);
@@ -978,7 +954,7 @@ if (item.tmdbId && !item.tmdbName) {
         if (!title) return;
 
         var button = $(
-            '<div class="full-start__button selector utopia-search-btn" data-subtitle="Claude V5">' +
+            '<div class="full-start__button selector utopia-search-btn" data-subtitle="Claude v5">' +
             '<span>\ud83e\uddf2 UTOPIA - торенти</span>' +
             '</div>'
         );
