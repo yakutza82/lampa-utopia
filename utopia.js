@@ -837,48 +837,7 @@
             return row;
         }
 
-        function playTorrent(item) {
-            if (typeof item.magnet === 'string' && item.magnet.indexOf('magnet:') === 0) {
-                Lampa.Torrent.play({ url: item.magnet, name: item.name });
-                return;
-            }
-
-            if (!item.isDirect || !item.magnet) {
-                showDebugOverlay('Немає magnet/download - дані цього торента', item.__raw || item);
-                return;
-            }
-
-            Lampa.Loading.start('utopia_prepare', 'UTOPIA: готуємо торент...');
-
-            var headers = { 'Authorization': 'Bearer ' + getKey() };
-
-            fetchTorrentFileBytes(item.magnet, headers, function (buffer, rawText) {
-                try {
-                    var infoRange = findInfoDictRange(buffer);
-                    if (!infoRange) throw new Error('не знайдено секцію info у .torrent файлі');
-
-                    var infoBytes = new Uint8Array(buffer, infoRange.start, infoRange.end - infoRange.start);
-
-                    sha1HexAsync(infoBytes).then(function (hashHex) {
-                        Lampa.Loading.stop('utopia_prepare');
-                        var realMagnet = buildMagnetFromHash(hashHex, item.name);
-                        Lampa.Torrent.play({ url: realMagnet, name: item.name });
-                    });
-
-                } catch (e) {
-                    Lampa.Loading.stop('utopia_prepare');
-                    showDebugOverlay('Помилка розбору .torrent файлу', {
-                        error: String(e),
-                        byteLength: buffer ? buffer.byteLength : 0,
-                        rawPreview: rawText ? rawText.slice(0, 300) : '',
-                        download_link: item.magnet
-                    });
-                }
-            }, function (code) {
-                Lampa.Loading.stop('utopia_prepare');
-                Lampa.Noty.show('UTOPIA: не вдалося завантажити .torrent файл - ' + errorMessage(code));
-            });
-        }
+        function playTorrent(item) { if (!item || !item.magnet) { Lampa.Noty.show('UTOPIA: немає посилання на торрент'); return; } // Якщо UTOPIA дала готовий magnet — залишаємо стару логіку if (item.magnet.indexOf('magnet:') === 0) { Lampa.Torrent.play({ url: item.magnet, name: item.name }); return; } // UTOPIA дає download_link на .torrent-файл. // Завантажуємо його з авторизацією API-ключем. var headers = { 'Authorization': 'Bearer ' + getKey() }; Lampa.Loading.start( 'utopia_download', 'UTOPIA: завантаження .torrent...' ); var network = new Lampa.Reguest(); network.timeout(30000); network.native( item.magnet, function (response) { Lampa.Loading.stop('utopia_download'); if (!response || typeof response !== 'string') { Lampa.Noty.show('UTOPIA: отримано порожній файл'); return; } try { // Перетворюємо відповідь у байти .torrent var bytes = new Uint8Array(response.length); for (var i = 0; i < response.length; i++) { bytes[i] = response.charCodeAt(i) & 0xFF; } var blob = new Blob( [bytes], { type: 'application/x-bittorrent' } ); var url = URL.createObjectURL(blob); // Створюємо тимчасове посилання на .torrent var a = document.createElement('a'); a.href = url; a.download = (item.name || 'torrent') + '.torrent'; a.style.display = 'none'; document.body.appendChild(a); a.click(); document.body.removeChild(a); setTimeout(function () { URL.revokeObjectURL(url); }, 10000); Lampa.Noty.show( 'UTOPIA: .torrent завантажено' ); } catch (e) { Lampa.Noty.show( 'UTOPIA: помилка збереження .torrent' ); } }, function (xhr) { Lampa.Loading.stop('utopia_download'); var status = xhr ? xhr.status : 0; if (status === 401) { Lampa.Noty.show('UTOPIA: неправильний API ключ'); } else if (status === 403) { Lampa.Noty.show('UTOPIA: доступ заборонено'); } else { Lampa.Noty.show( 'UTOPIA: помилка завантаження (' + (status || 'network') + ')' ); } }, false, { headers: headers } ); }
 
         function ensureMoreButton() {
             if (!moreButtonEl) {
@@ -1011,7 +970,7 @@
         if (!title) return;
 
         var button = $(
-            '<div class="full-start__button selector utopia-search-btn" data-subtitle="Gemini V9">' +
+            '<div class="full-start__button selector utopia-search-btn" data-subtitle="GPT V12">' +
             '<span>\ud83e\uddf2 UTOPIA - торенти</span>' +
             '</div>'
         );
