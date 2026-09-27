@@ -754,7 +754,7 @@ function getFullMovieTitle(item) {
                 '</div>'
             );
 
-            row.find('.utopia-item__movie').text(getFullMovieTitle(item));
+            row.find('.utopia-item__movie').text(item.name);
             row.find('.utopia-item__title').text(item.name);
             row.find('.utopia-item__meta').text(item.size ? formatSize(item.size) : 'Розмір невідомий');
             row.find('.utopia-item__badges').html(badge(item.seeds, '\u25b2') + '&nbsp;&nbsp;' + badge(item.peers, '\u25bc'));
@@ -955,7 +955,7 @@ function getFullMovieTitle(item) {
         if (!title) return;
 
         var button = $(
-            '<div class="full-start__button selector utopia-search-btn" data-subtitle="GPT V3">' +
+            '<div class="full-start__button selector utopia-search-btn" data-subtitle="GPT V4">' +
             '<span>\ud83e\uddf2 UTOPIA - торенти</span>' +
             '</div>'
         );
