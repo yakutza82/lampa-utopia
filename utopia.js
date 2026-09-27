@@ -766,7 +766,7 @@ function getFullMovieTitle(item) {
 if (item.tmdbId && !item.tmdbName) {
     var tmdbType = item.category === 'TV' ? 'tv/' : 'movie/';
 
-    Lampa.Api.sources.tmdb.get(tmdbType + item.tmdbId, {}, function (data) {
+    Lampa.Api.sources.tmdb.get(tmdbType + item.tmdbId, {language: 'uk-UA'}, function (data) {
         if (data && data.name) {
     item.tmdbName = (data.title || data.name) + (item.releaseYear ? ' (' + item.releaseYear + ')' : '');
     row.find('.utopia-item__movie').text(item.tmdbName);
@@ -977,7 +977,7 @@ if (item.tmdbId && !item.tmdbName) {
         if (!title) return;
 
         var button = $(
-            '<div class="full-start__button selector utopia-search-btn" data-subtitle="GPT V9">' +
+            '<div class="full-start__button selector utopia-search-btn" data-subtitle="GPT V9.1">' +
             '<span>\ud83e\uddf2 UTOPIA - торенти</span>' +
             '</div>'
         );
