@@ -781,7 +781,7 @@ if (item.tmdbId && !item.tmdbName) {
             row.find('.utopia-item__badges').html(badge(item.seeds, '\u25b2') + '&nbsp;&nbsp;' + badge(item.peers, '\u25bc'));
 
             row.on('click hover:enter', function () {
-    showDebugOverlay('Дані конкретного торента', item.__raw);
+    playTorrent(item);
 });
 
             bindScrollFollow(row);
@@ -978,7 +978,7 @@ if (item.tmdbId && !item.tmdbName) {
         if (!title) return;
 
         var button = $(
-            '<div class="full-start__button selector utopia-search-btn" data-subtitle="GPT V10.1">' +
+            '<div class="full-start__button selector utopia-search-btn" data-subtitle="GPT V11">' +
             '<span>\ud83e\uddf2 UTOPIA - торенти</span>' +
             '</div>'
         );
