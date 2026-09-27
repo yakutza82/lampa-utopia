@@ -759,7 +759,9 @@ function getFullMovieTitle(item) {
             row.find('.utopia-item__meta').text(item.size ? formatSize(item.size) : 'Розмір невідомий');
             row.find('.utopia-item__badges').html(badge(item.seeds, '\u25b2') + '&nbsp;&nbsp;' + badge(item.peers, '\u25bc'));
 
-            row.on('click hover:enter', function () { playTorrent(item); });
+            row.on('click hover:enter', function () {
+    showDebugOverlay('Дані конкретного торента', item.__raw);
+});
 
             bindScrollFollow(row);
             return row;
