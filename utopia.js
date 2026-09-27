@@ -518,7 +518,7 @@
             String(object.search_original).toLowerCase() !== String(primaryQuery).toLowerCase())
             ? object.search_original
             : '';
-        var query = primaryQuery;
+        var query = altQuery || primaryQuery;
         var usedAlt = false;
 
         injectStyles();
@@ -978,7 +978,7 @@ if (item.tmdbId && !item.tmdbName) {
         if (!title) return;
 
         var button = $(
-            '<div class="full-start__button selector utopia-search-btn" data-subtitle="GPT V10">' +
+            '<div class="full-start__button selector utopia-search-btn" data-subtitle="GPT V10.1">' +
             '<span>\ud83e\uddf2 UTOPIA - торенти</span>' +
             '</div>'
         );
