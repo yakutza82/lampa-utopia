@@ -5,7 +5,7 @@
     window.UTOPIA_PLUGIN = true;
 
     var API_BASE = 'https://utp.to/api';
-    var PER_PAGE = 1;
+    var PER_PAGE = 99;
 
     var TRACKERS = [
         'udp://tracker.opentrackr.org:1337/announce',
@@ -349,6 +349,7 @@
             isDirect: isDirect,
             releaseYear: releaseYear,
             tmdbId: attrs.tmdb_id || null,
+            tmdbName: '',
             __raw: raw
         };
     }
@@ -761,15 +762,16 @@ function getFullMovieTitle(item) {
                 '</div>'
             );
 
-if (item.tmdbId) {
+if (item.tmdbId && !item.tmdbName) {
     Lampa.Api.sources.tmdb.get('tv/' + item.tmdbId, {}, function (data) {
-        showDebugOverlay('TMDB для торента', data);
-    }, function () {
-        showDebugOverlay('TMDB', 'Помилка запиту для ID ' + item.tmdbId);
+        if (data && data.name) {
+            item.tmdbName = data.name;
+            row.find('.utopia-item__movie').text(item.tmdbName);
+        }
     });
 }
 
-            row.find('.utopia-item__movie').text(getFullMovieTitle(item));
+            row.find('.utopia-item__movie').text(item.tmdbName || getFullMovieTitle(item));
             row.find('.utopia-item__title').text(item.name);
             row.find('.utopia-item__meta').text(item.size ? formatSize(item.size) : 'Розмір невідомий');
             row.find('.utopia-item__badges').html(badge(item.seeds, '\u25b2') + '&nbsp;&nbsp;' + badge(item.peers, '\u25bc'));
@@ -972,7 +974,7 @@ if (item.tmdbId) {
         if (!title) return;
 
         var button = $(
-            '<div class="full-start__button selector utopia-search-btn" data-subtitle="GPT V6">' +
+            '<div class="full-start__button selector utopia-search-btn" data-subtitle="GPT V7">' +
             '<span>\ud83e\uddf2 UTOPIA - торенти</span>' +
             '</div>'
         );
