@@ -21,50 +21,65 @@
     // =========================================================
     function findInfoDictRange(buffer) {
         var buf = new Uint8Array(buffer);
+        var len = buf.length;
         var pos = 0;
 
         function readString() {
             var start = pos;
-            while (buf[pos] !== 0x3a) pos++; // ':'
+            while (pos < len && buf[pos] !== 0x3a) pos++; // ':'
+            if (pos >= len) throw new Error('Завершення файлу під час читання довжини рядка');
+            
             var lenStr = '';
             for (var i = start; i < pos; i++) lenStr += String.fromCharCode(buf[i]);
-            var len = parseInt(lenStr, 10);
+            var strLen = parseInt(lenStr, 10);
+            if (isNaN(strLen)) throw new Error('Некоректна довжина рядка Bencode');
+            
             pos++; // skip ':'
+            if (pos + strLen > len) throw new Error('Вихід за межі файлу при читанні рядка');
+            
             var text = '';
-            for (var j = 0; j < len; j++) text += String.fromCharCode(buf[pos + j]);
-            pos += len;
+            // Обмежуємо читання тексту, щоб не створювати гігантські рядки в пам'яті
+            var readMax = Math.min(strLen, 100);
+            for (var j = 0; j < readMax; j++) text += String.fromCharCode(buf[pos + j]);
+            pos += strLen;
             return text;
         }
 
         function skipValue() {
+            if (pos >= len) throw new Error('Несподіваний кінець файлу');
             var c = buf[pos];
             if (c === 0x69) { // 'i' - integer
                 pos++;
-                while (buf[pos] !== 0x65) pos++;
+                while (pos < len && buf[pos] !== 0x65) pos++;
+                if (pos >= len) throw new Error('Незакритий integer');
                 pos++;
             } else if (c === 0x6c) { // 'l' - list
                 pos++;
-                while (buf[pos] !== 0x65) skipValue();
+                while (pos < len && buf[pos] !== 0x65) skipValue();
+                if (pos >= len) throw new Error('Незакритий list');
                 pos++;
             } else if (c === 0x64) { // 'd' - dict
                 pos++;
-                while (buf[pos] !== 0x65) {
+                while (pos < len && buf[pos] !== 0x65) {
                     readString();
                     skipValue();
                 }
+                if (pos >= len) throw new Error('Незакритий dict');
                 pos++;
             } else if (c >= 0x30 && c <= 0x39) { // string
                 readString();
             } else {
-                throw new Error('bad bencode byte at ' + pos);
+                throw new Error('Некоректний байт Bencode: ' + c + ' на позиції ' + pos);
             }
         }
 
-        if (buf[pos] !== 0x64) throw new Error('.torrent файл має починатись зі словника');
+        if (len === 0 || buf[0] !== 0x64) {
+            throw new Error('Файл не є .torrent (не починається з Bencode-словника "d")');
+        }
         pos++; // skip top-level 'd'
 
         var infoRange = null;
-        while (buf[pos] !== 0x65) {
+        while (pos < len && buf[pos] !== 0x65) {
             var key = readString();
             if (key === 'info') {
                 var infoStart = pos;
@@ -164,8 +179,9 @@
 
     function fetchTorrentFileBytes(url, headers, onSuccess, onError) {
         var network = new Lampa.Reguest();
-        network.timeout(20000);
+        network.timeout(15000);
 
+        // ВстановлюємоResponseType якщо доступно
         network.native(url, function (response) {
             if (!response) {
                 onError('parse_error');
@@ -178,6 +194,12 @@
             }
 
             if (typeof response === 'string' && response.length > 0) {
+                // Якщо сервер повернув HTML сторінку помилки (наприклад Cloudflare або 404)
+                if (response.indexOf('<!DOCTYPE') !== -1 || response.indexOf('<html') !== -1) {
+                    onError('forbidden');
+                    return;
+                }
+
                 var bytes = new Uint8Array(response.length);
                 for (var i = 0; i < response.length; i++) {
                     bytes[i] = response.charCodeAt(i) & 0xFF;
@@ -989,7 +1011,7 @@
         if (!title) return;
 
         var button = $(
-            '<div class="full-start__button selector utopia-search-btn" data-subtitle="Gemini V10">' +
+            '<div class="full-start__button selector utopia-search-btn" data-subtitle="Gemini V7">' +
             '<span>\ud83e\uddf2 UTOPIA - торенти</span>' +
             '</div>'
         );
