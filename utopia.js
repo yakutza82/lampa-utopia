@@ -5,7 +5,7 @@
     window.UTOPIA_PLUGIN = true;
 
     var API_BASE = 'https://utp.to/api';
-    var PER_PAGE = 30;
+    var PER_PAGE = 99;
 
     var TRACKERS = [
         'udp://tracker.opentrackr.org:1337/announce',
@@ -131,23 +131,31 @@
         return toHex(h0) + toHex(h1) + toHex(h2) + toHex(h3) + toHex(h4);
     }
 
+    // Качаємо .torrent-файл ЧЕРЕЗ ТОЙ САМИЙ механізм, що вже успішно
+    // обходить CORS для звичайних JSON-запитів (Lampa.Reguest().native()) -
+    // звичайний XMLHttpRequest, як з'ясувалось, CORS не обходить.
+    // native() віддає відповідь як звичайний РЯДОК (як і для JSON), тому
+    // переводимо кожен символ назад у байт (код символу як є, без UTF-8).
     function fetchTorrentFileBytes(url, headers, onSuccess, onError) {
-        var xhr = new XMLHttpRequest();
-        xhr.open('GET', url, true);
-        xhr.responseType = 'arraybuffer';
-        for (var h in headers) {
-            if (headers.hasOwnProperty(h)) {
-                try { xhr.setRequestHeader(h, headers[h]); } catch (e) {}
+        var network = new Lampa.Reguest();
+        network.timeout(20000);
+
+        network.native(url, function (response) {
+            if (typeof response !== 'string' || !response.length) {
+                onError('parse_error');
+                return;
             }
-        }
-        xhr.timeout = 20000;
-        xhr.onload = function () {
-            if (xhr.status >= 200 && xhr.status < 300 && xhr.response) onSuccess(xhr.response);
-            else onError(xhr.status === 0 ? 'network' : 'http_' + xhr.status);
-        };
-        xhr.onerror = function () { onError('network'); };
-        xhr.ontimeout = function () { onError('timeout'); };
-        xhr.send();
+            var bytes = new Uint8Array(response.length);
+            for (var i = 0; i < response.length; i++) {
+                bytes[i] = response.charCodeAt(i) & 0xFF;
+            }
+            onSuccess(bytes.buffer, response);
+        }, function (xhr) {
+            var status = xhr ? xhr.status : 0;
+            if (status === 401) onError('unauthorized');
+            else if (status === 403) onError('forbidden');
+            else onError(status === 0 ? 'network' : 'http_' + status);
+        }, false, { headers: headers });
     }
 
     function buildMagnetFromHash(hashHex, name) {
@@ -316,6 +324,7 @@
         var size = attrs.size != null ? attrs.size : (deepFind(raw, ['size']) || 0);
         var seeds = attrs.seeders != null ? attrs.seeders : (deepFind(raw, ['seeders', 'seeds']) || 0);
         var peers = attrs.leechers != null ? attrs.leechers : (deepFind(raw, ['leechers', 'peers']) || 0);
+        var releaseYear = attrs.release_year || null;
 
         var magnet = '';
         var isDirect = false;
@@ -338,6 +347,7 @@
             peers: parseInt(peers, 10) || 0,
             magnet: magnet || '',
             isDirect: isDirect,
+            releaseYear: releaseYear,
             __raw: raw
         };
     }
@@ -721,7 +731,7 @@
                 '<div class="utopia-item__badges"></div>' +
                 '</div>'
             );
-            row.find('.utopia-item__movie').text(primaryQuery);
+            row.find('.utopia-item__movie').text(primaryQuery + (item.releaseYear ? ' (' + item.releaseYear + ')' : ''));
             row.find('.utopia-item__title').text(item.name);
             row.find('.utopia-item__meta').text(item.size ? formatSize(item.size) : 'Розмір невідомий');
             row.find('.utopia-item__badges').html(badge(item.seeds, '\u25b2') + '&nbsp;&nbsp;' + badge(item.peers, '\u25bc'));
@@ -749,7 +759,7 @@
 
             var headers = { 'Authorization': 'Bearer ' + getKey() };
 
-            fetchTorrentFileBytes(item.magnet, headers, function (buffer) {
+            fetchTorrentFileBytes(item.magnet, headers, function (buffer, rawText) {
                 Lampa.Loading.stop('utopia_prepare');
                 try {
                     var infoRange = findInfoDictRange(buffer);
@@ -764,6 +774,7 @@
                     showDebugOverlay('Помилка розбору .torrent файлу', {
                         error: String(e),
                         byteLength: buffer ? buffer.byteLength : 0,
+                        rawPreview: rawText ? rawText.slice(0, 300) : '',
                         download_link: item.magnet
                     });
                 }
@@ -921,7 +932,7 @@
         if (!title) return;
 
         var button = $(
-            '<div class="full-start__button selector utopia-search-btn" data-subtitle="Claude v4">' +
+            '<div class="full-start__button selector utopia-search-btn" data-subtitle="Claude V5">' +
             '<span>\ud83e\uddf2 UTOPIA - торенти</span>' +
             '</div>'
         );
