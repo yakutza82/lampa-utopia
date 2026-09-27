@@ -18,16 +18,6 @@
 
     // =========================================================
     // -1. Побудова робочого magnet з .torrent-файлу
-    //
-    // UTOPIA не завжди дає готовий magnet - часто натомість дає
-    // посилання на завантаження самого .torrent-файлу. Щоб все одно
-    // відкрити його одним кліком (без ручного скачування), тут:
-    // 1) вручну розбираємо bencode-структуру .torrent файлу,
-    //    щоб знайти РІВНО ті байти, де лежить секція "info";
-    // 2) рахуємо SHA-1 від цих байтів - це і є справжній BTIH-хеш;
-    // 3) збираємо з нього робочий magnet-рядок.
-    // SHA-1 порахований власноруч (не через Web Crypto), бо
-    // crypto.subtle іноді недоступний у не-https/file:// оточенні.
     // =========================================================
     function findInfoDictRange(buffer) {
         var buf = new Uint8Array(buffer);
@@ -88,22 +78,52 @@
         return infoRange;
     }
 
-    function sha1Hex(bytes) {
-        function rotl(n, s) { return (n << s) | (n >>> (32 - s)); }
+    // Асинхронний SHA-1 для уникнення зависання UI
+    function sha1HexAsync(bytes) {
+        return new Promise(function (resolve) {
+            if (window.crypto && window.crypto.subtle && window.crypto.subtle.digest) {
+                window.crypto.subtle.digest('SHA-1', bytes).then(function (hash) {
+                    var hexCodes = [];
+                    var view = new DataView(hash);
+                    for (var i = 0; i < view.byteLength; i += 4) {
+                        var value = view.getUint32(i);
+                        var stringValue = value.toString(16);
+                        var padding = '00000000';
+                        var paddedValue = (padding + stringValue).slice(-8);
+                        hexCodes.push(paddedValue);
+                    }
+                    resolve(hexCodes.join(''));
+                }).catch(function () {
+                    resolve(sha1HexSync(bytes));
+                });
+            } else {
+                setTimeout(function () {
+                    resolve(sha1HexSync(bytes));
+                }, 50);
+            }
+        });
+    }
 
-        var ml = bytes.length * 8;
-        var withOne = new Uint8Array(((bytes.length + 9 + 63) >> 6) << 6);
-        withOne.set(bytes);
-        withOne[bytes.length] = 0x80;
-        var view = new DataView(withOne.buffer);
-        view.setUint32(withOne.length - 4, ml >>> 0, false);
-
+    function sha1HexSync(bytes) {
+        var i;
+        var l = bytes.length;
+        var wd = new Uint32Array(80);
         var h0 = 0x67452301, h1 = 0xEFCDAB89, h2 = 0x98BADCFE, h3 = 0x10325476, h4 = 0xC3D2E1F0;
 
-        for (var chunkStart = 0; chunkStart < withOne.length; chunkStart += 64) {
-            var w = new Array(80);
-            for (var i = 0; i < 16; i++) w[i] = view.getUint32(chunkStart + i * 4, false);
-            for (i = 16; i < 80; i++) w[i] = rotl(w[i - 3] ^ w[i - 8] ^ w[i - 14] ^ w[i - 16], 1);
+        var newLen = ((l + 9 + 63) >> 6) << 6;
+        var newBytes = new Uint8Array(newLen);
+        newBytes.set(bytes);
+        newBytes[l] = 0x80;
+
+        var view = new DataView(newBytes.buffer);
+        view.setUint32(newLen - 4, l * 8, false);
+
+        for (var chunk = 0; chunk < newLen; chunk += 64) {
+            for (i = 0; i < 16; i++) wd[i] = view.getUint32(chunk + i * 4, false);
+            for (i = 16; i < 80; i++) {
+                var w = wd[i - 3] ^ wd[i - 8] ^ wd[i - 14] ^ wd[i - 16];
+                wd[i] = (w << 1) | (w >>> 31);
+            }
 
             var a = h0, b = h1, c = h2, d = h3, e = h4;
 
@@ -114,8 +134,8 @@
                 else if (i < 60) { f = (b & c) | (b & d) | (c & d); k = 0x8F1BBCDC; }
                 else { f = b ^ c ^ d; k = 0xCA62C1D6; }
 
-                var temp = (rotl(a, 5) + f + e + k + w[i]) >>> 0;
-                e = d; d = c; c = rotl(b, 30); b = a; a = temp;
+                var temp = (((a << 5) | (a >>> 27)) + f + e + k + wd[i]) >>> 0;
+                e = d; d = c; c = (b << 30) | (b >>> 2); b = a; a = temp;
             }
 
             h0 = (h0 + a) >>> 0;
@@ -129,25 +149,31 @@
         return toHex(h0) + toHex(h1) + toHex(h2) + toHex(h3) + toHex(h4);
     }
 
-    // Качаємо .torrent-файл ЧЕРЕЗ ТОЙ САМИЙ механізм, що вже успішно
-    // обходить CORS для звичайних JSON-запитів (Lampa.Reguest().native()) -
-    // звичайний XMLHttpRequest, як з'ясувалось, CORS не обходить.
-    // native() віддає відповідь як звичайний РЯДОК (як і для JSON), тому
-    // переводимо кожен символ назад у байт (код символу як є, без UTF-8).
     function fetchTorrentFileBytes(url, headers, onSuccess, onError) {
         var network = new Lampa.Reguest();
         network.timeout(20000);
 
         network.native(url, function (response) {
-            if (typeof response !== 'string' || !response.length) {
+            if (!response) {
                 onError('parse_error');
                 return;
             }
-            var bytes = new Uint8Array(response.length);
-            for (var i = 0; i < response.length; i++) {
-                bytes[i] = response.charCodeAt(i) & 0xFF;
+
+            if (response instanceof ArrayBuffer) {
+                onSuccess(response);
+                return;
             }
-            onSuccess(bytes.buffer, response);
+
+            if (typeof response === 'string' && response.length > 0) {
+                var bytes = new Uint8Array(response.length);
+                for (var i = 0; i < response.length; i++) {
+                    bytes[i] = response.charCodeAt(i) & 0xFF;
+                }
+                onSuccess(bytes.buffer, response);
+                return;
+            }
+
+            onError('parse_error');
         }, function (xhr) {
             var status = xhr ? xhr.status : 0;
             if (status === 401) onError('unauthorized');
@@ -315,7 +341,6 @@
     function normalizeItem(raw) {
         if (!raw || typeof raw !== 'object') return {};
 
-        // Реальна структура відповіді UTOPIA: { type: "torrent", id: "...", attributes: {...} }
         var attrs = (raw.attributes && typeof raw.attributes === 'object') ? raw.attributes : raw;
 
         var name = attrs.name || deepFind(raw, ['name', 'title', 'filename']) || 'Без назви';
@@ -519,9 +544,6 @@
             return el;
         }
 
-        // Готує дані для показу в дебаг-екрані: обрізає задовгі текстові
-        // поля (типу media_info/description, які бувають на кілька тисяч
-        // символів), щоб textarea не гальмувала й не "вішала" WebView.
         function truncateForDebug(value, depth) {
             depth = depth || 0;
             if (depth > 6) return '(...)';
@@ -774,9 +796,6 @@
             row.find('.utopia-item__meta').text(item.size ? formatSize(item.size) : 'Розмір невідомий');
             row.find('.utopia-item__badges').html(badge(item.seeds, '\u25b2') + '&nbsp;&nbsp;' + badge(item.peers, '\u25bc'));
 
-            // ВАЖЛИВО: клік має запускати відтворення, а не дебаг-екран -
-            // дебаг лишається тільки як fallback усередині playTorrent,
-            // коли справді нема ні magnet, ні download_link.
             row.on('click hover:enter', function () { playTorrent(item); });
 
             bindScrollFollow(row);
@@ -799,17 +818,20 @@
             var headers = { 'Authorization': 'Bearer ' + getKey() };
 
             fetchTorrentFileBytes(item.magnet, headers, function (buffer, rawText) {
-                Lampa.Loading.stop('utopia_prepare');
                 try {
                     var infoRange = findInfoDictRange(buffer);
                     if (!infoRange) throw new Error('не знайдено секцію info у .torrent файлі');
 
                     var infoBytes = new Uint8Array(buffer, infoRange.start, infoRange.end - infoRange.start);
-                    var hashHex = sha1Hex(infoBytes);
-                    var realMagnet = buildMagnetFromHash(hashHex, item.name);
 
-                    Lampa.Torrent.play({ url: realMagnet, name: item.name });
+                    sha1HexAsync(infoBytes).then(function (hashHex) {
+                        Lampa.Loading.stop('utopia_prepare');
+                        var realMagnet = buildMagnetFromHash(hashHex, item.name);
+                        Lampa.Torrent.play({ url: realMagnet, name: item.name });
+                    });
+
                 } catch (e) {
+                    Lampa.Loading.stop('utopia_prepare');
                     showDebugOverlay('Помилка розбору .torrent файлу', {
                         error: String(e),
                         byteLength: buffer ? buffer.byteLength : 0,
@@ -954,7 +976,7 @@
         if (!title) return;
 
         var button = $(
-            '<div class="full-start__button selector utopia-search-btn" data-subtitle="Claude V5.1">' +
+            '<div class="full-start__button selector utopia-search-btn" data-subtitle="Gemini V7">' +
             '<span>\ud83e\uddf2 UTOPIA - торенти</span>' +
             '</div>'
         );
