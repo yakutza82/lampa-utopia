@@ -6,7 +6,7 @@
 
     var API_BASE = 'https://utp.to/api';
     var PER_PAGE = 99;
-    var VERSION = 'v0.9.29 build 155';
+    var VERSION = 'v0.9.29 build 205';
 
     var TRACKERS = [
         'udp://tracker.opentrackr.org:1337/announce',
@@ -1229,9 +1229,9 @@ var moviePanel = $(
 
             Lampa.Controller.add('content', {
                     toggle: function () {
-                    Lampa.Noty.show('UTOPIA: елементів для пульта: ' + scroll.render().find('.selector').length);
                     Lampa.Controller.collectionSet(scroll.render());
-                    Lampa.Controller.collectionFocus(false, scroll.render());
+                    var firstVisible = scroll.render().find('.selector').filter(':visible').first();
+                    Lampa.Controller.collectionFocus(firstVisible.length ? firstVisible[0] : false, scroll.render());
                 },
                 up: function () {
                     if (Navigator.canmove('up')) { Navigator.move('up'); return; }
@@ -1652,7 +1652,7 @@ function showTorrentActionMenu(item) {
         if (!title) return;
 
         var button = $(
-            '<div class="full-start__button selector utopia-search-btn" data-subtitle="v0.9.29 build 155">' +
+            '<div class="full-start__button selector utopia-search-btn" data-subtitle="v0.9.29 build 205">' +
             '<span>\ud83e\uddf2 UTOPIA - торенти</span>' +
             '</div>'
         );
