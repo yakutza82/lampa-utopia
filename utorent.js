@@ -6,7 +6,7 @@
 
     var API_BASE = 'https://utp.to/api';
     var PER_PAGE = 99;
-    var VERSION = 'v0.9.28 build 2103';
+    var VERSION = 'v0.9.28 build 2255';
 
     var TRACKERS = [
         'udp://tracker.opentrackr.org:1337/announce',
@@ -922,28 +922,31 @@ var moviePanel = $(
         year = String(movie.first_air_date).slice(0, 4);
     }
 
-    var countries = '';
+        var countries = '';
     try {
-        if (
-            Lampa.TMDB &&
-            typeof Lampa.TMDB.parseCountries === 'function'
-        ) {
-            countries = Lampa.TMDB.parseCountries(movie).join(', ');
+        var tmdbApi = Lampa.Api && Lampa.Api.sources && Lampa.Api.sources.tmdb;
+        if (tmdbApi && typeof tmdbApi.parseCountries === 'function') {
+            countries = tmdbApi.parseCountries(movie).join(', ');
         }
     } catch (e) {}
+
+    if (!countries && Array.isArray(movie.production_countries)) {
+        countries = movie.production_countries
+            .map(function (c) { return c && c.name ? c.name : ''; })
+            .filter(Boolean)
+            .join(', ');
+    }
 
     var rating = '';
     if (movie.vote_average) {
         rating = Number(movie.vote_average).toFixed(1);
     }
 
-    var pg = '';
+        var pg = '';
     try {
-        if (
-            Lampa.TMDB &&
-            typeof Lampa.TMDB.parsePG === 'function'
-        ) {
-            pg = Lampa.TMDB.parsePG(movie) || '';
+        var tmdbApi2 = Lampa.Api && Lampa.Api.sources && Lampa.Api.sources.tmdb;
+        if (tmdbApi2 && typeof tmdbApi2.parsePG === 'function') {
+            pg = tmdbApi2.parsePG(movie) || '';
         }
     } catch (e) {}
 
@@ -1589,7 +1592,7 @@ function showTorrentActionMenu(item) {
         if (!title) return;
 
         var button = $(
-            '<div class="full-start__button selector utopia-search-btn" data-subtitle="v0.9.28 build 2103">' +
+            '<div class="full-start__button selector utopia-search-btn" data-subtitle="v0.9.28 build 2255">' +
             '<span>\ud83e\uddf2 UTOPIA - торенти</span>' +
             '</div>'
         );
