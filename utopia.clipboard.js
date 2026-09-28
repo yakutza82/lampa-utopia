@@ -16,61 +16,33 @@
             return;
         }
 
-        Lampa.Noty.show('URL знайдено:\n' + url.substring(0, 300));
+        Lampa.Noty.show(
+            'URL знайдено:\n' + url.substring(0, 300)
+        );
+
         console.log('[UTOPIA BUFFER]', url);
     }
 
     function downloadTorrent() {
-    var url = getUrl();
+        var url = getUrl();
 
-    if (!url) {
-        Lampa.Noty.show('❌ Немає URL торента');
-        return;
+        if (!url) {
+            Lampa.Noty.show('❌ Немає URL торента');
+            return;
+        }
+
+        console.log('[UTOPIA DOWNLOAD] URL:', url);
+        console.log('[UTOPIA DOWNLOAD] AndroidJS:', window.AndroidJS);
+        console.log(
+            '[UTOPIA DOWNLOAD] AndroidJS methods:',
+            Object.keys(window.AndroidJS || {})
+        );
+
+        Lampa.Noty.show(
+            'AndroidJS: ' +
+            (window.AndroidJS ? 'Є' : 'Немає')
+        );
     }
-
-    console.log('[UTOPIA DOWNLOAD] URL:', url);
-    console.log('[UTOPIA DOWNLOAD] AndroidJS:', window.AndroidJS);
-    console.log('[UTOPIA DOWNLOAD] AndroidJS methods:', Object.keys(window.AndroidJS || {}));
-
-    Lampa.Noty.show(
-        'AndroidJS: ' +
-        (window.AndroidJS ? 'Є' : 'Немає')
-    );
-}
-
-    Lampa.Noty.show('⏳ Отримую .torrent...');
-
-    fetch(url)
-        .then(function (response) {
-            if (!response.ok) {
-                throw new Error('HTTP ' + response.status);
-            }
-
-            return response.blob();
-        })
-        .then(function (blob) {
-            console.log('[UTOPIA TORRENT] blob:', blob);
-
-            var blobUrl = URL.createObjectURL(blob);
-            var a = document.createElement('a');
-
-            a.href = blobUrl;
-            a.download = 'torrent.torrent';
-            document.body.appendChild(a);
-            a.click();
-            a.remove();
-
-            setTimeout(function () {
-                URL.revokeObjectURL(blobUrl);
-            }, 5000);
-
-            Lampa.Noty.show('✅ Файл підготовлено до завантаження');
-        })
-        .catch(function (error) {
-            console.error('[UTOPIA TORRENT]', error);
-            Lampa.Noty.show('❌ Помилка завантаження: ' + error.message);
-        });
-}
 
     function init() {
         if (!window.Lampa || !Lampa.SettingsApi) return;
@@ -83,36 +55,45 @@
 
         Lampa.SettingsApi.addParam({
             component: 'utopia_clipboard',
+
             param: {
                 name: 'read_buffer',
                 type: 'button'
             },
+
             field: {
                 name: 'Прочитати URL',
                 description: 'Показати останній URL торента'
             },
+
             onChange: readTorrentUrl
         });
 
         Lampa.SettingsApi.addParam({
             component: 'utopia_clipboard',
+
             param: {
                 name: 'download_torrent',
                 type: 'button'
             },
+
             field: {
                 name: 'Завантажити .torrent',
-                description: 'Завантажити останній вибраний торрент'
+                description: 'Перевірити AndroidJS'
             },
+
             onChange: downloadTorrent
         });
     }
 
     if (window.Lampa && Lampa.Listener) {
         Lampa.Listener.follow('app', function (e) {
+
             if (e.type === 'ready') {
                 init();
             }
+
         });
     }
+
 })();
