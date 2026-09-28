@@ -6,7 +6,7 @@
 
     var API_BASE = 'https://utp.to/api';
     var PER_PAGE = 99;
-    var VERSION = 'v0.9.29 build 49';
+    var VERSION = 'v0.9.29 build 107';
 
     var TRACKERS = [
         'udp://tracker.opentrackr.org:1337/announce',
@@ -232,7 +232,7 @@
             'border-radius:.6em;' +
             'background:rgba(255,255,255,.08);' +
             'border:1px solid rgba(255,255,255,.12);' +
-            'font-size:.88em;' +
+            'font-size:2em;' +
             'white-space:nowrap;' +
             'box-sizing:border-box;' +
         '}' +
@@ -464,9 +464,29 @@
                 'display:none;' +
             '}' +
 
-            '.utopia-portrait-back{' +
-                'display:flex;' +
-                'font-size:1.32em;' +
+            '.utopia-portrait-back,' +
+            '.utopia-sort-btn{' +
+            'font-size:2em;' +
+            '}' +
+
+            '.utopia-wrap{' +
+                'height:100%;' +
+                'min-height:0;' +
+                'overflow-y:auto;' +
+                'overflow-x:hidden;' +
+                'touch-action:pan-y;' +
+                'overscroll-behavior:contain;' +
+                '-webkit-mask-image:linear-gradient(to bottom,rgba(0,0,0,0) 0,rgba(0,0,0,.35) .6em,rgba(0,0,0,.55) 1.2em,#000 1.8em);' +
+                'mask-image:linear-gradient(to bottom,rgba(0,0,0,0) 0,rgba(0,0,0,.35) .6em,rgba(0,0,0,.55) 1.2em,#000 1.8em);' +
+            '}' +
+
+            '.utopia-header{' +
+                'flex-shrink:0;' +
+                'margin-top:1em;' +
+            '}' +
+
+            '.utopia-list{' +
+                'flex-shrink:0;' +
             '}' +
 
         '}' +
@@ -1023,9 +1043,13 @@ var moviePanel = $(
 
         injectStyles();
 
-        function bindScrollFollow(el) {
+                function bindScrollFollow(el) {
             el.on('hover:focus', function (e) {
-                scroll.update($(e.target), true);
+                var node = e.target;
+                if (node && node.scrollIntoView) {
+                    try { node.scrollIntoView({ block: 'nearest' }); }
+                    catch (err) { node.scrollIntoView(false); }
+                }
             });
             return el;
         }
@@ -1168,6 +1192,10 @@ var moviePanel = $(
                     search_original: object.search_original,
                     movie: object.movie
                 });
+            });
+
+            wrap.on('touchstart touchmove touchend wheel mousewheel', function (e) {
+                e.stopPropagation();
             });
 
             wrap.append(header);
@@ -1616,7 +1644,7 @@ function showTorrentActionMenu(item) {
         if (!title) return;
 
         var button = $(
-            '<div class="full-start__button selector utopia-search-btn" data-subtitle="v0.9.29 build 49">' +
+            '<div class="full-start__button selector utopia-search-btn" data-subtitle="v0.9.29 build 107">' +
             '<span>\ud83e\uddf2 UTOPIA - торенти</span>' +
             '</div>'
         );
