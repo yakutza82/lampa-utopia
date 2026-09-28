@@ -6,6 +6,7 @@
 
     var API_BASE = 'https://utp.to/api';
     var PER_PAGE = 99;
+    var VERSION = 'v11';
 
     var TRACKERS = [
         'udp://tracker.opentrackr.org:1337/announce',
@@ -18,68 +19,63 @@
 
     // =========================================================
     // -1. Побудова робочого magnet з .torrent-файлу
+    //
+    // UTOPIA не завжди дає готовий magnet - часто натомість дає
+    // посилання на завантаження самого .torrent-файлу. Щоб все одно
+    // відкрити його одним кліком (без ручного скачування), тут:
+    // 1) вручну розбираємо bencode-структуру .torrent файлу,
+    //    щоб знайти РІВНО ті байти, де лежить секція "info";
+    // 2) рахуємо SHA-1 від цих байтів - це і є справжній BTIH-хеш;
+    // 3) збираємо з нього робочий magnet-рядок.
+    // SHA-1 порахований власноруч (не через Web Crypto), бо
+    // crypto.subtle іноді недоступний у не-https/file:// оточенні.
     // =========================================================
     function findInfoDictRange(buffer) {
         var buf = new Uint8Array(buffer);
-        var len = buf.length;
         var pos = 0;
 
         function readString() {
             var start = pos;
-            while (pos < len && buf[pos] !== 0x3a) pos++; // ':'
-            if (pos >= len) throw new Error('Завершення файлу під час читання довжини рядка');
-            
+            while (buf[pos] !== 0x3a) pos++; // ':'
             var lenStr = '';
             for (var i = start; i < pos; i++) lenStr += String.fromCharCode(buf[i]);
-            var strLen = parseInt(lenStr, 10);
-            if (isNaN(strLen)) throw new Error('Некоректна довжина рядка Bencode');
-            
+            var len = parseInt(lenStr, 10);
             pos++; // skip ':'
-            if (pos + strLen > len) throw new Error('Вихід за межі файлу при читанні рядка');
-            
             var text = '';
-            // Обмежуємо читання тексту, щоб не створювати гігантські рядки в пам'яті
-            var readMax = Math.min(strLen, 100);
-            for (var j = 0; j < readMax; j++) text += String.fromCharCode(buf[pos + j]);
-            pos += strLen;
+            for (var j = 0; j < len; j++) text += String.fromCharCode(buf[pos + j]);
+            pos += len;
             return text;
         }
 
         function skipValue() {
-            if (pos >= len) throw new Error('Несподіваний кінець файлу');
             var c = buf[pos];
             if (c === 0x69) { // 'i' - integer
                 pos++;
-                while (pos < len && buf[pos] !== 0x65) pos++;
-                if (pos >= len) throw new Error('Незакритий integer');
+                while (buf[pos] !== 0x65) pos++;
                 pos++;
             } else if (c === 0x6c) { // 'l' - list
                 pos++;
-                while (pos < len && buf[pos] !== 0x65) skipValue();
-                if (pos >= len) throw new Error('Незакритий list');
+                while (buf[pos] !== 0x65) skipValue();
                 pos++;
             } else if (c === 0x64) { // 'd' - dict
                 pos++;
-                while (pos < len && buf[pos] !== 0x65) {
+                while (buf[pos] !== 0x65) {
                     readString();
                     skipValue();
                 }
-                if (pos >= len) throw new Error('Незакритий dict');
                 pos++;
             } else if (c >= 0x30 && c <= 0x39) { // string
                 readString();
             } else {
-                throw new Error('Некоректний байт Bencode: ' + c + ' на позиції ' + pos);
+                throw new Error('bad bencode byte at ' + pos);
             }
         }
 
-        if (len === 0 || buf[0] !== 0x64) {
-            throw new Error('Файл не є .torrent (не починається з Bencode-словника "d")');
-        }
+        if (buf[pos] !== 0x64) throw new Error('.torrent файл має починатись зі словника');
         pos++; // skip top-level 'd'
 
         var infoRange = null;
-        while (pos < len && buf[pos] !== 0x65) {
+        while (buf[pos] !== 0x65) {
             var key = readString();
             if (key === 'info') {
                 var infoStart = pos;
@@ -93,122 +89,66 @@
         return infoRange;
     }
 
-    // Асинхронний SHA-1 для уникнення зависання UI
-    function sha1HexAsync(bytes) {
-    if (window.crypto && window.crypto.subtle && window.crypto.subtle.digest) {
-        return window.crypto.subtle.digest('SHA-1', bytes).then(function (hash) {
-            var hexCodes = [];
-            var view = new DataView(hash);
-            for (var i = 0; i < view.byteLength; i += 4) {
-                var value = view.getUint32(i);
-                var stringValue = value.toString(16);
-                var padding = '00000000';
-                var paddedValue = (padding + stringValue).slice(-8);
-                hexCodes.push(paddedValue);
-            }
-            return hexCodes.join('');
-        }).catch(function () {
-            return sha1HexSync(bytes);
-        });
-    }
-    return sha1HexSync(bytes);
-}
+    function sha1Hex(bytes) {
+        function rotl(n, s) { return (n << s) | (n >>> (32 - s)); }
 
-    function sha1HexSync(bytes) {
-    return new Promise(function (resolve) {
-        var i;
-        var l = bytes.length;
-        var wd = new Uint32Array(80);
+        var ml = bytes.length * 8;
+        var withOne = new Uint8Array(((bytes.length + 9 + 63) >> 6) << 6);
+        withOne.set(bytes);
+        withOne[bytes.length] = 0x80;
+        var view = new DataView(withOne.buffer);
+        view.setUint32(withOne.length - 4, ml >>> 0, false);
+
         var h0 = 0x67452301, h1 = 0xEFCDAB89, h2 = 0x98BADCFE, h3 = 0x10325476, h4 = 0xC3D2E1F0;
 
-        var newLen = ((l + 9 + 63) >> 6) << 6;
-        var newBytes = new Uint8Array(newLen);
-        newBytes.set(bytes);
-        newBytes[l] = 0x80;
+        for (var chunkStart = 0; chunkStart < withOne.length; chunkStart += 64) {
+            var w = new Array(80);
+            for (var i = 0; i < 16; i++) w[i] = view.getUint32(chunkStart + i * 4, false);
+            for (i = 16; i < 80; i++) w[i] = rotl(w[i - 3] ^ w[i - 8] ^ w[i - 14] ^ w[i - 16], 1);
 
-        var view = new DataView(newBytes.buffer);
-        view.setUint32(newLen - 4, l * 8, false);
+            var a = h0, b = h1, c = h2, d = h3, e = h4;
 
-        var chunk = 0;
-        var CHUNK_BATCH = 2000; // кількість чанків за один квант часу
+            for (i = 0; i < 80; i++) {
+                var f, k;
+                if (i < 20) { f = (b & c) | ((~b) & d); k = 0x5A827999; }
+                else if (i < 40) { f = b ^ c ^ d; k = 0x6ED9EBA1; }
+                else if (i < 60) { f = (b & c) | (b & d) | (c & d); k = 0x8F1BBCDC; }
+                else { f = b ^ c ^ d; k = 0xCA62C1D6; }
 
-        function processBatch() {
-            var limit = Math.min(chunk + CHUNK_BATCH * 64, newLen);
-
-            while (chunk < limit) {
-                for (i = 0; i < 16; i++) wd[i] = view.getUint32(chunk + i * 4, false);
-                for (i = 16; i < 80; i++) {
-                    var w = wd[i - 3] ^ wd[i - 8] ^ wd[i - 14] ^ wd[i - 16];
-                    wd[i] = (w << 1) | (w >>> 31);
-                }
-
-                var a = h0, b = h1, c = h2, d = h3, e = h4;
-
-                for (i = 0; i < 80; i++) {
-                    var f, k;
-                    if (i < 20) { f = (b & c) | ((~b) & d); k = 0x5A827999; }
-                    else if (i < 40) { f = b ^ c ^ d; k = 0x6ED9EBA1; }
-                    else if (i < 60) { f = (b & c) | (b & d) | (c & d); k = 0x8F1BBCDC; }
-                    else { f = b ^ c ^ d; k = 0xCA62C1D6; }
-
-                    var temp = (((a << 5) | (a >>> 27)) + f + e + k + wd[i]) >>> 0;
-                    e = d; d = c; c = (b << 30) | (b >>> 2); b = a; a = temp;
-                }
-
-                h0 = (h0 + a) >>> 0;
-                h1 = (h1 + b) >>> 0;
-                h2 = (h2 + c) >>> 0;
-                h3 = (h3 + d) >>> 0;
-                h4 = (h4 + e) >>> 0;
-
-                chunk += 64;
+                var temp = (rotl(a, 5) + f + e + k + w[i]) >>> 0;
+                e = d; d = c; c = rotl(b, 30); b = a; a = temp;
             }
 
-            if (chunk < newLen) {
-                // Віддаємо потік інтерфейсу, щоб спінер крутився і Lampa не висла
-                setTimeout(processBatch, 0);
-            } else {
-                function toHex(n) { return ('00000000' + (n >>> 0).toString(16)).slice(-8); }
-                resolve(toHex(h0) + toHex(h1) + toHex(h2) + toHex(h3) + toHex(h4));
-            }
+            h0 = (h0 + a) >>> 0;
+            h1 = (h1 + b) >>> 0;
+            h2 = (h2 + c) >>> 0;
+            h3 = (h3 + d) >>> 0;
+            h4 = (h4 + e) >>> 0;
         }
 
-        processBatch();
-    });
-}
+        function toHex(n) { return ('00000000' + (n >>> 0).toString(16)).slice(-8); }
+        return toHex(h0) + toHex(h1) + toHex(h2) + toHex(h3) + toHex(h4);
+    }
 
+    // Качаємо .torrent-файл ЧЕРЕЗ ТОЙ САМИЙ механізм, що вже успішно
+    // обходить CORS для звичайних JSON-запитів (Lampa.Reguest().native()) -
+    // звичайний XMLHttpRequest, як з'ясувалось, CORS не обходить.
+    // native() віддає відповідь як звичайний РЯДОК (як і для JSON), тому
+    // переводимо кожен символ назад у байт (код символу як є, без UTF-8).
     function fetchTorrentFileBytes(url, headers, onSuccess, onError) {
         var network = new Lampa.Reguest();
-        network.timeout(15000);
+        network.timeout(20000);
 
-        // ВстановлюємоResponseType якщо доступно
         network.native(url, function (response) {
-            if (!response) {
+            if (typeof response !== 'string' || !response.length) {
                 onError('parse_error');
                 return;
             }
-
-            if (response instanceof ArrayBuffer) {
-                onSuccess(response);
-                return;
+            var bytes = new Uint8Array(response.length);
+            for (var i = 0; i < response.length; i++) {
+                bytes[i] = response.charCodeAt(i) & 0xFF;
             }
-
-            if (typeof response === 'string' && response.length > 0) {
-                // Якщо сервер повернув HTML сторінку помилки (наприклад Cloudflare або 404)
-                if (response.indexOf('<!DOCTYPE') !== -1 || response.indexOf('<html') !== -1) {
-                    onError('forbidden');
-                    return;
-                }
-
-                var bytes = new Uint8Array(response.length);
-                for (var i = 0; i < response.length; i++) {
-                    bytes[i] = response.charCodeAt(i) & 0xFF;
-                }
-                onSuccess(bytes.buffer, response);
-                return;
-            }
-
-            onError('parse_error');
+            onSuccess(bytes.buffer, response);
         }, function (xhr) {
             var status = xhr ? xhr.status : 0;
             if (status === 401) onError('unauthorized');
@@ -302,7 +242,7 @@
             param: { name: 'utopia_api_key', type: 'input', values: '', default: '' },
             field: {
                 name: 'API ключ UTOPIA',
-                description: 'Встав ключ доступу до utp.to.'
+                description: 'Встав ключ доступу до utp.to. Версія плагіна: ' + VERSION
             },
             onChange: function (value) {
                 var key = (value || '').trim();
@@ -376,6 +316,7 @@
     function normalizeItem(raw) {
         if (!raw || typeof raw !== 'object') return {};
 
+        // Реальна структура відповіді UTOPIA: { type: "torrent", id: "...", attributes: {...} }
         var attrs = (raw.attributes && typeof raw.attributes === 'object') ? raw.attributes : raw;
 
         var name = attrs.name || deepFind(raw, ['name', 'title', 'filename']) || 'Без назви';
@@ -392,6 +333,15 @@
         } else if (attrs.download_link) {
             magnet = attrs.download_link;
             isDirect = true;
+        } else {
+            // Запасний варіант: будь-яке поле з "download"/"magnet" у назві,
+            // значення якого схоже на посилання.
+            for (var key in attrs) {
+                if (!attrs.hasOwnProperty(key) || !/download|magnet/i.test(key)) continue;
+                var v = attrs[key];
+                if (typeof v === 'string' && v.indexOf('magnet:') === 0) { magnet = v; break; }
+                if (typeof v === 'string' && /^https?:\/\//.test(v)) { magnet = v; isDirect = true; break; }
+            }
         }
 
         return {
@@ -536,6 +486,17 @@
         size_asc: 'Спочатку менший розмір'
     };
 
+    // Компактний опис торента для дебагу: список полів + усе, що схоже
+    // на посилання. Вміщається на екран і не залежить від розміру опису.
+    function summarizeItem(item) {
+        var attrs = (item.__raw && item.__raw.attributes) || {};
+        var links = {};
+        for (var k in attrs) {
+            if (attrs.hasOwnProperty(k) && /link|magnet|hash|download|url/i.test(k)) links[k] = attrs[k];
+        }
+        return { id: item.__raw && item.__raw.id, name: item.name, attributeKeys: Object.keys(attrs), linkFields: links };
+    }
+
     // =========================================================
     // 6. Компонент екрана
     // =========================================================
@@ -579,6 +540,9 @@
             return el;
         }
 
+        // Готує дані для показу в дебаг-екрані: обрізає задовгі текстові
+        // поля (типу media_info/description, які бувають на кілька тисяч
+        // символів), щоб textarea не гальмувала й не "вішала" WebView.
         function truncateForDebug(value, depth) {
             depth = depth || 0;
             if (depth > 6) return '(...)';
@@ -600,13 +564,13 @@
 
         function showDebugOverlay(title, data) {
             var jsonText = (function () {
-                try { return JSON.stringify(truncateForDebug(data), null, 2); }
+                try { return typeof data === 'string' ? data : JSON.stringify(truncateForDebug(data), null, 2); }
                 catch (e) { return String(data); }
             })();
 
             var overlay = $('<div class="utopia-debug-overlay"></div>');
             var box = $('<div class="utopia-debug-box"></div>');
-            var titleEl = $('<div class="utopia-debug-title"></div>').text(title);
+            var titleEl = $('<div class="utopia-debug-title"></div>').text(title + ' [' + VERSION + ']');
             var textarea = $('<textarea class="utopia-debug-textarea" readonly></textarea>').val(jsonText);
             var copyBtn = $('<div class="utopia-btn selector utopia-debug-copy">\ud83d\udccb Скопіювати</div>');
             var closeBtn = $('<div class="utopia-btn selector utopia-debug-close">Закрити</div>');
@@ -831,185 +795,98 @@
             row.find('.utopia-item__meta').text(item.size ? formatSize(item.size) : 'Розмір невідомий');
             row.find('.utopia-item__badges').html(badge(item.seeds, '\u25b2') + '&nbsp;&nbsp;' + badge(item.peers, '\u25bc'));
 
-            row.on('click hover:enter', function () { playTorrent(item); });
+            // ВАЖЛИВО: клік має запускати відтворення, а не дебаг-екран -
+            // дебаг лишається тільки як fallback усередині playTorrent,
+            // коли справді нема ні magnet, ні download_link.
+            row.on('click hover:enter', function () { chooseAction(item); });
 
             bindScrollFollow(row);
             return row;
         }
 
+        // Віддає користувачу .torrent-файл (його потім відкриє Transmission).
+        // Який спосіб спрацює - залежить від застосунку Lampa, тому
+        // пропонуємо кілька окремими пунктами меню.
+        function openInBrowser(url) {
+            try { window.open(url, '_system'); }
+            catch (e) { Lampa.Noty.show('UTOPIA: не вдалося відкрити браузер'); }
+        }
+
+        function downloadDirect(url, name) {
+            try {
+                var a = document.createElement('a');
+                a.href = url;
+                a.download = String(name || 'utopia') + '.torrent';
+                a.rel = 'noopener';
+                a.style.display = 'none';
+                document.body.appendChild(a);
+                a.click();
+                setTimeout(function () { document.body.removeChild(a); }, 1000);
+            } catch (e) {
+                Lampa.Noty.show('UTOPIA: не вдалося почати завантаження');
+            }
+        }
+
+        function chooseAction(item) {
+            if (!item.isDirect || !item.magnet) { playTorrent(item); return; }
+
+            Lampa.Select.show({
+                title: item.name,
+                items: [
+                    { title: '\ud83d\udce5 Завантажити .torrent (спосіб 1: браузер)', act: 'browser' },
+                    { title: '\ud83d\udce5 Завантажити .torrent (спосіб 2: напряму)', act: 'direct' },
+                    { title: '\ud83d\udccb Скопіювати посилання на .torrent', act: 'copy' }
+                ],
+                onSelect: function (sel) {
+                    setTimeout(function () {
+                        if (sel.act === 'browser') openInBrowser(item.magnet);
+                        else if (sel.act === 'direct') downloadDirect(item.magnet, item.name);
+                        else showDebugOverlay('Посилання на .torrent-файл', item.magnet);
+                    }, 100);
+                },
+                onBack: function () { Lampa.Controller.toggle('content'); }
+            });
+        }
+
         function playTorrent(item) {
-    if (!item || !item.magnet) {
-        Lampa.Noty.show('UTOPIA: немає посилання на торрент');
-        return;
-    }
-
-    // Якщо раптом UTOPIA дала готовий magnet —
-    // залишаємо стандартну обробку Lampa.
-    if (typeof item.magnet === 'string' &&
-        item.magnet.indexOf('magnet:') === 0) {
-
-        Lampa.Torrent.play({
-            url: item.magnet,
-            name: item.name
-        });
-
-        return;
-    }
-
-    // Тут item.magnet насправді містить download_link UTOPIA.
-    var downloadUrl = item.magnet;
-    var apiKey = getKey();
-
-    if (!apiKey) {
-        Lampa.Noty.show(
-            'UTOPIA: API ключ не знайдено'
-        );
-        return;
-    }
-
-    Lampa.Loading.start(
-        'utopia_download',
-        'UTOPIA: завантаження .torrent...'
-    );
-
-    var network = new Lampa.Reguest();
-
-    network.timeout(30000);
-
-    network.native(
-        downloadUrl,
-
-        function (response) {
-            Lampa.Loading.stop('utopia_download');
-
-            if (!response ||
-                typeof response !== 'string' ||
-                !response.length) {
-
-                Lampa.Noty.show(
-                    'UTOPIA: сервер повернув порожній файл'
-                );
-
+            if (typeof item.magnet === 'string' && item.magnet.indexOf('magnet:') === 0) {
+                Lampa.Torrent.play({ url: item.magnet, name: item.name });
                 return;
             }
 
-            try {
-                /*
-                 * Lampa.Reguest().native() повертає .torrent
-                 * як рядок.
-                 *
-                 * Повертаємо кожен символ назад у байт.
-                 */
-                var bytes = new Uint8Array(response.length);
+            if (!item.isDirect || !item.magnet) {
+                showDebugOverlay('Немає magnet/download', summarizeItem(item));
+                return;
+            }
 
-                for (var i = 0; i < response.length; i++) {
-                    bytes[i] = response.charCodeAt(i) & 0xFF;
+            Lampa.Loading.start('utopia_prepare', 'UTOPIA: готуємо торент...');
+
+            var headers = { 'Authorization': 'Bearer ' + getKey() };
+
+            fetchTorrentFileBytes(item.magnet, headers, function (buffer, rawText) {
+                Lampa.Loading.stop('utopia_prepare');
+                try {
+                    var infoRange = findInfoDictRange(buffer);
+                    if (!infoRange) throw new Error('не знайдено секцію info у .torrent файлі');
+
+                    var infoBytes = new Uint8Array(buffer, infoRange.start, infoRange.end - infoRange.start);
+                    var hashHex = sha1Hex(infoBytes);
+                    var realMagnet = buildMagnetFromHash(hashHex, item.name);
+
+                    Lampa.Torrent.play({ url: realMagnet, name: item.name });
+                } catch (e) {
+                    showDebugOverlay('Помилка розбору .torrent файлу', {
+                        error: String(e),
+                        byteLength: buffer ? buffer.byteLength : 0,
+                        rawPreview: rawText ? rawText.slice(0, 300) : '',
+                        download_link: item.magnet
+                    });
                 }
-
-                /*
-                 * Створюємо справжній .torrent Blob.
-                 */
-                var blob = new Blob(
-                    [bytes],
-                    {
-                        type: 'application/x-bittorrent'
-                    }
-                );
-
-                /*
-                 * Створюємо тимчасовий URL файлу.
-                 */
-                var blobUrl = URL.createObjectURL(blob);
-
-                /*
-                 * Ім'я файлу.
-                 */
-                var fileName = String(item.name || 'torrent')
-                    .replace(/[\\\/:*?"<>|]/g, '_')
-                    .trim();
-
-                if (!/\.torrent$/i.test(fileName)) {
-                    fileName += '.torrent';
-                }
-
-                /*
-                 * Передаємо файл Android/WebView
-                 * через звичайне завантаження.
-                 */
-                var link = document.createElement('a');
-
-                link.href = blobUrl;
-                link.download = fileName;
-                link.style.display = 'none';
-
-                document.body.appendChild(link);
-
-                link.click();
-
-                document.body.removeChild(link);
-
-                /*
-                 * URL більше не потрібен.
-                 */
-                setTimeout(function () {
-                    URL.revokeObjectURL(blobUrl);
-                }, 10000);
-
-                Lampa.Noty.show(
-                    'UTOPIA: .torrent завантажено'
-                );
-
-            } catch (e) {
-
-                Lampa.Noty.show(
-                    'UTOPIA: помилка створення .torrent'
-                );
-
-                console.log(
-                    'UTOPIA torrent save error:',
-                    e
-                );
-            }
-        },
-
-        function (xhr) {
-
-            Lampa.Loading.stop('utopia_download');
-
-            var status = xhr ? xhr.status : 0;
-
-            if (status === 401) {
-
-                Lampa.Noty.show(
-                    'UTOPIA: неправильний API ключ'
-                );
-
-            } else if (status === 403) {
-
-                Lampa.Noty.show(
-                    'UTOPIA: доступ заборонено (403)'
-                );
-
-            } else {
-
-                Lampa.Noty.show(
-                    'UTOPIA: помилка завантаження (' +
-                    (status || 'network') +
-                    ')'
-                );
-            }
-        },
-
-        false,
-
-        {
-            headers: {
-                'Authorization': 'Bearer ' + apiKey,
-                'Accept': 'application/x-bittorrent, application/octet-stream, */*'
-            }
+            }, function (code) {
+                Lampa.Loading.stop('utopia_prepare');
+                Lampa.Noty.show('UTOPIA: не вдалося завантажити .torrent файл - ' + errorMessage(code));
+            });
         }
-    );
-}
 
         function ensureMoreButton() {
             if (!moreButtonEl) {
@@ -1142,7 +1019,7 @@
         if (!title) return;
 
         var button = $(
-            '<div class="full-start__button selector utopia-search-btn" data-subtitle="GPT V1">' +
+            '<div class="full-start__button selector utopia-search-btn" data-subtitle="yakutza">' +
             '<span>\ud83e\uddf2 UTOPIA - торенти</span>' +
             '</div>'
         );
