@@ -6,7 +6,7 @@
 
     var API_BASE = 'https://utp.to/api';
     var PER_PAGE = 99;
-    var VERSION = 'v0.9.28 build 2103';
+    var VERSION = 'v0.9.28 build 2319';
 
     var TRACKERS = [
         'udp://tracker.opentrackr.org:1337/announce',
@@ -290,6 +290,7 @@
 '.utopia-movie__year,' +
 '.utopia-movie__country,' +
 '.utopia-movie__rating,' +
+'.utopia-movie__imdb,' +
 '.utopia-movie__pg{' +
     'font-size:1.22em;' +
     'color:#FFFFFF;' +
@@ -298,6 +299,7 @@
 '}' +
 
 '.utopia-movie__rating{' +
+'.utopia-movie__imdb{' +
     'margin-top:.35em;' +
 '}' +
 
@@ -892,6 +894,7 @@ var moviePanel = $(
                 '<div class="utopia-movie__year"></div>' +
                 '<div class="utopia-movie__country"></div>' +
                 '<div class="utopia-movie__rating"></div>' +
+                '<div class="utopia-movie__imdb"></div>' +
                 '<div class="utopia-movie__pg"></div>' +
             '</div>' +
 
@@ -942,6 +945,12 @@ var moviePanel = $(
         rating = Number(movie.vote_average).toFixed(1);
     }
 
+    var imdb = '';
+    var imdbValue = parseFloat(movie.imdb_rating);
+    if (imdbValue) {
+        imdb = imdbValue.toFixed(1);
+    }
+
         var pg = '';
     try {
         var tmdbApi2 = Lampa.Api && Lampa.Api.sources && Lampa.Api.sources.tmdb;
@@ -968,6 +977,9 @@ var moviePanel = $(
     moviePanel.find('.utopia-movie__country').text(countries);
     moviePanel.find('.utopia-movie__rating').text(
         rating ? 'IMDb ★ ' + rating : ''
+    );
+    moviePanel.find('.utopia-movie__imdb').text(
+        imdb ? 'IMDb ★ ' + imdb : ''
     );
     moviePanel.find('.utopia-movie__pg').text(pg);
     moviePanel.find('.utopia-movie__genres').text(genres);
@@ -1592,7 +1604,7 @@ function showTorrentActionMenu(item) {
         if (!title) return;
 
         var button = $(
-            '<div class="full-start__button selector utopia-search-btn" data-subtitle="v0.9.28 build 2103">' +
+            '<div class="full-start__button selector utopia-search-btn" data-subtitle="v0.9.28 build 2319">' +
             '<span>\ud83e\uddf2 UTOPIA - торенти</span>' +
             '</div>'
         );
