@@ -843,10 +843,73 @@
             fallbackCopy();
         }
 
-        function chooseAction(item) {
-            if (item.isDirect && item.magnet) copyLink(item);
-            else playTorrent(item);
+function downloadTorrent(item) {
+    var url = item && item.magnet
+        ? item.magnet
+        : Lampa.Storage.get('utopia_last_torrent_url', '');
+
+    if (!url) {
+        Lampa.Noty.show('UTOPIA: немає URL торента');
+        return;
+    }
+
+    Lampa.Storage.set('utopia_last_torrent_url', url);
+
+    if (
+        typeof AndroidJS === 'undefined' ||
+        typeof AndroidJS.openBrowser !== 'function'
+    ) {
+        Lampa.Noty.show('UTOPIA: завантаження недоступне');
+        return;
+    }
+
+    try {
+        AndroidJS.openBrowser(url);
+    } catch (e) {
+        console.error('[UTOPIA DOWNLOAD]', e);
+        Lampa.Noty.show('UTOPIA: помилка завантаження');
+    }
+}
+
+function showTorrentActionMenu(item) {
+    Lampa.Select.show({
+        title: 'Торрент',
+        items: [
+            {
+                title: '📥 Завантажити .torrent',
+                action: 'download'
+            },
+            {
+                title: '📋 Скопіювати посилання',
+                action: 'copy'
+            },
+            {
+                title: '❌ Скасувати',
+                action: 'cancel'
+            }
+        ],
+        onSelect: function (selected) {
+            if (selected.action === 'download') {
+                downloadTorrent(item);
+            } else if (selected.action === 'copy') {
+                copyLink(item);
+            }
+
+            Lampa.Controller.toggle('content');
+        },
+        onBack: function () {
+            Lampa.Controller.toggle('content');
         }
+    });
+}
+
+        function chooseAction(item) {
+    if (item.isDirect && item.magnet) {
+        showTorrentActionMenu(item);
+    } else {
+        playTorrent(item);
+    }
+}
 
         function playTorrent(item) {
             if (typeof item.magnet === 'string' && item.magnet.indexOf('magnet:') === 0) {
