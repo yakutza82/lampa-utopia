@@ -8,57 +8,31 @@
         return Lampa.Storage.get('utopia_last_torrent_url', '');
     }
 
-    function readTorrentUrl() {
+    function downloadTorrent() {
         var url = getUrl();
 
         if (!url) {
-            Lampa.Noty.show('Буфер UTOPIA порожній');
+            Lampa.Noty.show('❌ Немає вибраного торента UTOPIA');
             return;
         }
 
-        Lampa.Noty.show(
-            'URL знайдено:\n' + url.substring(0, 300)
-        );
+        if (
+            typeof AndroidJS === 'undefined' ||
+            typeof AndroidJS.openBrowser !== 'function'
+        ) {
+            Lampa.Noty.show('❌ Завантаження недоступне');
+            return;
+        }
 
-        console.log('[UTOPIA BUFFER]', url);
+        try {
+            AndroidJS.openBrowser(url);
+        } catch (e) {
+            console.error('[UTOPIA DOWNLOAD]', e);
+            Lampa.Noty.show(
+                '❌ Помилка завантаження: ' + (e.message || e)
+            );
+        }
     }
-
-    function downloadTorrent() {
-    var url = getUrl();
-
-    if (!url) {
-        Lampa.Noty.show('❌ Немає URL торента');
-        return;
-    }
-
-    if (
-        typeof AndroidJS === 'undefined' ||
-        typeof AndroidJS.openBrowser !== 'function'
-    ) {
-        Lampa.Noty.show('❌ AndroidJS.openBrowser недоступний');
-        return;
-    }
-
-    try {
-        AndroidJS.openBrowser(url);
-
-        Lampa.Noty.show(
-            '🌐 Відкриваю URL у браузері...'
-        );
-
-    } catch (e) {
-
-        console.error(
-            '[UTOPIA DOWNLOAD]',
-            e
-        );
-
-        Lampa.Noty.show(
-            '❌ Помилка: ' +
-            (e.message || e)
-        );
-    }
-}
 
     function init() {
         if (!window.Lampa || !Lampa.SettingsApi) return;
@@ -73,29 +47,13 @@
             component: 'utopia_clipboard',
 
             param: {
-                name: 'read_buffer',
-                type: 'button'
-            },
-
-            field: {
-                name: 'Прочитати URL',
-                description: 'Показати останній URL торента'
-            },
-
-            onChange: readTorrentUrl
-        });
-
-        Lampa.SettingsApi.addParam({
-            component: 'utopia_clipboard',
-
-            param: {
                 name: 'download_torrent',
                 type: 'button'
             },
 
             field: {
                 name: 'Завантажити .torrent',
-                description: 'Перевірити AndroidJS'
+                description: 'Завантажити останній вибраний торрент UTOPIA'
             },
 
             onChange: downloadTorrent
@@ -104,12 +62,9 @@
 
     if (window.Lampa && Lampa.Listener) {
         Lampa.Listener.follow('app', function (e) {
-
             if (e.type === 'ready') {
                 init();
             }
-
         });
     }
-
 })();
