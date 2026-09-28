@@ -6,7 +6,7 @@
 
     var API_BASE = 'https://utp.to/api';
     var PER_PAGE = 99;
-    var VERSION = 'v0.9.29 build 133';
+    var VERSION = 'v0.9.29 build 138';
 
     var TRACKERS = [
         'udp://tracker.opentrackr.org:1337/announce',
@@ -381,7 +381,7 @@
         '}' +
 
         '.utopia-item__title{' +
-            'font-size:.87em;' +
+            'font-size:1.27em;' +
             'opacity:.58;' +
             'line-height:1.3;' +
             'margin-bottom:.3em;' +
@@ -391,7 +391,7 @@
         '}' +
 
         '.utopia-item__meta{' +
-            'font-size:.78em;' +
+            'font-size:1.16em;' +
             'opacity:.45;' +
         '}' +
 
@@ -1651,7 +1651,7 @@ function showTorrentActionMenu(item) {
         if (!title) return;
 
         var button = $(
-            '<div class="full-start__button selector utopia-search-btn" data-subtitle="v0.9.29 build 133">' +
+            '<div class="full-start__button selector utopia-search-btn" data-subtitle="v0.9.29 build 138">' +
             '<span>\ud83e\uddf2 UTOPIA - торенти</span>' +
             '</div>'
         );
