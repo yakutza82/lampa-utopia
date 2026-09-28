@@ -290,7 +290,7 @@
 '.utopia-movie__country,' +
 '.utopia-movie__rating,' +
 '.utopia-movie__pg{' +
-    'font-size:.82em;' +
+    'font-size:1.22em;' +
     'line-height:1.45;' +
     'opacity:.8;' +
 '}' +
