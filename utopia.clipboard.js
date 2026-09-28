@@ -52,7 +52,9 @@
         );
 
         Lampa.Noty.show('✅ Передано Android');
+
     } catch (e) {
+        
         console.error(
             '[UTOPIA DOWNLOAD]',
             e
