@@ -24,25 +24,45 @@
     }
 
     function downloadTorrent() {
-        var url = getUrl();
+    var url = getUrl();
 
-        if (!url) {
-            Lampa.Noty.show('❌ Немає URL торента');
-            return;
-        }
+    if (!url) {
+        Lampa.Noty.show('❌ Немає URL торента');
+        return;
+    }
 
-        console.log('[UTOPIA DOWNLOAD] URL:', url);
-        console.log('[UTOPIA DOWNLOAD] AndroidJS:', window.AndroidJS);
+    if (
+        typeof AndroidJS === 'undefined' ||
+        typeof AndroidJS.openTorrentLink !== 'function'
+    ) {
+        Lampa.Noty.show('❌ AndroidJS.openTorrentLink недоступний');
+        return;
+    }
+
+    try {
+        var data = JSON.stringify({
+            title: 'UTOPIA Torrent'
+        });
+
+        var result = AndroidJS.openTorrentLink(url, data);
+
         console.log(
-            '[UTOPIA DOWNLOAD] AndroidJS methods:',
-            Object.keys(window.AndroidJS || {})
+            '[UTOPIA DOWNLOAD] openTorrentLink:',
+            result
+        );
+
+        Lampa.Noty.show('✅ Передано Android');
+    } catch (e) {
+        console.error(
+            '[UTOPIA DOWNLOAD]',
+            e
         );
 
         Lampa.Noty.show(
-            'AndroidJS: ' +
-            (window.AndroidJS ? 'Є' : 'Немає')
+            '❌ Помилка: ' + (e.message || e)
         );
     }
+}
 
     function init() {
         if (!window.Lampa || !Lampa.SettingsApi) return;
