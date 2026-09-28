@@ -304,7 +304,7 @@
 '}' +
 
 '.utopia-movie__title{' +
-    'font-size:1.05em;' +
+    'font-size:1.25em;' +
     'font-weight:700;' +
     'line-height:1.25;' +
     'margin-top:1em;' +
@@ -367,7 +367,7 @@
         '}' +
 
         '.utopia-item__title{' +
-            'font-size:1.2em;' +
+            'font-size:.87em;' +
             'opacity:.58;' +
             'line-height:1.3;' +
             'margin-bottom:.3em;' +
