@@ -472,10 +472,10 @@
 
     '.utopia-wrap{' +
         'display:grid;' +
-        'grid-template-columns:minmax(0,25%) minmax(0,1fr);' +
+        'grid-template-columns:minmax(0,30%) minmax(0,1fr);' +
         'grid-template-rows:auto minmax(0,1fr);' +
         'column-gap:1.2em;' +
-        'height:100%;' +
+        'height:calc(100% - 1em);' +
         'min-height:0;' +
         'box-sizing:border-box;' +
         'align-items:stretch;' +
@@ -517,7 +517,7 @@
         'grid-row:2;' +
         'min-width:0;' +
         'min-height:0;' +
-        'height:100%;' +
+        'height:auto;' +
         'overflow-y:auto;' +
         'overflow-x:hidden;' +
     '}' +
