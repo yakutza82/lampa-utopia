@@ -6,7 +6,7 @@
 
     var API_BASE = 'https://utp.to/api';
     var PER_PAGE = 99;
-    var VERSION = 'v0.9.29 build 107';
+    var VERSION = 'v0.9.29 build 117';
 
     var TRACKERS = [
         'udp://tracker.opentrackr.org:1337/announce',
@@ -232,15 +232,20 @@
             'border-radius:.6em;' +
             'background:rgba(255,255,255,.08);' +
             'border:1px solid rgba(255,255,255,.12);' +
-            'font-size:2em;' +
+            'font-size:1.8em;' +
             'white-space:nowrap;' +
             'box-sizing:border-box;' +
         '}' +
 
-        '.utopia-action.focus{' +
-            'background:rgba(255,255,255,.10);' +
-            'border-color:rgba(255,255,255,.75);' +
-        '}' +
+        '.utopia-sort-btn{' +
+    'background:#4c4c4f;' +
+    'border-color:#aac1bf;' +
+'}' +
+
+'.utopia-sort-btn.focus{' +
+    'background:#565656;' +
+    'border-color:rgba(255,255,255,.75);' +
+'}' +
 
         /* Картка фільму */
 
@@ -466,7 +471,7 @@
 
             '.utopia-portrait-back,' +
             '.utopia-sort-btn{' +
-            'font-size:2em;' +
+            'font-size:1.8em;' +
             '}' +
 
             '.utopia-wrap{' +
@@ -1644,7 +1649,7 @@ function showTorrentActionMenu(item) {
         if (!title) return;
 
         var button = $(
-            '<div class="full-start__button selector utopia-search-btn" data-subtitle="v0.9.29 build 107">' +
+            '<div class="full-start__button selector utopia-search-btn" data-subtitle="v0.9.29 build 117">' +
             '<span>\ud83e\uddf2 UTOPIA - торенти</span>' +
             '</div>'
         );
