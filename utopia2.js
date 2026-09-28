@@ -6,7 +6,7 @@
 
     var API_BASE = 'https://utp.to/api';
     var PER_PAGE = 99;
-    var VERSION = 'v0.9.28.1412';
+    var VERSION = 'v0.9.28.1426';
 
     var TRACKERS = [
         'udp://tracker.opentrackr.org:1337/announce',
@@ -1082,7 +1082,7 @@ function showTorrentActionMenu(item) {
         if (!title) return;
 
         var button = $(
-            '<div class="full-start__button selector utopia-search-btn" data-subtitle="GPT Edition">' +
+            '<div class="full-start__button selector utopia-search-btn" data-subtitle="v0.9.28.1426">' +
             '<span>\ud83e\uddf2 UTOPIA - торенти</span>' +
             '</div>'
         );
