@@ -6,7 +6,7 @@
 
     var API_BASE = 'https://utp.to/api';
     var PER_PAGE = 99;
-    var VERSION = 'v0.9.28 build 2224';
+    var VERSION = 'v0.9.28 build 2103';
 
     var TRACKERS = [
         'udp://tracker.opentrackr.org:1337/announce',
@@ -288,6 +288,7 @@
 '}' +
 
 '.utopia-movie__year,' +
+'.utopia-movie__country,' +
 '.utopia-movie__rating,' +
 '.utopia-movie__pg{' +
     'font-size:1.22em;' +
@@ -889,6 +890,7 @@ var moviePanel = $(
 
             '<div class="utopia-movie__details">' +
                 '<div class="utopia-movie__year"></div>' +
+                '<div class="utopia-movie__country"></div>' +
                 '<div class="utopia-movie__rating"></div>' +
                 '<div class="utopia-movie__pg"></div>' +
             '</div>' +
@@ -959,13 +961,12 @@ var moviePanel = $(
     }
 
     moviePanel.find('.utopia-movie__title').text(title);
-    moviePanel.find('.utopia-movie__meta').text(
-    year && countries ? year + ' • ' + countries : (year || countries)
-);
-moviePanel.find('.utopia-movie__rating').text(
-    rating ? 'IMDb ★ ' + rating : ''
-);
-moviePanel.find('.utopia-movie__pg').text(pg);
+    moviePanel.find('.utopia-movie__year').text(year);
+    moviePanel.find('.utopia-movie__country').text(countries);
+    moviePanel.find('.utopia-movie__rating').text(
+        rating ? 'IMDb ★ ' + rating : ''
+    );
+    moviePanel.find('.utopia-movie__pg').text(pg);
     moviePanel.find('.utopia-movie__genres').text(genres);
     moviePanel.find('.utopia-movie__overview').text(
         movie.overview || ''
@@ -1148,9 +1149,6 @@ moviePanel.find('.utopia-movie__pg').text(pg);
 
             renderMoviePanel();
 
-            moviePanel.find('.utopia-movie__meta').text(
-    year && countries ? year + ' • ' + countries : (year || countries)
-);
             scroll.append(wrap);
 
             scroll.render().addClass('layer--wheight');
@@ -1591,7 +1589,7 @@ function showTorrentActionMenu(item) {
         if (!title) return;
 
         var button = $(
-            '<div class="full-start__button selector utopia-search-btn" data-subtitle="v0.9.28 build 2224">' +
+            '<div class="full-start__button selector utopia-search-btn" data-subtitle="v0.9.28 build 2103">' +
             '<span>\ud83e\uddf2 UTOPIA - торенти</span>' +
             '</div>'
         );
