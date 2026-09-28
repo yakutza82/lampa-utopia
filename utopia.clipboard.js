@@ -33,35 +33,29 @@
 
     if (
         typeof AndroidJS === 'undefined' ||
-        typeof AndroidJS.openTorrentLink !== 'function'
+        typeof AndroidJS.openBrowser !== 'function'
     ) {
-        Lampa.Noty.show('❌ AndroidJS.openTorrentLink недоступний');
+        Lampa.Noty.show('❌ AndroidJS.openBrowser недоступний');
         return;
     }
 
     try {
-        var data = JSON.stringify({
-            title: 'UTOPIA Torrent'
-        });
+        AndroidJS.openBrowser(url);
 
-        var result = AndroidJS.openTorrentLink(url, data);
-
-        console.log(
-            '[UTOPIA DOWNLOAD] openTorrentLink:',
-            result
+        Lampa.Noty.show(
+            '🌐 Відкриваю URL у браузері...'
         );
 
-        Lampa.Noty.show('✅ Передано Android');
-
     } catch (e) {
-        
+
         console.error(
             '[UTOPIA DOWNLOAD]',
             e
         );
 
         Lampa.Noty.show(
-            '❌ Помилка: ' + (e.message || e)
+            '❌ Помилка: ' +
+            (e.message || e)
         );
     }
 }
