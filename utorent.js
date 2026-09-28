@@ -6,7 +6,7 @@
 
     var API_BASE = 'https://utp.to/api';
     var PER_PAGE = 99;
-    var VERSION = 'v0.9.28 build 2329';
+    var VERSION = 'v0.9.28 build 2342';
 
     var TRACKERS = [
         'udp://tracker.opentrackr.org:1337/announce',
@@ -289,8 +289,7 @@
 
 '.utopia-movie__year,' +
 '.utopia-movie__country,' +
-'.utopia-movie__rating,' +
-'.utopia-movie__imdb,' +
+'.utopia-movie__ratings,' +
 '.utopia-movie__pg{' +
     'font-size:1.22em;' +
     'color:#FFFFFF;' +
@@ -298,8 +297,11 @@
     'opacity:1;' +
 '}' +
 
-'.utopia-movie__rating' +
-'.utopia-movie__imdb{' +
+'.utopia-movie__ratings{' +
+    'display:flex;' +
+    'flex-wrap:wrap;' +
+    'align-items:center;' +
+    'gap:.4em 1.1em;' +
     'margin-top:.35em;' +
 '}' +
 
@@ -893,8 +895,9 @@ var moviePanel = $(
             '<div class="utopia-movie__details">' +
                 '<div class="utopia-movie__year"></div>' +
                 '<div class="utopia-movie__country"></div>' +
-                '<div class="utopia-movie__rating"></div>' +
-                '<div class="utopia-movie__imdb"></div>' +
+                '<span class="utopia-movie__imdb"></span>' +
+                '<span class="utopia-movie__rating"></span>' +
+                '</div>' +
                 '<div class="utopia-movie__pg"></div>' +
             '</div>' +
 
@@ -942,7 +945,7 @@ var moviePanel = $(
 
     var rating = '';
     if (movie.vote_average) {
-        rating = Number(movie.vote_average).toFixed(1);
+        rating = Math.round(Number(movie.vote_average) * 10) + '%';
     }
 
     var imdb = '';
@@ -976,7 +979,7 @@ var moviePanel = $(
     moviePanel.find('.utopia-movie__year').text(year);
     moviePanel.find('.utopia-movie__country').text(countries);
     moviePanel.find('.utopia-movie__rating').text(
-        rating ? 'IMDb ★ ' + rating : ''
+        rating ? 'TMDb ' + rating : ''
     );
     moviePanel.find('.utopia-movie__imdb').text(
         imdb ? 'IMDb ★ ' + imdb : ''
@@ -1604,7 +1607,7 @@ function showTorrentActionMenu(item) {
         if (!title) return;
 
         var button = $(
-            '<div class="full-start__button selector utopia-search-btn" data-subtitle="v0.9.28 build 2329">' +
+            '<div class="full-start__button selector utopia-search-btn" data-subtitle="v0.9.28 build 2342">' +
             '<span>\ud83e\uddf2 UTOPIA - торенти</span>' +
             '</div>'
         );
