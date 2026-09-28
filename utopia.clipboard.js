@@ -21,17 +21,46 @@
     }
 
     function downloadTorrent() {
-        var url = getUrl();
+    var url = getUrl();
 
-        if (!url) {
-            Lampa.Noty.show('❌ Немає URL торента');
-            return;
-        }
-
-        Lampa.Noty.show('⏳ Відкриваю завантаження...');
-
-        window.location.href = url;
+    if (!url) {
+        Lampa.Noty.show('❌ Немає URL торента');
+        return;
     }
+
+    Lampa.Noty.show('⏳ Отримую .torrent...');
+
+    fetch(url)
+        .then(function (response) {
+            if (!response.ok) {
+                throw new Error('HTTP ' + response.status);
+            }
+
+            return response.blob();
+        })
+        .then(function (blob) {
+            console.log('[UTOPIA TORRENT] blob:', blob);
+
+            var blobUrl = URL.createObjectURL(blob);
+            var a = document.createElement('a');
+
+            a.href = blobUrl;
+            a.download = 'torrent.torrent';
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+
+            setTimeout(function () {
+                URL.revokeObjectURL(blobUrl);
+            }, 5000);
+
+            Lampa.Noty.show('✅ Файл підготовлено до завантаження');
+        })
+        .catch(function (error) {
+            console.error('[UTOPIA TORRENT]', error);
+            Lampa.Noty.show('❌ Помилка завантаження: ' + error.message);
+        });
+}
 
     function init() {
         if (!window.Lampa || !Lampa.SettingsApi) return;
