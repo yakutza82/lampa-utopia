@@ -28,6 +28,16 @@
         return;
     }
 
+    console.log('[UTOPIA DOWNLOAD] URL:', url);
+    console.log('[UTOPIA DOWNLOAD] AndroidJS:', window.AndroidJS);
+    console.log('[UTOPIA DOWNLOAD] AndroidJS methods:', Object.keys(window.AndroidJS || {}));
+
+    Lampa.Noty.show(
+        'AndroidJS: ' +
+        (window.AndroidJS ? 'Є' : 'Немає')
+    );
+}
+
     Lampa.Noty.show('⏳ Отримую .torrent...');
 
     fetch(url)
