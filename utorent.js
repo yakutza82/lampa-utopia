@@ -306,20 +306,23 @@
 
 '.utopia-movie__title{' +
     'font-size:2.25em;' +
+    'color:#FFFFFF' +
     'font-weight:700;' +
     'line-height:1.25;' +
     'margin-top:1em;' +
 '}' +
 
 '.utopia-movie__genres{' +
-    'font-size:.8em;' +
+    'font-size:1.22em;' +
+    'color:#FFFFFF' +
     'line-height:1.4;' +
     'opacity:.65;' +
     'margin-top:.45em;' +
 '}' +
 
 '.utopia-movie__overview{' +
-    'font-size:.82em;' +
+    'font-size:1.22em;' +
+    'color:#FFFFFF' +
     'line-height:1.45;' +
     'opacity:.8;' +
     'margin-top:1.2em;' +
