@@ -232,7 +232,7 @@
             'border-radius:.6em;' +
             'background:rgba(255,255,255,.08);' +
             'border:1px solid rgba(255,255,255,.12);' +
-            'font-size:1.7em;' +
+            'font-size:1.6em;' +
             'white-space:nowrap;' +
             'box-sizing:border-box;' +
         '}' +
@@ -473,7 +473,7 @@
 
             '.utopia-portrait-back,' +
             '.utopia-sort-btn{' +
-            'font-size:1.7em;' +
+            'font-size:1.6em;' +
             '}' +
 
             '.utopia-wrap{' +
