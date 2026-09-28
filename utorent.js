@@ -367,7 +367,7 @@
         '}' +
 
         '.utopia-item__title{' +
-            'font-size:.87em;' +
+            'font-size:1.2em;' +
             'opacity:.58;' +
             'line-height:1.3;' +
             'margin-bottom:.3em;' +
