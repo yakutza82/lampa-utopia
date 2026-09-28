@@ -6,7 +6,7 @@
 
     var API_BASE = 'https://utp.to/api';
     var PER_PAGE = 99;
-    var VERSION = 'v0.9.28 build 1728';
+    var VERSION = 'v0.9.28 build 2046';
 
     var TRACKERS = [
         'udp://tracker.opentrackr.org:1337/announce',
@@ -174,7 +174,7 @@
             'display:flex;' +
             'flex-direction:column;' +
             'gap:1em;' +
-            'padding:1em 1.2em 5em;' +
+            'padding:1em 1.2em 0;' +
             'touch-action:pan-y;' +
             'box-sizing:border-box;' +
         '}' +
@@ -291,7 +291,7 @@
 '.utopia-movie__rating,' +
 '.utopia-movie__pg{' +
     'font-size:1.22em;' +
-    'color:#FFFFFF' +
+    'color:#FFFFFF;' +
     'line-height:1.45;' +
     'opacity:.8;' +
 '}' +
@@ -306,7 +306,7 @@
 
 '.utopia-movie__title{' +
     'font-size:2.25em;' +
-    'color:#FFFFFF' +
+    'color:#FFFFFF;' +
     'font-weight:700;' +
     'line-height:1.25;' +
     'margin-top:1em;' +
@@ -314,7 +314,7 @@
 
 '.utopia-movie__genres{' +
     'font-size:1.22em;' +
-    'color:#FFFFFF' +
+    'color:#FFFFFF;' +
     'line-height:1.4;' +
     'opacity:.65;' +
     'margin-top:.45em;' +
@@ -322,7 +322,7 @@
 
 '.utopia-movie__overview{' +
     'font-size:1.22em;' +
-    'color:#FFFFFF' +
+    'color:#FFFFFF;' +
     'line-height:1.45;' +
     'opacity:.8;' +
     'margin-top:1.2em;' +
@@ -475,7 +475,7 @@
         'grid-template-columns:minmax(0,30%) minmax(0,1fr);' +
         'grid-template-rows:auto minmax(0,1fr);' +
         'column-gap:1.2em;' +
-        'height:calc(100% - 1em);' +
+        'height:100%;' +
         'min-height:0;' +
         'box-sizing:border-box;' +
         'align-items:stretch;' +
@@ -531,7 +531,7 @@
         '@media screen and (max-width:600px){' +
 
             '.utopia-wrap{' +
-                'padding:.8em .8em 4em;' +
+                'padding:.8em .8em 0;' +
             '}' +
 
             '.utopia-item{' +
@@ -1586,7 +1586,7 @@ function showTorrentActionMenu(item) {
         if (!title) return;
 
         var button = $(
-            '<div class="full-start__button selector utopia-search-btn" data-subtitle="v0.9.28 build 1728">' +
+            '<div class="full-start__button selector utopia-search-btn" data-subtitle="v0.9.28 build 2046">' +
             '<span>\ud83e\uddf2 UTOPIA - торенти</span>' +
             '</div>'
         );
