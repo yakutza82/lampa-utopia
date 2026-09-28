@@ -6,7 +6,7 @@
 
     var API_BASE = 'https://utp.to/api';
     var PER_PAGE = 99;
-    var VERSION = 'v0.9.28 build 1633';
+    var VERSION = 'v0.9.28 build 1656';
 
     var TRACKERS = [
         'udp://tracker.opentrackr.org:1337/announce',
@@ -847,16 +847,24 @@
 var moviePanel = $(
     '<div class="utopia-movie">' +
 
-        '<div class="utopia-movie__poster">' +
-            '<img class="utopia-movie__poster-img" />' +
+        '<div class="utopia-movie__top">' +
+
+            '<div class="utopia-movie__poster">' +
+                '<img class="utopia-movie__poster-img" />' +
+            '</div>' +
+
+            '<div class="utopia-movie__details">' +
+                '<div class="utopia-movie__year"></div>' +
+                '<div class="utopia-movie__country"></div>' +
+                '<div class="utopia-movie__rating"></div>' +
+                '<div class="utopia-movie__pg"></div>' +
+            '</div>' +
+
         '</div>' +
 
-        '<div class="utopia-movie__info">' +
-            '<div class="utopia-movie__title"></div>' +
-            '<div class="utopia-movie__original"></div>' +
-            '<div class="utopia-movie__meta"></div>' +
-            '<div class="utopia-movie__overview"></div>' +
-        '</div>' +
+        '<div class="utopia-movie__title"></div>' +
+        '<div class="utopia-movie__genres"></div>' +
+        '<div class="utopia-movie__overview"></div>' +
 
     '</div>'
 );
@@ -871,15 +879,81 @@ var moviePanel = $(
     var movie = object.movie || {};
 
     var title = movie.title || movie.name || '';
-    var originalTitle = movie.original_title || movie.original_name || '';
 
     var year = '';
-
     if (movie.release_date) {
         year = String(movie.release_date).slice(0, 4);
     } else if (movie.first_air_date) {
         year = String(movie.first_air_date).slice(0, 4);
     }
+
+    var countries = '';
+    try {
+        if (
+            Lampa.TMDB &&
+            typeof Lampa.TMDB.parseCountries === 'function'
+        ) {
+            countries = Lampa.TMDB.parseCountries(movie).join(', ');
+        }
+    } catch (e) {}
+
+    var rating = '';
+    if (movie.vote_average) {
+        rating = Number(movie.vote_average).toFixed(1);
+    }
+
+    var pg = '';
+    try {
+        if (
+            Lampa.TMDB &&
+            typeof Lampa.TMDB.parsePG === 'function'
+        ) {
+            pg = Lampa.TMDB.parsePG(movie) || '';
+        }
+    } catch (e) {}
+
+    var genres = '';
+    if (Array.isArray(movie.genres)) {
+        genres = movie.genres
+            .slice(0, 5)
+            .map(function (genre) {
+                return genre && genre.name
+                    ? genre.name
+                    : String(genre || '');
+            })
+            .filter(Boolean)
+            .join(', ');
+    }
+
+    moviePanel.find('.utopia-movie__title').text(title);
+    moviePanel.find('.utopia-movie__year').text(year);
+    moviePanel.find('.utopia-movie__country').text(countries);
+    moviePanel.find('.utopia-movie__rating').text(
+        rating ? 'IMDb ★ ' + rating : ''
+    );
+    moviePanel.find('.utopia-movie__pg').text(pg);
+    moviePanel.find('.utopia-movie__genres').text(genres);
+    moviePanel.find('.utopia-movie__overview').text(
+        movie.overview || ''
+    );
+
+    /*
+     * Lampa у повній картці вже формує готове поле img.
+     * Використовуємо його в першу чергу.
+     */
+    var posterUrl = movie.img || movie.poster || movie.poster_path || '';
+
+    if (posterUrl) {
+        moviePanel
+            .find('.utopia-movie__poster-img')
+            .attr('src', posterUrl)
+            .show();
+    } else {
+        moviePanel
+            .find('.utopia-movie__poster-img')
+            .hide();
+    }
+}
 
     var meta = [];
 
@@ -1531,7 +1605,7 @@ function showTorrentActionMenu(item) {
         if (!title) return;
 
         var button = $(
-            '<div class="full-start__button selector utopia-search-btn" data-subtitle="v0.9.28 build 1633">' +
+            '<div class="full-start__button selector utopia-search-btn" data-subtitle="v0.9.28 build 1656">' +
             '<span>\ud83e\uddf2 UTOPIA - торенти</span>' +
             '</div>'
         );
