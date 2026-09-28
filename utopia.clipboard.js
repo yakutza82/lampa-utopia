@@ -1,16 +1,13 @@
 (function () {
     'use strict';
 
-    if (window.UTOPIA_CLIPBOARD_TEST) return;
-    window.UTOPIA_CLIPBOARD_TEST = true;
+    if (window.UTOPIA_CLIPBOARD) return;
+    window.UTOPIA_CLIPBOARD = true;
+
+    var VERSION = '0.1.0';
 
     function readClipboard() {
 
-        Lampa.Noty.show('Читаю буфер...');
-
-        /*
-         * Спочатку перевіряємо стандартний Clipboard API.
-         */
         if (
             navigator.clipboard &&
             typeof navigator.clipboard.readText === 'function'
@@ -24,9 +21,16 @@
                         return;
                     }
 
-                    Lampa.Noty.show(
-                        '📋 ' + text.substring(0, 500)
+                    console.log(
+                        '[UTOPIA CLIPBOARD]',
+                        text
                     );
+
+                    Lampa.Noty.show(
+                        '📋 Буфер:\n' +
+                        text.substring(0, 500)
+                    );
+
                 })
                 .catch(function (error) {
 
@@ -43,69 +47,90 @@
             return;
         }
 
-        /*
-         * Для Android WebView readText() відсутній.
-         * Поки просто повідомляємо це.
-         */
         Lampa.Noty.show(
-            '❌ Android WebView не має clipboard.readText()'
+            '❌ У цьому Android WebView відсутній clipboard.readText()'
         );
     }
 
 
-    function addButton() {
+    function initSettings() {
+
+        Lampa.SettingsApi.addComponent({
+            component: 'utopia_clipboard',
+            name: 'Буфер',
+            icon:
+                '<svg width="26" height="26" viewBox="0 0 26 26" xmlns="http://www.w3.org/2000/svg">' +
+                '<rect x="7" y="5" width="13" height="17" rx="2" stroke="currentColor" stroke-width="2" fill="none"/>' +
+                '<path d="M10 5V3h6v2" stroke="currentColor" stroke-width="2" fill="none"/>' +
+                '<path d="M10 10h7M10 14h7M10 18h5" stroke="currentColor" stroke-width="1.5"/>' +
+                '</svg>'
+        });
+
+
+        Lampa.SettingsApi.addParam({
+            component: 'utopia_clipboard',
+
+            param: {
+                name: 'clipboard_read',
+                type: 'button',
+                values: '',
+                default: ''
+            },
+
+            field: {
+                name: 'Прочитати буфер',
+                description:
+                    'Перевірити вміст буфера обміну. Версія плагіна: ' +
+                    VERSION
+            },
+
+            onChange: function () {
+                readClipboard();
+            }
+        });
+    }
+
+
+    function start() {
 
         if (
-            !window.Lampa ||
-            !Lampa.Menu ||
-            typeof Lampa.Menu.addButton !== 'function'
+            typeof Lampa === 'undefined' ||
+            !Lampa.SettingsApi
         ) {
             console.error(
-                '[UTOPIA CLIPBOARD] Lampa.Menu.addButton недоступний'
+                '[UTOPIA CLIPBOARD] Lampa.SettingsApi недоступний'
             );
             return;
         }
 
-        var icon =
-            '<svg viewBox="0 0 24 24">' +
-            '<path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/>' +
-            '</svg>';
-
-        Lampa.Menu.addButton(
-            icon,
-            'Буфер',
-            readClipboard
-        );
+        initSettings();
 
         console.log(
-            '[UTOPIA CLIPBOARD] Кнопка Буфер додана'
+            '[UTOPIA CLIPBOARD] loaded v' + VERSION
         );
     }
 
 
-    function init() {
+    if (window.appready) {
+        start();
+    } else if (
+        window.Lampa &&
+        Lampa.Listener &&
+        typeof Lampa.Listener.follow === 'function'
+    ) {
 
-        if (window.appready) {
-            addButton();
-            return;
-        }
+        Lampa.Listener.follow('app', function (e) {
 
-        if (
-            window.Lampa &&
-            Lampa.Listener &&
-            typeof Lampa.Listener.follow === 'function'
-        ) {
-            Lampa.Listener.follow('app', function (event) {
+            if (e.type === 'ready') {
+                start();
+            }
 
-                if (event.type === 'ready') {
-                    addButton();
-                }
+        });
 
-            });
-        }
+    } else {
+
+        setTimeout(start, 2000);
+
     }
-
-
-    init();
 
 })();
