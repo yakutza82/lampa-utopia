@@ -1000,58 +1000,7 @@ var moviePanel = $(
     }
 }
 
-    var meta = [];
-
-    if (year) meta.push(year);
-
-    if (movie.vote_average) {
-        meta.push('★ ' + Number(movie.vote_average).toFixed(1));
-    }
-
-    if (movie.runtime) {
-        meta.push(movie.runtime + ' хв');
-    }
-
-    moviePanel.find('.utopia-movie__title').text(title);
-    moviePanel.find('.utopia-movie__original').text(originalTitle);
-
-    moviePanel.find('.utopia-movie__meta').text(
-        meta.join(' • ')
-    );
-
-    moviePanel.find('.utopia-movie__overview').text(
-        movie.overview || ''
-    );
-
-    /*
-     * Lampa обычно передает poster_path как путь TMDB.
-     * Сначала пытаемся использовать штатный Lampa.TMDB.image().
-     */
-    var poster = movie.poster_path || movie.poster || '';
-
-    if (poster) {
-        var posterUrl = poster;
-
-        try {
-            if (
-                Lampa.TMDB &&
-                typeof Lampa.TMDB.image === 'function'
-            ) {
-                posterUrl = Lampa.TMDB.image(poster);
-            }
-        } catch (e) {}
-
-        moviePanel
-            .find('.utopia-movie__poster-img')
-            .attr('src', posterUrl);
-    } else {
-        moviePanel
-            .find('.utopia-movie__poster-img')
-            .hide();
-    }
-}
-
-        var primaryQuery = object.search;
+            var primaryQuery = object.search;
         var altQuery = (object.search_original &&
             String(object.search_original).toLowerCase() !== String(primaryQuery).toLowerCase())
             ? object.search_original
