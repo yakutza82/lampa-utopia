@@ -362,7 +362,7 @@
 
             '@keyframes utopia-bounce{' +
             '0%{transform:translateY(0) scale(1);}' +
-            '30%{transform:translateY(-.55em) scale(1.02);}' +
+            '30%{transform:translateY(-.45em) scale(1.02);}' +
             '55%{transform:translateY(.12em) scale(.995);}' +
             '80%{transform:translateY(-.08em) scale(1.005);}' +
             '100%{transform:translateY(0) scale(1);}' +
