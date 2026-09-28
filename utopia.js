@@ -6,7 +6,7 @@
 
     var API_BASE = 'https://utp.to/api';
     var PER_PAGE = 99;
-    var VERSION = 'v12';
+    var VERSION = 'v0.9.28';
 
     var TRACKERS = [
         'udp://tracker.opentrackr.org:1337/announce',
@@ -810,6 +810,8 @@
         // показуємо вікно з посиланням, щоб скопіювати вручну.
         function copyLink(item) {
             var text = item.magnet;
+
+            Lampa.Storage.set('utopia_last_torrent_url', text);
 
             function ok() {
                 Lampa.Noty.show('UTOPIA: посилання скопійовано. Встав його в Transmission (Add by URL)');
