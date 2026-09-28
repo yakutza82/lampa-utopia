@@ -4,52 +4,65 @@
     if (window.UTOPIA_CLIPBOARD) return;
     window.UTOPIA_CLIPBOARD = true;
 
-    var VERSION = '0.1.0';
+    var VERSION = '0.2.0';
 
     function readClipboard() {
 
-        if (
-            navigator.clipboard &&
-            typeof navigator.clipboard.readText === 'function'
-        ) {
+        Lampa.Noty.show('📋 Спроба отримати буфер...');
 
-            navigator.clipboard.readText()
-                .then(function (text) {
+        var textarea = document.createElement('textarea');
 
-                    if (!text) {
-                        Lampa.Noty.show('📋 Буфер порожній');
-                        return;
-                    }
+        textarea.style.position = 'fixed';
+        textarea.style.left = '-10000px';
+        textarea.style.top = '0';
+        textarea.style.width = '1px';
+        textarea.style.height = '1px';
+        textarea.style.opacity = '0';
 
-                    console.log(
-                        '[UTOPIA CLIPBOARD]',
-                        text
-                    );
+        document.body.appendChild(textarea);
 
-                    Lampa.Noty.show(
-                        '📋 Буфер:\n' +
-                        text.substring(0, 500)
-                    );
+        textarea.focus();
 
-                })
-                .catch(function (error) {
+        var success = false;
 
-                    console.error(
-                        '[UTOPIA CLIPBOARD]',
-                        error
-                    );
-
-                    Lampa.Noty.show(
-                        '❌ Не вдалося прочитати буфер'
-                    );
-                });
-
-            return;
+        try {
+            success = document.execCommand('paste');
+        } catch (e) {
+            console.error(
+                '[UTOPIA CLIPBOARD] paste error:',
+                e
+            );
         }
 
-        Lampa.Noty.show(
-            '❌ У цьому Android WebView відсутній clipboard.readText()'
+        var text = textarea.value || '';
+
+        document.body.removeChild(textarea);
+
+        console.log(
+            '[UTOPIA CLIPBOARD] execCommand:',
+            success
         );
+
+        console.log(
+            '[UTOPIA CLIPBOARD] text:',
+            text
+        );
+
+        if (text) {
+
+            Lampa.Noty.show(
+                '📋 Буфер:\n' +
+                text.substring(0, 500)
+            );
+
+        } else {
+
+            Lampa.Noty.show(
+                '❌ Paste не повернув дані\n' +
+                'execCommand: ' +
+                success
+            );
+        }
     }
 
 
@@ -58,6 +71,7 @@
         Lampa.SettingsApi.addComponent({
             component: 'utopia_clipboard',
             name: 'Буфер',
+
             icon:
                 '<svg width="26" height="26" viewBox="0 0 26 26" xmlns="http://www.w3.org/2000/svg">' +
                 '<rect x="7" y="5" width="13" height="17" rx="2" stroke="currentColor" stroke-width="2" fill="none"/>' +
@@ -68,6 +82,7 @@
 
 
         Lampa.SettingsApi.addParam({
+
             component: 'utopia_clipboard',
 
             param: {
@@ -79,8 +94,9 @@
 
             field: {
                 name: 'Прочитати буфер',
+
                 description:
-                    'Перевірити вміст буфера обміну. Версія плагіна: ' +
+                    'Тест отримання буфера через Android WebView. Версія: ' +
                     VERSION
             },
 
@@ -98,7 +114,7 @@
             !Lampa.SettingsApi
         ) {
             console.error(
-                '[UTOPIA CLIPBOARD] Lampa.SettingsApi недоступний'
+                '[UTOPIA CLIPBOARD] SettingsApi недоступний'
             );
             return;
         }
@@ -106,13 +122,16 @@
         initSettings();
 
         console.log(
-            '[UTOPIA CLIPBOARD] loaded v' + VERSION
+            '[UTOPIA CLIPBOARD] loaded v' +
+            VERSION
         );
     }
 
 
     if (window.appready) {
+
         start();
+
     } else if (
         window.Lampa &&
         Lampa.Listener &&
