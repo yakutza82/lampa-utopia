@@ -1,81 +1,79 @@
 (function () {
     'use strict';
 
-    if (window.LAMPA_CLIPBOARD_TEST) return;
-    window.LAMPA_CLIPBOARD_TEST = true;
+    if (window.UTOPIA_CLIPBOARD_TEST) return;
+    window.UTOPIA_CLIPBOARD_TEST = true;
 
-    function init() {
+    function testClipboard() {
 
-        if (!Lampa.Menu || !Lampa.Menu.addButton) {
-            console.log('[Clipboard Test] Lampa.Menu недоступний');
+        console.log('[UTOPIA CLIPBOARD] test started');
+
+        if (!navigator.clipboard) {
+            Lampa.Noty.show('❌ navigator.clipboard недоступний');
             return;
         }
 
-        var icon =
-            '<svg viewBox="0 0 24 24">' +
-            '<path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/>' +
-            '</svg>';
+        if (!navigator.clipboard.readText) {
+            Lampa.Noty.show('❌ clipboard.readText недоступний');
+            return;
+        }
 
-        Lampa.Menu.addButton(
-            icon,
-            'Буфер',
-            function () {
+        navigator.clipboard.readText()
+            .then(function (text) {
 
-                console.log('[Clipboard Test] Кнопка натиснута');
+                console.log('[UTOPIA CLIPBOARD] TEXT:', text);
 
-                if (!navigator.clipboard || !navigator.clipboard.readText) {
-                    Lampa.Noty.show(
-                        'Lampa не має доступу до Clipboard API'
-                    );
+                if (!text) {
+                    Lampa.Noty.show('📋 Буфер порожній');
                     return;
                 }
 
-                navigator.clipboard.readText()
-                    .then(function (text) {
+                Lampa.Noty.show(
+                    '📋 Буфер:\n' + text.substring(0, 500)
+                );
+            })
+            .catch(function (error) {
 
-                        console.log(
-                            '[Clipboard Test] Clipboard:',
-                            text
-                        );
+                console.error(
+                    '[UTOPIA CLIPBOARD] ERROR:',
+                    error
+                );
 
-                        if (!text) {
-                            Lampa.Noty.show(
-                                'Буфер порожній'
-                            );
-                            return;
-                        }
+                Lampa.Noty.show(
+                    '❌ Clipboard error:\n' +
+                    (error.message || error)
+                );
+            });
+    }
 
-                        Lampa.Noty.show(
-                            'БУФЕР:\n' +
-                            text.substring(0, 500)
-                        );
-                    })
-                    .catch(function (error) {
+    function start() {
 
-                        console.error(
-                            '[Clipboard Test] Error:',
-                            error
-                        );
+        console.log('[UTOPIA CLIPBOARD] plugin loaded');
 
-                        Lampa.Noty.show(
-                            'Не вдалося прочитати буфер: ' +
-                            error.message
-                        );
-                    });
-            }
-        );
-
-        console.log('[Clipboard Test] Plugin loaded');
+        /*
+         * Чекаємо, поки Lampa повністю запуститься.
+         */
+        setTimeout(function () {
+            testClipboard();
+        }, 3000);
     }
 
     if (window.appready) {
-        init();
-    } else {
-        Lampa.Listener.follow('app', function (event) {
-            if (event.type === 'ready') {
-                init();
+        start();
+    } else if (window.Lampa && Lampa.Listener) {
+
+        Lampa.Listener.follow('app', function (e) {
+
+            if (e.type === 'ready') {
+                start();
             }
+
         });
+
+    } else {
+
+        setTimeout(start, 5000);
+
     }
 
 })();
