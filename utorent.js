@@ -291,6 +291,7 @@
 '.utopia-movie__rating,' +
 '.utopia-movie__pg{' +
     'font-size:1.22em;' +
+    'color:#FFFFFF' +
     'line-height:1.45;' +
     'opacity:.8;' +
 '}' +
