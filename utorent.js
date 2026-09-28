@@ -6,7 +6,7 @@
 
     var API_BASE = 'https://utp.to/api';
     var PER_PAGE = 99;
-    var VERSION = 'v0.9.28 build 2353';
+    var VERSION = 'v0.9.29 build 2';
 
     var TRACKERS = [
         'udp://tracker.opentrackr.org:1337/announce',
@@ -1146,10 +1146,14 @@ var moviePanel = $(
             }
 
             bindScrollFollow(header.find('.utopia-sort-btn')).on('click hover:enter', showSortMenu);
-            bindScrollFollow(header.find('.utopia-portrait-back')
-            ).on('click hover:enter', function () {
-            Lampa.Activity.backward();
-});
+                        var backBusy = false;
+            bindScrollFollow(header.find('.utopia-portrait-back')).on('click hover:enter', function () {
+                if (backBusy) return;
+                backBusy = true;
+                setTimeout(function () { backBusy = false; }, 600);
+
+                Lampa.Activity.backward();
+            });
             bindScrollFollow(header.find('.utopia-debug-btn')).on('click hover:enter', function () {
                 showDebugModal('Дані картки фільму (object)', {
                     search: object.search,
@@ -1604,7 +1608,7 @@ function showTorrentActionMenu(item) {
         if (!title) return;
 
         var button = $(
-            '<div class="full-start__button selector utopia-search-btn" data-subtitle="v0.9.28 build 2353">' +
+            '<div class="full-start__button selector utopia-search-btn" data-subtitle="v0.9.29 build 2">' +
             '<span>\ud83e\uddf2 UTOPIA - торенти</span>' +
             '</div>'
         );
