@@ -6,7 +6,7 @@
 
     var API_BASE = 'https://utp.to/api';
     var PER_PAGE = 99;
-    var VERSION = 'v0.9.28 build 2329';
+    var VERSION = 'v0.9.28 build 2353';
 
     var TRACKERS = [
         'udp://tracker.opentrackr.org:1337/announce',
@@ -942,7 +942,7 @@ var moviePanel = $(
 
     var rating = '';
     if (movie.vote_average) {
-        rating = Number(movie.vote_average).toFixed(1);
+        rating = Math.round(Number(movie.vote_average) * 10) + '%';
     }
 
     var imdb = '';
@@ -976,7 +976,7 @@ var moviePanel = $(
     moviePanel.find('.utopia-movie__year').text(year);
     moviePanel.find('.utopia-movie__country').text(countries);
     moviePanel.find('.utopia-movie__rating').text(
-        rating ? 'IMDb ★ ' + rating : ''
+        rating ? 'TMDb ' + rating : ''
     );
     moviePanel.find('.utopia-movie__imdb').text(
         imdb ? 'IMDb ★ ' + imdb : ''
@@ -1604,7 +1604,7 @@ function showTorrentActionMenu(item) {
         if (!title) return;
 
         var button = $(
-            '<div class="full-start__button selector utopia-search-btn" data-subtitle="v0.9.28 build 2329">' +
+            '<div class="full-start__button selector utopia-search-btn" data-subtitle="v0.9.28 build 2353">' +
             '<span>\ud83e\uddf2 UTOPIA - торенти</span>' +
             '</div>'
         );
