@@ -1,11 +1,15 @@
 (function () {
     'use strict';
 
-    if (window.UTOPIA_CLIPBOARD_TEST) return;
-    window.UTOPIA_CLIPBOARD_TEST = true;
+    if (window.UTOPIA_CLIPBOARD) return;
+    window.UTOPIA_CLIPBOARD = true;
+
+    function getUrl() {
+        return Lampa.Storage.get('utopia_last_torrent_url', '');
+    }
 
     function readTorrentUrl() {
-        var url = Lampa.Storage.get('utopia_last_torrent_url', '');
+        var url = getUrl();
 
         if (!url) {
             Lampa.Noty.show('Буфер UTOPIA порожній');
@@ -14,6 +18,19 @@
 
         Lampa.Noty.show('URL знайдено:\n' + url.substring(0, 300));
         console.log('[UTOPIA BUFFER]', url);
+    }
+
+    function downloadTorrent() {
+        var url = getUrl();
+
+        if (!url) {
+            Lampa.Noty.show('❌ Немає URL торента');
+            return;
+        }
+
+        Lampa.Noty.show('⏳ Відкриваю завантаження...');
+
+        window.location.href = url;
     }
 
     function init() {
@@ -33,9 +50,22 @@
             },
             field: {
                 name: 'Прочитати URL',
-                description: 'Перевірка останнього торента UTOPIA'
+                description: 'Показати останній URL торента'
             },
             onChange: readTorrentUrl
+        });
+
+        Lampa.SettingsApi.addParam({
+            component: 'utopia_clipboard',
+            param: {
+                name: 'download_torrent',
+                type: 'button'
+            },
+            field: {
+                name: 'Завантажити .torrent',
+                description: 'Завантажити останній вибраний торрент'
+            },
+            onChange: downloadTorrent
         });
     }
 
