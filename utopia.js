@@ -6,7 +6,7 @@
 
     var API_BASE = 'https://utp.to/api';
     var PER_PAGE = 99;
-    var VERSION = 'v11';
+    var VERSION = 'v12';
 
     var TRACKERS = [
         'udp://tracker.opentrackr.org:1337/announce',
@@ -804,48 +804,46 @@
             return row;
         }
 
-        // Віддає користувачу .torrent-файл (його потім відкриє Transmission).
-        // Який спосіб спрацює - залежить від застосунку Lampa, тому
-        // пропонуємо кілька окремими пунктами меню.
-        function openInBrowser(url) {
-            try { window.open(url, '_system'); }
-            catch (e) { Lampa.Noty.show('UTOPIA: не вдалося відкрити браузер'); }
-        }
+        // Копіює посилання на .torrent у буфер обміну одним натисканням.
+        // Далі його вставляють у Transmission/Transdroid ("Add by URL"),
+        // і клієнт сам завантажує файл. Якщо копіювання не вдалось -
+        // показуємо вікно з посиланням, щоб скопіювати вручну.
+        function copyLink(item) {
+            var text = item.magnet;
 
-        function downloadDirect(url, name) {
-            try {
-                var a = document.createElement('a');
-                a.href = url;
-                a.download = String(name || 'utopia') + '.torrent';
-                a.rel = 'noopener';
-                a.style.display = 'none';
-                document.body.appendChild(a);
-                a.click();
-                setTimeout(function () { document.body.removeChild(a); }, 1000);
-            } catch (e) {
-                Lampa.Noty.show('UTOPIA: не вдалося почати завантаження');
+            function ok() {
+                Lampa.Noty.show('UTOPIA: посилання скопійовано. Встав його в Transmission (Add by URL)');
             }
+            function fail() {
+                showDebugOverlay('Скопіюй посилання вручну', text);
+            }
+            function fallbackCopy() {
+                try {
+                    var ta = document.createElement('textarea');
+                    ta.value = text;
+                    ta.style.position = 'fixed';
+                    ta.style.opacity = '0';
+                    document.body.appendChild(ta);
+                    ta.focus();
+                    ta.select();
+                    var done = document.execCommand('copy');
+                    document.body.removeChild(ta);
+                    if (done) ok(); else fail();
+                } catch (e) { fail(); }
+            }
+
+            try {
+                if (Lampa.Utils && typeof Lampa.Utils.copyTextToClipboard === 'function') {
+                    Lampa.Utils.copyTextToClipboard(text, ok, fail);
+                    return;
+                }
+            } catch (e) {}
+            fallbackCopy();
         }
 
         function chooseAction(item) {
-            if (!item.isDirect || !item.magnet) { playTorrent(item); return; }
-
-            Lampa.Select.show({
-                title: item.name,
-                items: [
-                    { title: '\ud83d\udce5 Завантажити .torrent (спосіб 1: браузер)', act: 'browser' },
-                    { title: '\ud83d\udce5 Завантажити .torrent (спосіб 2: напряму)', act: 'direct' },
-                    { title: '\ud83d\udccb Скопіювати посилання на .torrent', act: 'copy' }
-                ],
-                onSelect: function (sel) {
-                    setTimeout(function () {
-                        if (sel.act === 'browser') openInBrowser(item.magnet);
-                        else if (sel.act === 'direct') downloadDirect(item.magnet, item.name);
-                        else showDebugOverlay('Посилання на .torrent-файл', item.magnet);
-                    }, 100);
-                },
-                onBack: function () { Lampa.Controller.toggle('content'); }
-            });
+            if (item.isDirect && item.magnet) copyLink(item);
+            else playTorrent(item);
         }
 
         function playTorrent(item) {
@@ -1019,7 +1017,7 @@
         if (!title) return;
 
         var button = $(
-            '<div class="full-start__button selector utopia-search-btn" data-subtitle="yakutza">' +
+            '<div class="full-start__button selector utopia-search-btn" data-subtitle="Claude V12">' +
             '<span>\ud83e\uddf2 UTOPIA - торенти</span>' +
             '</div>'
         );
