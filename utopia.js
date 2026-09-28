@@ -838,47 +838,178 @@
         }
 
         function playTorrent(item) {
-            if (typeof item.magnet === 'string' && item.magnet.indexOf('magnet:') === 0) {
-                Lampa.Torrent.play({ url: item.magnet, name: item.name });
+    if (!item || !item.magnet) {
+        Lampa.Noty.show('UTOPIA: немає посилання на торрент');
+        return;
+    }
+
+    // Якщо раптом UTOPIA дала готовий magnet —
+    // залишаємо стандартну обробку Lampa.
+    if (typeof item.magnet === 'string' &&
+        item.magnet.indexOf('magnet:') === 0) {
+
+        Lampa.Torrent.play({
+            url: item.magnet,
+            name: item.name
+        });
+
+        return;
+    }
+
+    // Тут item.magnet насправді містить download_link UTOPIA.
+    var downloadUrl = item.magnet;
+    var apiKey = getKey();
+
+    if (!apiKey) {
+        Lampa.Noty.show(
+            'UTOPIA: API ключ не знайдено'
+        );
+        return;
+    }
+
+    Lampa.Loading.start(
+        'utopia_download',
+        'UTOPIA: завантаження .torrent...'
+    );
+
+    var network = new Lampa.Reguest();
+
+    network.timeout(30000);
+
+    network.native(
+        downloadUrl,
+
+        function (response) {
+            Lampa.Loading.stop('utopia_download');
+
+            if (!response ||
+                typeof response !== 'string' ||
+                !response.length) {
+
+                Lampa.Noty.show(
+                    'UTOPIA: сервер повернув порожній файл'
+                );
+
                 return;
             }
 
-            if (!item.isDirect || !item.magnet) {
-                showDebugOverlay('Немає magnet/download - дані цього торента', item.__raw || item);
-                return;
-            }
+            try {
+                /*
+                 * Lampa.Reguest().native() повертає .torrent
+                 * як рядок.
+                 *
+                 * Повертаємо кожен символ назад у байт.
+                 */
+                var bytes = new Uint8Array(response.length);
 
-            Lampa.Loading.start('utopia_prepare', 'UTOPIA: готуємо торент...');
-
-            var headers = { 'Authorization': 'Bearer ' + getKey() };
-
-            fetchTorrentFileBytes(item.magnet, headers, function (buffer, rawText) {
-                try {
-                    var infoRange = findInfoDictRange(buffer);
-                    if (!infoRange) throw new Error('не знайдено секцію info у .torrent файлі');
-
-                    var infoBytes = new Uint8Array(buffer, infoRange.start, infoRange.end - infoRange.start);
-
-                    sha1HexAsync(infoBytes).then(function (hashHex) {
-                        Lampa.Loading.stop('utopia_prepare');
-                        var realMagnet = buildMagnetFromHash(hashHex, item.name);
-                        Lampa.Torrent.play({ url: realMagnet, name: item.name });
-                    });
-
-                } catch (e) {
-                    Lampa.Loading.stop('utopia_prepare');
-                    showDebugOverlay('Помилка розбору .torrent файлу', {
-                        error: String(e),
-                        byteLength: buffer ? buffer.byteLength : 0,
-                        rawPreview: rawText ? rawText.slice(0, 300) : '',
-                        download_link: item.magnet
-                    });
+                for (var i = 0; i < response.length; i++) {
+                    bytes[i] = response.charCodeAt(i) & 0xFF;
                 }
-            }, function (code) {
-                Lampa.Loading.stop('utopia_prepare');
-                Lampa.Noty.show('UTOPIA: не вдалося завантажити .torrent файл - ' + errorMessage(code));
-            });
+
+                /*
+                 * Створюємо справжній .torrent Blob.
+                 */
+                var blob = new Blob(
+                    [bytes],
+                    {
+                        type: 'application/x-bittorrent'
+                    }
+                );
+
+                /*
+                 * Створюємо тимчасовий URL файлу.
+                 */
+                var blobUrl = URL.createObjectURL(blob);
+
+                /*
+                 * Ім'я файлу.
+                 */
+                var fileName = String(item.name || 'torrent')
+                    .replace(/[\\\/:*?"<>|]/g, '_')
+                    .trim();
+
+                if (!/\.torrent$/i.test(fileName)) {
+                    fileName += '.torrent';
+                }
+
+                /*
+                 * Передаємо файл Android/WebView
+                 * через звичайне завантаження.
+                 */
+                var link = document.createElement('a');
+
+                link.href = blobUrl;
+                link.download = fileName;
+                link.style.display = 'none';
+
+                document.body.appendChild(link);
+
+                link.click();
+
+                document.body.removeChild(link);
+
+                /*
+                 * URL більше не потрібен.
+                 */
+                setTimeout(function () {
+                    URL.revokeObjectURL(blobUrl);
+                }, 10000);
+
+                Lampa.Noty.show(
+                    'UTOPIA: .torrent завантажено'
+                );
+
+            } catch (e) {
+
+                Lampa.Noty.show(
+                    'UTOPIA: помилка створення .torrent'
+                );
+
+                console.log(
+                    'UTOPIA torrent save error:',
+                    e
+                );
+            }
+        },
+
+        function (xhr) {
+
+            Lampa.Loading.stop('utopia_download');
+
+            var status = xhr ? xhr.status : 0;
+
+            if (status === 401) {
+
+                Lampa.Noty.show(
+                    'UTOPIA: неправильний API ключ'
+                );
+
+            } else if (status === 403) {
+
+                Lampa.Noty.show(
+                    'UTOPIA: доступ заборонено (403)'
+                );
+
+            } else {
+
+                Lampa.Noty.show(
+                    'UTOPIA: помилка завантаження (' +
+                    (status || 'network') +
+                    ')'
+                );
+            }
+        },
+
+        false,
+
+        {
+            headers: {
+                'Authorization': 'Bearer ' + apiKey,
+                'Accept': 'application/x-bittorrent, application/octet-stream, */*'
+            }
         }
+    );
+}
 
         function ensureMoreButton() {
             if (!moreButtonEl) {
@@ -1011,7 +1142,7 @@
         if (!title) return;
 
         var button = $(
-            '<div class="full-start__button selector utopia-search-btn" data-subtitle="Gemini V7">' +
+            '<div class="full-start__button selector utopia-search-btn" data-subtitle="GPT V1">' +
             '<span>\ud83e\uddf2 UTOPIA - торенти</span>' +
             '</div>'
         );
