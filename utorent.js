@@ -294,7 +294,7 @@
     'font-size:1.22em;' +
     'color:#FFFFFF;' +
     'line-height:1.45;' +
-    'opacity:.1;' +
+    'opacity:1;' +
 '}' +
 
 '.utopia-movie__rating{' +
@@ -325,7 +325,7 @@
     'font-size:1.22em;' +
     'color:#FFFFFF;' +
     'line-height:1.45;' +
-    'opacity:.1;' +
+    'opacity:1;' +
     'margin-top:1.2em;' +
     'padding-bottom:1em;' +
 '}' +
