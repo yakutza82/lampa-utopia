@@ -6,7 +6,7 @@
 
     var API_BASE = 'https://utp.to/api';
     var PER_PAGE = 99;
-    var VERSION = 'v0.9.29 build 205';
+    var VERSION = 'v0.9.29 build 218';
 
     var TRACKERS = [
         'udp://tracker.opentrackr.org:1337/announce',
@@ -1050,13 +1050,36 @@ var moviePanel = $(
 
         injectStyles();
 
-                function bindScrollFollow(el) {
+        function bindScrollFollow(el) {
             el.on('hover:focus', function (e) {
-                var node = e.target;
-                if (node && node.scrollIntoView) {
-                    try { node.scrollIntoView({ block: 'nearest' }); }
-                    catch (err) { node.scrollIntoView(false); }
+                var node = $(e.target);
+                var box = node.parent();
+
+                while (box.length && box[0] !== document.body) {
+                    var overflowY = box.css('overflow-y');
+                    if ((overflowY === 'auto' || overflowY === 'scroll') &&
+                        box[0].scrollHeight > box[0].clientHeight + 1) break;
+                    box = box.parent();
                 }
+
+                if (!box.length || box[0] === document.body) return;
+
+                var fontSize = parseFloat(box.css('font-size')) || 16;
+                var padTop = fontSize * 3;
+                var padBottom = fontSize * 1.8;
+                var boxRect = box[0].getBoundingClientRect();
+                var nodeRect = node[0].getBoundingClientRect();
+                var target = box.scrollTop();
+
+                if (nodeRect.top < boxRect.top + padTop) {
+                    target += nodeRect.top - (boxRect.top + padTop);
+                } else if (nodeRect.bottom > boxRect.bottom - padBottom) {
+                    target += nodeRect.bottom - (boxRect.bottom - padBottom);
+                } else {
+                    return;
+                }
+
+                box.stop(true).animate({ scrollTop: target }, 150);
             });
             return el;
         }
@@ -1233,7 +1256,13 @@ var moviePanel = $(
                     var firstVisible = scroll.render().find('.selector').filter(':visible').first();
                     Lampa.Controller.collectionFocus(firstVisible.length ? firstVisible[0] : false, scroll.render());
                 },
-                up: function () {
+                                up: function () {
+                    var focused = listBox.find('.selector.focus');
+                    var prev = focused.length ? focused.prev('.selector') : $();
+                    if (prev.length) {
+                        Lampa.Controller.collectionFocus(prev[0], scroll.render());
+                        return;
+                    }
                     if (Navigator.canmove('up')) { Navigator.move('up'); return; }
                     try { Lampa.Controller.toggle('head'); } catch (e) {}
                 },
@@ -1652,7 +1681,7 @@ function showTorrentActionMenu(item) {
         if (!title) return;
 
         var button = $(
-            '<div class="full-start__button selector utopia-search-btn" data-subtitle="v0.9.29 build 205">' +
+            '<div class="full-start__button selector utopia-search-btn" data-subtitle="v0.9.29 build 218">' +
             '<span>\ud83e\uddf2 UTOPIA - торенти</span>' +
             '</div>'
         );
