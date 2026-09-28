@@ -1,0 +1,53 @@
+(function () {
+    'use strict';
+
+    if (window.CLIPBOARD_TEST_PLUGIN) return;
+    window.CLIPBOARD_TEST_PLUGIN = true;
+
+    function testClipboard() {
+        if (!navigator.clipboard || !navigator.clipboard.readText) {
+            Lampa.Noty.show('Clipboard API недоступний у цьому WebView');
+            return;
+        }
+
+        navigator.clipboard.readText()
+            .then(function (text) {
+                if (!text) {
+                    Lampa.Noty.show('Буфер порожній');
+                    return;
+                }
+
+                console.log('[Clipboard Test]', text);
+
+                Lampa.Noty.show(
+                    'Буфер:\n' + text.substring(0, 300)
+                );
+            })
+            .catch(function (error) {
+                console.error('[Clipboard Test]', error);
+
+                Lampa.Noty.show(
+                    'Не вдалося прочитати буфер: ' + error.message
+                );
+            });
+    }
+
+    function addButton() {
+        if (!window.Lampa || !Lampa.SettingsApi) return;
+
+        Lampa.SettingsApi.addComponent({
+            component: 'clipboard_test',
+            name: 'Clipboard Test',
+            icon: '⧉',
+            onClick: testClipboard
+        });
+    }
+
+    if (window.Lampa && Lampa.Listener) {
+        Lampa.Listener.follow('app', function (e) {
+            if (e.type === 'ready') {
+                addButton();
+            }
+        });
+    }
+})();
