@@ -6,7 +6,7 @@
 
     var API_BASE = 'https://utp.to/api';
     var PER_PAGE = 99;
-    var VERSION = 'v0.9.28 build 1656';
+    var VERSION = 'v0.9.28 build 1633';
 
     var TRACKERS = [
         'udp://tracker.opentrackr.org:1337/announce',
@@ -244,60 +244,86 @@
         '}' +
 
         /* Картка фільму */
-        '.utopia-movie{' +
-            'display:none;' +
-            'box-sizing:border-box;' +
-        '}' +
 
-        '.utopia-movie__poster{' +
-            'width:13em;' +
-            'height:19em;' +
-            'flex:0 0 13em;' +
-            'border-radius:.65em;' +
-            'overflow:hidden;' +
-            'background:rgba(255,255,255,.04);' +
-            'box-shadow:0 0 0 1px rgba(255,255,255,.08);' +
-        '}' +
+'.utopia-movie{' +
+    'display:flex;' +
+    'flex-direction:column;' +
+    'box-sizing:border-box;' +
+    'min-width:0;' +
+    'height:100%;' +
+    'overflow-y:auto;' +
+    'overflow-x:hidden;' +
+    'padding:.3em .8em .8em 0;' +
+'}' +
 
-        '.utopia-movie__poster img{' +
-            'display:block;' +
-            'width:100%;' +
-            'height:100%;' +
-            'object-fit:cover;' +
-        '}' +
+'.utopia-movie__top{' +
+    'display:flex;' +
+    'align-items:flex-start;' +
+    'gap:.8em;' +
+    'width:100%;' +
+    'box-sizing:border-box;' +
+'}' +
 
-        '.utopia-movie__info{' +
-            'min-width:0;' +
-        '}' +
+'.utopia-movie__poster{' +
+    'flex:0 0 8em;' +
+    'width:8em;' +
+    'height:12em;' +
+    'overflow:hidden;' +
+    'border-radius:.25em;' +
+    'background:rgba(255,255,255,.05);' +
+'}' +
 
-        '.utopia-movie__title{' +
-            'font-size:1.25em;' +
-            'font-weight:600;' +
-            'line-height:1.25;' +
-            'margin-bottom:.25em;' +
-        '}' +
+'.utopia-movie__poster-img{' +
+    'display:block;' +
+    'width:100%;' +
+    'height:100%;' +
+    'object-fit:cover;' +
+'}' +
 
-        '.utopia-movie__original{' +
-            'font-size:.85em;' +
-            'opacity:.55;' +
-            'margin-bottom:.65em;' +
-        '}' +
+'.utopia-movie__details{' +
+    'flex:1;' +
+    'min-width:0;' +
+    'padding-top:.1em;' +
+'}' +
 
-        '.utopia-movie__meta{' +
-            'font-size:.82em;' +
-            'opacity:.55;' +
-            'margin-bottom:.9em;' +
-        '}' +
+'.utopia-movie__year,' +
+'.utopia-movie__country,' +
+'.utopia-movie__rating,' +
+'.utopia-movie__pg{' +
+    'font-size:.82em;' +
+    'line-height:1.45;' +
+    'opacity:.8;' +
+'}' +
 
-        '.utopia-movie__overview{' +
-            'font-size:.86em;' +
-            'line-height:1.45;' +
-            'opacity:.65;' +
-            'display:-webkit-box;' +
-            '-webkit-line-clamp:8;' +
-            '-webkit-box-orient:vertical;' +
-            'overflow:hidden;' +
-        '}' +
+'.utopia-movie__rating{' +
+    'margin-top:.35em;' +
+'}' +
+
+'.utopia-movie__pg{' +
+    'margin-top:.35em;' +
+'}' +
+
+'.utopia-movie__title{' +
+    'font-size:1.05em;' +
+    'font-weight:700;' +
+    'line-height:1.25;' +
+    'margin-top:1em;' +
+'}' +
+
+'.utopia-movie__genres{' +
+    'font-size:.8em;' +
+    'line-height:1.4;' +
+    'opacity:.65;' +
+    'margin-top:.45em;' +
+'}' +
+
+'.utopia-movie__overview{' +
+    'font-size:.82em;' +
+    'line-height:1.45;' +
+    'opacity:.8;' +
+    'margin-top:1.2em;' +
+    'padding-bottom:1em;' +
+'}' +
 
         /* Торренти */
         '.utopia-list{' +
@@ -441,12 +467,14 @@
         '@media screen and (orientation:landscape){' +
 
             '.utopia-wrap{' +
-                'display:grid;' +
-                'grid-template-columns:minmax(17em, 25em) minmax(0, 1fr);' +
-                'grid-template-rows:auto 1fr;' +
-                'column-gap:1.5em;' +
-                'align-items:start;' +
-            '}' +
+    'display:grid;' +
+    'grid-template-columns:minmax(18em,25%) minmax(0,1fr);' +
+    'grid-template-rows:1fr;' +
+    'column-gap:1.2em;' +
+    'height:100%;' +
+    'min-height:0;' +
+    'align-items:stretch;' +
+'}' +
 
             '.utopia-header{' +
                 'grid-column:2;' +
@@ -455,19 +483,36 @@
             '}' +
 
             '.utopia-movie{' +
-                'display:flex;' +
-                'grid-column:1;' +
-                'grid-row:1 / span 2;' +
-                'align-items:flex-start;' +
-                'gap:1em;' +
-                'padding:.2em 0;' +
-            '}' +
+    'display:flex;' +
+    'grid-column:1;' +
+    'grid-row:1;' +
+    'height:100%;' +
+    'min-height:0;' +
+    'overflow-y:auto;' +
+    'overflow-x:hidden;' +
+'}' +
 
             '.utopia-movie__poster{' +
-                'width:11em;' +
-                'height:16em;' +
-                'flex-basis:11em;' +
-            '}' +
+    'flex-basis:7.5em;' +
+    'width:7.5em;' +
+    'height:11.25em;' +
+'}' +
+
+'.utopia-header{' +
+    'grid-column:2;' +
+    'grid-row:1;' +
+    'padding-bottom:.8em;' +
+'}' +
+
+'.utopia-list{' +
+    'grid-column:2;' +
+    'grid-row:1;' +
+    'min-width:0;' +
+    'min-height:0;' +
+    'height:100%;' +
+    'overflow-y:auto;' +
+    'overflow-x:hidden;' +
+'}' +
 
             '.utopia-movie__info{' +
                 'flex:1;' +
@@ -1605,7 +1650,7 @@ function showTorrentActionMenu(item) {
         if (!title) return;
 
         var button = $(
-            '<div class="full-start__button selector utopia-search-btn" data-subtitle="v0.9.28 build 1656">' +
+            '<div class="full-start__button selector utopia-search-btn" data-subtitle="v0.9.28 build 1633">' +
             '<span>\ud83e\uddf2 UTOPIA - торенти</span>' +
             '</div>'
         );
