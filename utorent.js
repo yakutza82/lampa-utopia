@@ -1065,8 +1065,8 @@ var moviePanel = $(
                 if (!box.length || box[0] === document.body) return;
 
                 var fontSize = parseFloat(box.css('font-size')) || 16;
-                var padTop = fontSize * 4;
-                var padBottom = fontSize * 2.8;
+                var padTop = fontSize * 5;
+                var padBottom = fontSize * 3.8;
                 var boxRect = box[0].getBoundingClientRect();
                 var nodeRect = node[0].getBoundingClientRect();
                 var target = box.scrollTop();
@@ -1079,7 +1079,7 @@ var moviePanel = $(
                     return;
                 }
 
-                box.stop(true).animate({ scrollTop: target }, 250);
+                box.stop(true).animate({ scrollTop: target }, 350);
             });
             return el;
         }
