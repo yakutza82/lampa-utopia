@@ -6,7 +6,7 @@
 
     var API_BASE = 'https://utp.to/api';
     var PER_PAGE = 99;
-    var VERSION = 'v0.9.29 build 10';
+    var VERSION = 'v0.9.29 build 40';
 
     var TRACKERS = [
         'udp://tracker.opentrackr.org:1337/announce',
@@ -485,11 +485,12 @@
         'align-items:stretch;' +
     '}' +
 
-    '.utopia-header{' +
+        '.utopia-header{' +
         'grid-column:2;' +
         'grid-row:1;' +
         'min-width:0;' +
         'padding-bottom:.8em;' +
+        'background:linear-gradient(to bottom,rgba(0,0,0,.85) 0,rgba(0,0,0,0) 100%);' +
     '}' +
 
     '.utopia-header__info{' +
@@ -516,7 +517,7 @@
         'height:11.25em;' +
     '}' +
 
-    '.utopia-list{' +
+        '.utopia-list{' +
         'grid-column:2;' +
         'grid-row:2;' +
         'min-width:0;' +
@@ -526,6 +527,9 @@
         'overflow-x:hidden;' +
         'touch-action: pan-y;' +
         'overscroll-behavior: contain;' +
+        'padding-bottom:1.8em;' +
+        '-webkit-mask-image:linear-gradient(to bottom,#000 0,#000 calc(100% - 1.8em),rgba(0,0,0,.55) calc(100% - 1.2em),rgba(0,0,0,.35) calc(100% - .6em),rgba(0,0,0,0) 100%);' +
+        'mask-image:linear-gradient(to bottom,#000 0,#000 calc(100% - 1.8em),rgba(0,0,0,.55) calc(100% - 1.2em),rgba(0,0,0,.35) calc(100% - .6em),rgba(0,0,0,0) 100%);' +
     '}' +
 
     '.utopia-portrait-back{' +
@@ -1609,7 +1613,7 @@ function showTorrentActionMenu(item) {
         if (!title) return;
 
         var button = $(
-            '<div class="full-start__button selector utopia-search-btn" data-subtitle="v0.9.29 build 10">' +
+            '<div class="full-start__button selector utopia-search-btn" data-subtitle="v0.9.29 build 40">' +
             '<span>\ud83e\uddf2 UTOPIA - торенти</span>' +
             '</div>'
         );
