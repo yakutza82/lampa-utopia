@@ -6,7 +6,7 @@
 
     var API_BASE = 'https://utp.to/api';
     var PER_PAGE = 99;
-    var VERSION = 'v0.9.29 build 1506';
+    var VERSION = 'v0.9.29 build 1533';
 
     var TRACKERS = [
         'udp://tracker.opentrackr.org:1337/announce',
@@ -1711,12 +1711,12 @@ function showTorrentActionMenu(item) {
         if (!title) return;
 
         var button = $(
-    '<div class="full-start__button selector utopia-search-btn" data-subtitle="v0.9.29 build 1506">' +
+    '<div class="full-start__button selector utopia-search-btn" data-subtitle="v0.9.29 build 1533">' +
         '<span style="display:flex;align-items:center;gap:.45em;">' +
             '<svg width="1.5em" height="1.5em" viewBox="0 0 64 64" ' +
                 'xmlns="http://www.w3.org/2000/svg" ' +
                 'style="flex-shrink:0;display:block;">' +
-                '<image href="https://raw.githubusercontent.com/yakutza82/lampa-utopia/b1e9953d1ac1a503d2fddec7c05132ae078cac4f/utopia.png" ' +
+                '<image href="https://raw.githubusercontent.com/yakutza82/lampa-utopia/refs/heads/main/pngegg2.png" ' +
                     'x="0" y="0" width="64" height="64" />' +
             '</svg>' +
             'UTOPIA - торенти' +
