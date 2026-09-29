@@ -6,7 +6,7 @@
 
     var API_BASE = 'https://utp.to/api';
     var PER_PAGE = 99;
-    var VERSION = 'v0.9.29 build 1139';
+    var VERSION = 'v0.9.29 build 1156';
 
     var TRACKERS = [
         'udp://tracker.opentrackr.org:1337/announce',
@@ -1703,7 +1703,7 @@ function showTorrentActionMenu(item) {
     // 7. Кнопка на картці
     // =========================================================
     // ЗНАЧОК НА КНОПЦІ КАРТКИ
-    var UTOPIA_ICON = 'https://raw.githubusercontent.com/yakutza82/lampa-utopia/76b9a721d049f1eedb147216c2a26116d3fa3b8e/a219cc1726ae2291488eb418b3e4216f.jpg';
+    var UTOPIA_ICON = 'https://cdn.jsdelivr.net/gh/yakutza82/lampa-utopia@76b9a721d049f1eedb147216c2a26116d3fa3b8e/a219cc1726ae2291488eb418b3e4216f.jpg';
 
     function addButtonToCard(root, object) {
         if (root.find('.utopia-search-btn').length) return;
@@ -1714,8 +1714,8 @@ function showTorrentActionMenu(item) {
         if (!title) return;
 
         var button = $(
-            '<div class="full-start__button selector utopia-search-btn" data-subtitle="v0.9.29 build 1139">' +
-            '<img src="' + UTOPIA_ICON + '" style="width:1.9em;height:1.9em;margin-right:.5em;object-fit:contain;border-radius:.3em;" onerror="this.style.display=\'none\'" />' +
+            '<div class="full-start__button selector utopia-search-btn" data-subtitle="v0.9.29 build 1156">' +
+            '<img src="' + UTOPIA_ICON + '" alt="[фото]" style="width:1.9em;height:1.9em;margin-right:.5em;object-fit:contain;border-radius:.3em;" />' +
             '<span>UTOPIA - торенти</span>' +
             '</div>'
         );
