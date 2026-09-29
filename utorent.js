@@ -1716,7 +1716,7 @@ function showTorrentActionMenu(item) {
             '<svg width="1.5em" height="1.5em" viewBox="0 0 64 64" ' +
                 'xmlns="http://www.w3.org/2000/svg" ' +
                 'style="flex-shrink:0;display:block;">' +
-                '<image href="https://raw.githubusercontent.com/yakutza82/lampa-utopia/refs/heads/main/pngegg2.png" ' +
+                '<image href="https://raw.githubusercontent.com/yakutza82/lampa-utopia/refs/heads/main/pngegg2wh.png" ' +
                     'x="0" y="0" width="64" height="64" />' +
             '</svg>' +
             'UTOPIA - торенти' +
