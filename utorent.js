@@ -6,7 +6,7 @@
 
     var API_BASE = 'https://utp.to/api';
     var PER_PAGE = 99;
-    var VERSION = 'v0.9.29 build 238';
+    var VERSION = 'v0.9.29 build 855';
 
     var TRACKERS = [
         'udp://tracker.opentrackr.org:1337/announce',
@@ -180,12 +180,11 @@
 
         '.utopia-header{' +
             'display:flex;' +
-            'align-items:flex-start;' +
-            'justify-content:space-between;' +
+            'align-items:center;' +
+            'justify-content:center;' +
             'gap:1em;' +
             'flex-wrap:wrap;' +
             'padding-bottom:1em;' +
-            'border-bottom:1px solid rgba(255,255,255,.10);' +
         '}' +
 
         '.utopia-header__info{' +
@@ -281,6 +280,11 @@
     'background:rgba(255,255,255,.05);' +
 '}' +
 
+'.utopia-movie__poster.focus{' +
+    'outline:.2em solid rgba(255,255,255,.85);' +
+    'outline-offset:-.2em;' +
+'}' +
+
 '.utopia-movie__poster-img{' +
     'display:block;' +
     'width:100%;' +
@@ -358,6 +362,8 @@
             'border:1px solid rgba(255,255,255,.07);' +
             'box-sizing:border-box;' +
             'user-select:none;' +
+            'width:98%;' +
+            'align-self:center;' +
         '}' +
 
             '@keyframes utopia-bounce{' +
@@ -930,7 +936,7 @@ var moviePanel = $(
 
         '<div class="utopia-movie__top">' +
 
-            '<div class="utopia-movie__poster">' +
+            '<div class="utopia-movie__poster selector">' +
                 '<img class="utopia-movie__poster-img" />' +
             '</div>' +
 
@@ -1235,6 +1241,15 @@ var moviePanel = $(
 
             wrap.on('touchstart touchmove touchend wheel mousewheel', function (e) {
                 e.stopPropagation();
+            });
+
+                        var posterBusy = false;
+            moviePanel.find('.utopia-movie__poster').on('click hover:enter', function () {
+                if (posterBusy) return;
+                posterBusy = true;
+                setTimeout(function () { posterBusy = false; }, 600);
+
+                Lampa.Activity.backward();
             });
 
             wrap.append(header);
@@ -1690,7 +1705,7 @@ function showTorrentActionMenu(item) {
         if (!title) return;
 
         var button = $(
-            '<div class="full-start__button selector utopia-search-btn" data-subtitle="v0.9.29 build 238">' +
+            '<div class="full-start__button selector utopia-search-btn" data-subtitle="v0.9.29 build 855">' +
             '<span>\ud83e\uddf2 UTOPIA - торенти</span>' +
             '</div>'
         );
