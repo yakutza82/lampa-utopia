@@ -1717,7 +1717,6 @@ function showTorrentActionMenu(item) {
     '<span>UTOPIA - торенти</span>' +
     '</div>'
 );
-);
 
         button.on('click hover:enter', function () {
             if (!hasKey()) {
