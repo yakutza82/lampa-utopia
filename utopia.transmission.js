@@ -7,9 +7,9 @@
     var ACTIVE_KEY = 'utopia_transmission_active';
     var sessionCache = {};
 
-    var activeInfoField = {
-        name: '📌 Активний профіль',
-        description: 'Не вибрано'
+    var profilesField = {
+        name: 'Профілі Transmission',
+        description: 'Сервери, логін, пароль і папки'
     };
 
     function uuid() {
@@ -57,24 +57,25 @@
 
     function updateActiveProfileDisplay() {
         var profile = getActiveProfile();
-        var desc = 'Не вибрано';
+        var activeText = 'Не вибрано';
 
         if (profile) {
             var url = normalizeUrl(profile);
-            desc = (profile.name || 'Transmission') + (url ? ' (' + url + ')' : '');
+            activeText = (profile.name || 'Transmission') + (url ? ' (' + url + ')' : '');
         }
 
-        activeInfoField.description = desc;
+        var fullDescr = 'Активний: ' + activeText + ' | Сервери, логін, пароль і папки';
+        profilesField.description = fullDescr;
 
-        // Динамічне оновлення DOM у меню Lampa без перезавантаження
+        // Динамічне оновлення DOM у меню Lampa
         try {
-            var $el = $('[data-name="active_profile_info"], [data-param="active_profile_info"]');
+            var $el = $('[data-name="profiles"], [data-param="profiles"]');
             if ($el.length) {
-                var $val = $el.find('.settings-param__value, .settings-param__descr, .settings-param__descr-text');
-                if ($val.length) {
-                    $val.text(desc);
+                var $descr = $el.find('.settings-param__descr, .settings-param__descr-text, .settings-param__value');
+                if ($descr.length) {
+                    $descr.text(fullDescr);
                 } else {
-                    $el.children().last().text(desc);
+                    $el.children().last().text(fullDescr);
                 }
             }
         } catch (e) {}
@@ -517,7 +518,7 @@
         openEditor();
     }
 
-    function showProfiles() {
+    function showProfiles(pendingActiveId) {
         var profiles = getProfiles();
 
         if (!profiles.length) {
@@ -525,8 +526,8 @@
             return;
         }
 
+        var activeId = (pendingActiveId !== undefined) ? pendingActiveId : getActiveId();
         var items = [];
-        var activeId = getActiveId();
 
         profiles.forEach(function (profile) {
             var isActive = (profile.id === activeId);
@@ -535,38 +536,66 @@
                 title: icon + (profile.name || 'Без назви'),
                 subtitle: normalizeUrl(profile) || 'Адреса не вказана',
                 profile: profile,
-                action: 'select',
+                action: 'select_temp',
                 selected: isActive
             });
         });
 
+        items.push({ title: '💾 Зберегти', action: 'save_active' });
         items.push({ title: '➕ Додати профіль', action: 'add' });
-        items.push({ title: '✏️ Редагувати активний профіль', action: 'edit' });
-        items.push({ title: '🗑 Видалити активний профіль', action: 'delete' });
+        items.push({ title: '✏️ Редагувати вибраний профіль', action: 'edit' });
+        items.push({ title: '🗑 Видалити вибраний профіль', action: 'delete' });
 
         Lampa.Select.show({
             title: 'Transmission',
             items: items,
             onSelect: function (item) {
+                if (item.action === 'select_temp' && item.profile) {
+                    setTimeout(function () {
+                        showProfiles(item.profile.id);
+                    }, 50);
+                    return;
+                }
+
+                if (item.action === 'save_active') {
+                    setActiveId(activeId);
+                    var selectedProf = getActiveProfile();
+                    var name = selectedProf ? (selectedProf.name || 'профіль') : '';
+                    Lampa.Noty.show('✅ Transmission: ' + name + ' збережено');
+                    closeSelect();
+                    return;
+                }
+
                 if (item.action === 'add') {
                     editProfile(null);
                     return;
                 }
 
                 if (item.action === 'edit') {
-                    editProfile(getActiveProfile());
+                    var profToEdit = null;
+                    for (var i = 0; i < profiles.length; i++) {
+                        if (profiles[i].id === activeId) {
+                            profToEdit = profiles[i];
+                            break;
+                        }
+                    }
+                    editProfile(profToEdit || getActiveProfile());
                     return;
                 }
 
                 if (item.action === 'delete') {
-                    deleteProfile(getActiveProfile());
-                    setTimeout(showProfiles, 200);
+                    var profToDelete = null;
+                    for (var d = 0; d < profiles.length; d++) {
+                        if (profiles[d].id === activeId) {
+                            profToDelete = profiles[d];
+                            break;
+                        }
+                    }
+                    deleteProfile(profToDelete || getActiveProfile());
+                    setTimeout(function () {
+                        showProfiles();
+                    }, 200);
                     return;
-                }
-
-                if (item.action === 'select' && item.profile) {
-                    setActiveId(item.profile.id);
-                    Lampa.Noty.show('Transmission: ' + (item.profile.name || 'профіль') + ' вибрано');
                 }
 
                 closeSelect();
@@ -664,20 +693,8 @@
 
         Lampa.SettingsApi.addParam({
             component: 'utopia_transmission',
-            param: {
-                name: 'active_profile_info',
-                type: 'title'
-            },
-            field: activeInfoField
-        });
-
-        Lampa.SettingsApi.addParam({
-            component: 'utopia_transmission',
             param: { name: 'profiles', type: 'button' },
-            field: {
-                name: 'Профілі Transmission',
-                description: 'Сервери, логін, пароль і папки'
-            },
+            field: profilesField,
             onChange: showProfiles
         });
 
