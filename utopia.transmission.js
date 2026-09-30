@@ -292,7 +292,7 @@
         }
     }
 
-    function editProfile(profile) {
+    function editProfile(profile, initialAction) {
         var isNew = !profile;
 
         if (!profile) {
@@ -311,19 +311,21 @@
             };
         }
 
-        function openEditor() {
+        function openEditor(activeAction) {
+            var currentActive = activeAction || initialAction || 'name';
+
             var items = [
-                { title: 'Назва профілю', subtitle: profile.name || 'Transmission', action: 'name' },
-                { title: 'Протокол', subtitle: profile.protocol === 'http' ? 'HTTP' : 'HTTPS', action: 'protocol' },
-                { title: 'Адреса сервера', subtitle: profile.host || 'Не вказана', action: 'host' },
-                { title: 'Порт', subtitle: profile.port || 'За замовчуванням', action: 'port' },
-                { title: 'Логін', subtitle: profile.username || 'Не вказаний', action: 'username' },
-                { title: 'Пароль', subtitle: profile.password ? '••••••••' : 'Не вказаний', action: 'password' },
-                { title: 'Папка Movies', subtitle: profile.movies || 'Не вказана', action: 'movies' },
-                { title: 'Папка Shows', subtitle: profile.shows || 'Не вказана', action: 'shows' },
-                { title: 'Папка Cartoons', subtitle: profile.cartoons || 'Не вказана', action: 'cartoons' },
-                { title: '🔌 Перевірити підключення', action: 'test' },
-                { title: '💾 Зберегти профіль', action: 'save' }
+                { title: 'Назва профілю', subtitle: profile.name || 'Transmission', action: 'name', selected: currentActive === 'name' },
+                { title: 'Протокол', subtitle: profile.protocol === 'http' ? 'HTTP' : 'HTTPS', action: 'protocol', selected: currentActive === 'protocol' },
+                { title: 'Адреса сервера', subtitle: profile.host || 'Не вказана', action: 'host', selected: currentActive === 'host' },
+                { title: 'Порт', subtitle: profile.port || 'За замовчуванням', action: 'port', selected: currentActive === 'port' },
+                { title: 'Логін', subtitle: profile.username || 'Не вказаний', action: 'username', selected: currentActive === 'username' },
+                { title: 'Пароль', subtitle: profile.password ? '••••••••' : 'Не вказаний', action: 'password', selected: currentActive === 'password' },
+                { title: 'Папка Movies', subtitle: profile.movies || 'Не вказана', action: 'movies', selected: currentActive === 'movies' },
+                { title: 'Папка Shows', subtitle: profile.shows || 'Не вказана', action: 'shows', selected: currentActive === 'shows' },
+                { title: 'Папка Cartoons', subtitle: profile.cartoons || 'Не вказана', action: 'cartoons', selected: currentActive === 'cartoons' },
+                { title: '🔌 Перевірити підключення', action: 'test', selected: currentActive === 'test' },
+                { title: '💾 Зберегти профіль', action: 'save', selected: currentActive === 'save' }
             ];
 
             Lampa.Select.show({
@@ -333,7 +335,7 @@
                     if (item.action === 'name') {
                         inputDialog('Назва профілю', profile.name, function (v) {
                             if (v !== null) profile.name = String(v).trim() || 'Transmission';
-                            setTimeout(openEditor, 200);
+                            setTimeout(function () { openEditor('name'); }, 200);
                         });
                         return;
                     }
@@ -349,9 +351,9 @@
                                 profile.protocol = p.value;
                                 if (profile.protocol === 'https' && profile.port === '9091') profile.port = '443';
                                 if (profile.protocol === 'http' && profile.port === '443') profile.port = '9091';
-                                setTimeout(openEditor, 200);
+                                setTimeout(function () { openEditor('protocol'); }, 200);
                             },
-                            onBack: function () { setTimeout(openEditor, 200); }
+                            onBack: function () { setTimeout(function () { openEditor('protocol'); }, 200); }
                         });
                         return;
                     }
@@ -359,7 +361,7 @@
                     if (item.action === 'host') {
                         inputDialog('Адреса Transmission', profile.host, function (v) {
                             if (v !== null) profile.host = String(v).trim().replace(/^https?:\/\//i, '').replace(/\/+$/, '');
-                            setTimeout(openEditor, 200);
+                            setTimeout(function () { openEditor('host'); }, 200);
                         });
                         return;
                     }
@@ -367,7 +369,7 @@
                     if (item.action === 'port') {
                         inputDialog('Порт Transmission', profile.port, function (v) {
                             if (v !== null) profile.port = String(v).trim();
-                            setTimeout(openEditor, 200);
+                            setTimeout(function () { openEditor('port'); }, 200);
                         });
                         return;
                     }
@@ -375,7 +377,7 @@
                     if (item.action === 'username') {
                         inputDialog('Логін', profile.username, function (v) {
                             if (v !== null) profile.username = String(v);
-                            setTimeout(openEditor, 200);
+                            setTimeout(function () { openEditor('username'); }, 200);
                         });
                         return;
                     }
@@ -383,7 +385,7 @@
                     if (item.action === 'password') {
                         inputDialog('Пароль', profile.password, function (v) {
                             if (v !== null) profile.password = String(v);
-                            setTimeout(openEditor, 200);
+                            setTimeout(function () { openEditor('password'); }, 200);
                         });
                         return;
                     }
@@ -391,7 +393,7 @@
                     if (item.action === 'movies') {
                         inputDialog('Папка Movies', profile.movies, function (v) {
                             if (v !== null) profile.movies = String(v).trim();
-                            setTimeout(openEditor, 200);
+                            setTimeout(function () { openEditor('movies'); }, 200);
                         });
                         return;
                     }
@@ -399,7 +401,7 @@
                     if (item.action === 'shows') {
                         inputDialog('Папка Shows', profile.shows, function (v) {
                             if (v !== null) profile.shows = String(v).trim();
-                            setTimeout(openEditor, 200);
+                            setTimeout(function () { openEditor('shows'); }, 200);
                         });
                         return;
                     }
@@ -407,7 +409,7 @@
                     if (item.action === 'cartoons') {
                         inputDialog('Папка Cartoons', profile.cartoons, function (v) {
                             if (v !== null) profile.cartoons = String(v).trim();
-                            setTimeout(openEditor, 200);
+                            setTimeout(function () { openEditor('cartoons'); }, 200);
                         });
                         return;
                     }
@@ -415,7 +417,7 @@
                     if (item.action === 'test') {
                         if (!profile.host) {
                             Lampa.Noty.show('❌ Спочатку вкажи адресу Transmission');
-                            setTimeout(openEditor, 500);
+                            setTimeout(function () { openEditor('host'); }, 500);
                             return;
                         }
 
@@ -428,7 +430,7 @@
                                 var ver = args.version || args['rpc-version'] || 'підключено успішно';
                                 Lampa.Noty.show('✅ Transmission підключено: ' + ver);
                             }
-                            setTimeout(openEditor, 700);
+                            setTimeout(function () { openEditor('test'); }, 700);
                         });
                         return;
                     }
@@ -486,12 +488,14 @@
         var activeId = getActiveId();
 
         profiles.forEach(function (profile) {
-            var icon = (profile.id === activeId) ? '● ' : '○ ';
+            var isActive = (profile.id === activeId);
+            var icon = isActive ? '● ' : '○ ';
             items.push({
                 title: icon + (profile.name || 'Без назви'),
                 subtitle: normalizeUrl(profile) || 'Адреса не вказана',
                 profile: profile,
-                action: 'select'
+                action: 'select',
+                selected: isActive
             });
         });
 
