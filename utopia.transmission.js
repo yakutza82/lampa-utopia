@@ -68,10 +68,20 @@
         return base + path;
     }
 
+    function closeSelect() {
+        if (Lampa.Select && typeof Lampa.Select.hide === 'function') {
+            Lampa.Select.hide();
+        }
+        try {
+            Lampa.Controller.toggle('settings_component');
+        } catch (e) {}
+    }
+
     function getSessionFromResponse(reqObj) {
         if (!reqObj) return '';
         var session = '';
 
+        // 1. Спроба зчитати із заголовків відповіді
         try {
             if (typeof reqObj.getResponseHeader === 'function') {
                 session = reqObj.getResponseHeader('X-Transmission-Session-Id') ||
@@ -91,19 +101,20 @@
             } catch (e) {}
         }
 
-        // Резервний парсинг із тіла HTML-відповіді 409
-        if (!session && reqObj.responseText) {
-            try {
-                var codeMatch = reqObj.responseText.match(/<code>\s*([a-zA-Z0-9]+)\s*<\/code>/i);
-                if (codeMatch && codeMatch[1]) {
-                    session = codeMatch[1];
+        // 2. Парсинг з HTML-тіла (якщо CORS блокує заголовки у відповіді 409)
+        if (!session) {
+            var bodyText = reqObj.responseText || reqObj.response || '';
+            if (typeof bodyText === 'string' && bodyText) {
+                var match = bodyText.match(/X-Transmission-Session-Id:\s*([a-zA-Z0-9]+)/i);
+                if (match && match[1]) {
+                    session = match[1];
                 } else {
-                    var headerMatch = reqObj.responseText.match(/X-Transmission-Session-Id:\s*([a-zA-Z0-9]+)/i);
-                    if (headerMatch && headerMatch[1]) {
-                        session = headerMatch[1];
+                    var codeMatch = bodyText.match(/<code>\s*([a-zA-Z0-9]+)\s*<\/code>/i);
+                    if (codeMatch && codeMatch[1]) {
+                        session = codeMatch[1];
                     }
                 }
-            } catch (e) {}
+            }
         }
 
         return session;
@@ -161,6 +172,8 @@
         }
 
         var options = {
+            method: 'POST',
+            type: 'POST',
             dataType: 'text',
             headers: requestHeaders
         };
@@ -168,6 +181,10 @@
         req.native(
             url,
             function (data) {
+                if (typeof data === 'string' && (data.trim().indexOf('<') === 0 || data.indexOf('<!DOCTYPE') !== -1)) {
+                    callback(false, null, 'Сервер повернув HTML замість JSON (перевірте Nginx/шлях)');
+                    return;
+                }
                 try {
                     var json = typeof data === 'string' ? JSON.parse(data) : data;
                     if (currentPath !== profile.rpc_path) {
@@ -186,13 +203,13 @@
                     sessionCache[profileKey] = newSession;
                 }
 
-                // 1. Автоматичний повтор при 409 Conflict
-                if (status === 409 && newSession && !isRetry) {
+                // 1. Автоматичний повтор з отриманим Session ID при 409 Conflict
+                if ((status === 409 || newSession) && !isRetry) {
                     request(profile, body, callback, idx, true);
                     return;
                 }
 
-                // 2. Автоматичний перебір шляхів при 404 Not Found
+                // 2. Автоматичний перебір альтернативних шляхів при 404 Not Found
                 if (status === 404 && idx + 1 < uniquePaths.length) {
                     request(profile, body, callback, idx + 1, false);
                     return;
@@ -448,12 +465,12 @@
                         setActiveId(profile.id);
 
                         Lampa.Noty.show('✅ Профіль Transmission збережено');
-                        Lampa.Controller.toggle('settings_component');
+                        closeSelect();
                         return;
                     }
                 },
                 onBack: function () {
-                    Lampa.Controller.toggle('settings_component');
+                    closeSelect();
                 }
             });
         }
@@ -510,10 +527,10 @@
                     Lampa.Noty.show('Transmission: ' + (item.profile.name || 'профіль') + ' вибрано');
                 }
 
-                Lampa.Controller.toggle('settings_component');
+                closeSelect();
             },
             onBack: function () {
-                Lampa.Controller.toggle('settings_component');
+                closeSelect();
             }
         });
     }
