@@ -606,11 +606,17 @@
     function initSettings() {
         if (!window.Lampa || !Lampa.SettingsApi) return;
 
-        Lampa.SettingsApi.addComponent({
-            component: 'utopia_transmission',
-            name: 'Transmission',
-            icon: '📡'
-        });
+    Lampa.SettingsApi.addComponent({
+        component: 'utopia_transmission',
+        name: 'Transmission',
+        icon:
+        '<svg width="1.5em" height="1.5em" viewBox="0 0 64 64" ' +
+        'xmlns="http://www.w3.org/2000/svg" ' +
+        'style="display:block;flex-shrink:0;">' +
+            '<image href="https://raw.githubusercontent.com/yakutza82/lampa-utopia/refs/heads/main/pngegg2wh.png" ' +
+            'x="0" y="0" width="64" height="64" />' +
+        '</svg>'
+});
 
         Lampa.SettingsApi.addParam({
             component: 'utopia_transmission',
