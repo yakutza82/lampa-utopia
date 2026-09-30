@@ -5,7 +5,6 @@
 
     var STORAGE_KEY = 'utopia_transmission_profiles';
     var ACTIVE_KEY = 'utopia_transmission_active';
-    var VERSION = 'v0.9.30 build 1623';
 
     var EDIT_COMPONENT = 'utopia_transmission_edit';
 
@@ -260,354 +259,622 @@
      * ---------------------------------------------------------
      */
 
-    function editProfile(profile) {
-        var isNew = !profile;
+    function inputDialog(title, value, callback) {
+    if (
+        Lampa.Input &&
+        typeof Lampa.Input.edit === 'function'
+    ) {
+        Lampa.Input.edit({
+            title: title,
+            value: value || '',
+            free: true,
+            nosave: true
+        }, function (newValue) {
+            callback(newValue);
+        });
+    } else {
+        var result = prompt(
+            title,
+            value || ''
+        );
 
-        if (!profile) {
-            profile = {
-                id: uuid(),
-                name: 'Transmission',
-                protocol: 'https',
-                host: '',
-                port: '9091',
-                rpc_path: '/transmission/rpc',
-                username: '',
-                password: '',
-                movies: '',
-                shows: '',
-                cartoons: ''
-            };
+        if (result !== null) {
+            callback(result);
         }
+    }
+}
 
-        var prefix = 'utopia_tr_edit_' + profile.id + '_';
 
-        /*
-         * Зберігаємо всі значення в Lampa.Storage.
-         * Так штатні поля Lampa працюють нормально з пультом.
-         */
+function editProfile(profile) {
 
-        var fields = [
+    var isNew = !profile;
+
+    if (!profile) {
+        profile = {
+            id: uuid(),
+            name: 'Transmission',
+            protocol: 'https',
+            host: '',
+            port: '9091',
+            rpc_path: '/transmission/rpc',
+            username: '',
+            password: '',
+            movies: '',
+            shows: '',
+            cartoons: ''
+        };
+    }
+
+    /*
+     * Меню редагування одного профілю.
+     * Ніяких Settings.open().
+     */
+
+    function openEditor() {
+
+        var items = [
             {
-                name: 'name',
                 title: 'Назва профілю',
-                value: profile.name || '',
-                type: 'input'
+                subtitle: profile.name || 'Transmission',
+                action: 'name'
             },
             {
-                name: 'protocol',
                 title: 'Протокол',
-                value: profile.protocol || 'https',
-                type: 'select',
-                values: {
-                    http: 'HTTP',
-                    https: 'HTTPS'
-                }
+                subtitle:
+                    profile.protocol === 'http'
+                        ? 'HTTP'
+                        : 'HTTPS',
+                action: 'protocol'
             },
             {
-                name: 'host',
                 title: 'Адреса сервера',
-                value: profile.host || '',
-                type: 'input'
+                subtitle:
+                    profile.host ||
+                    'Не вказана',
+                action: 'host'
             },
             {
-                name: 'port',
                 title: 'Порт',
-                value: profile.port || '',
-                type: 'input'
+                subtitle:
+                    profile.port ||
+                    'Не вказаний',
+                action: 'port'
             },
             {
-                name: 'username',
                 title: 'Логін',
-                value: profile.username || '',
-                type: 'input'
+                subtitle:
+                    profile.username ||
+                    'Не вказаний',
+                action: 'username'
             },
             {
-                name: 'password',
                 title: 'Пароль',
-                value: profile.password || '',
-                type: 'input'
+                subtitle:
+                    profile.password
+                        ? '••••••••'
+                        : 'Не вказаний',
+                action: 'password'
             },
             {
-                name: 'movies',
                 title: 'Папка Movies',
-                value: profile.movies || '',
-                type: 'input'
+                subtitle:
+                    profile.movies ||
+                    'Не вказана',
+                action: 'movies'
             },
             {
-                name: 'shows',
                 title: 'Папка Shows',
-                value: profile.shows || '',
-                type: 'input'
+                subtitle:
+                    profile.shows ||
+                    'Не вказана',
+                action: 'shows'
             },
             {
-                name: 'cartoons',
                 title: 'Папка Cartoons',
-                value: profile.cartoons || '',
-                type: 'input'
+                subtitle:
+                    profile.cartoons ||
+                    'Не вказана',
+                action: 'cartoons'
+            },
+            {
+                title: '🔌 Перевірити підключення',
+                action: 'test'
+            },
+            {
+                title: '💾 Зберегти профіль',
+                action: 'save'
             }
         ];
 
-        var values = {};
+        Lampa.Select.show({
 
-        fields.forEach(function (field) {
-            var key = prefix + field.name;
+            title:
+                isNew
+                    ? 'Новий профіль Transmission'
+                    : 'Редагування: ' +
+                      (
+                          profile.name ||
+                          'Transmission'
+                      ),
 
-            values[field.name] =
-                Lampa.Storage.get(
-                    key,
-                    field.value
-                );
-        });
+            items: items,
 
-        /*
-         * Створюємо компонент редактора один раз.
-         */
-
-        Lampa.SettingsApi.addComponent({
-            component: EDIT_COMPONENT,
-            name: 'Профіль Transmission'
-        });
-
-        fields.forEach(function (field) {
-            var key = prefix + field.name;
-
-            var param = {
-                name: key,
-                type: field.type
-            };
-
-            if (field.type === 'select') {
-                param.values = field.values;
-                param.default = values[field.name];
-            } else {
-                param.values = values[field.name];
-                param.default = values[field.name];
-            }
-
-            Lampa.SettingsApi.addParam({
-                component: EDIT_COMPONENT,
-
-                param: param,
-
-                field: {
-                    name: field.title
-                },
-
-                onChange: function (value) {
-                    values[field.name] = value;
-
-                    Lampa.Storage.set(
-                        key,
-                        value
-                    );
-                }
-            });
-        });
-
-        /*
-         * Кнопка збереження.
-         */
-
-        Lampa.SettingsApi.addParam({
-            component: EDIT_COMPONENT,
-
-            param: {
-                name: prefix + 'save',
-                type: 'button'
-            },
-
-            field: {
-                name: '💾 Зберегти профіль'
-            },
-
-            onChange: function () {
-                fields.forEach(function (field) {
-                    var key = prefix + field.name;
-
-                    values[field.name] =
-                        Lampa.Storage.get(
-                            key,
-                            values[field.name]
-                        );
-                });
-
-                profile.name =
-                    String(values.name || '').trim() ||
-                    'Transmission';
-
-                profile.protocol =
-                    values.protocol === 'http'
-                        ? 'http'
-                        : 'https';
-
-                profile.host =
-                    String(values.host || '').trim();
-
-                profile.port =
-                    String(values.port || '').trim();
-
-                profile.username =
-                    String(values.username || '');
-
-                profile.password =
-                    String(values.password || '');
-
-                profile.movies =
-                    String(values.movies || '').trim();
-
-                profile.shows =
-                    String(values.shows || '').trim();
-
-                profile.cartoons =
-                    String(values.cartoons || '').trim();
+            onSelect: function (item) {
 
                 /*
-                 * RPC шлях залишається внутрішнім.
+                 * Назва
                  */
-                profile.rpc_path =
-                    profile.rpc_path ||
-                    '/transmission/rpc';
+                if (item.action === 'name') {
 
-                var profiles = getProfiles();
-                var found = false;
+                    inputDialog(
+                        'Назва профілю',
+                        profile.name,
+                        function (value) {
 
-                for (var i = 0; i < profiles.length; i++) {
-                    if (profiles[i].id === profile.id) {
-                        profiles[i] = profile;
-                        found = true;
-                        break;
-                    }
-                }
+                            if (
+                                value !== undefined &&
+                                value !== null
+                            ) {
+                                profile.name =
+                                    String(value).trim() ||
+                                    'Transmission';
+                            }
 
-                if (!found) {
-                    profiles.push(profile);
-                }
-
-                saveProfiles(profiles);
-                setActiveId(profile.id);
-
-                Lampa.Noty.show(
-                    '✅ Профіль Transmission збережено'
-                );
-
-                /*
-                 * Очищаємо тимчасові поля.
-                 */
-                fields.forEach(function (field) {
-                    Lampa.Storage.remove(
-                        prefix + field.name
+                            setTimeout(
+                                openEditor,
+                                200
+                            );
+                        }
                     );
-                });
 
-                Lampa.Controller.toggle('content');
-            }
-        });
-
-        /*
-         * Кнопка перевірки прямо з редактора.
-         */
-
-        Lampa.SettingsApi.addParam({
-            component: EDIT_COMPONENT,
-
-            param: {
-                name: prefix + 'test',
-                type: 'button'
-            },
-
-            field: {
-                name: '🔌 Перевірити підключення'
-            },
-
-            onChange: function () {
-                fields.forEach(function (field) {
-                    var key = prefix + field.name;
-
-                    values[field.name] =
-                        Lampa.Storage.get(
-                            key,
-                            values[field.name]
-                        );
-                });
-
-                var testProfile = {
-                    protocol:
-                        values.protocol === 'http'
-                            ? 'http'
-                            : 'https',
-
-                    host:
-                        String(values.host || '').trim(),
-
-                    port:
-                        String(values.port || '').trim(),
-
-                    username:
-                        String(values.username || ''),
-
-                    password:
-                        String(values.password || ''),
-
-                    rpc_path:
-                        '/transmission/rpc'
-                };
-
-                if (!testProfile.host) {
-                    Lampa.Noty.show(
-                        '❌ Вкажи адресу сервера'
-                    );
                     return;
                 }
 
-                Lampa.Noty.show(
-                    'Перевіряємо Transmission...'
-                );
+                /*
+                 * Протокол
+                 */
+                if (item.action === 'protocol') {
 
-                testConnection(
-                    testProfile,
-                    function (ok, result) {
-                        if (!ok) {
-                            Lampa.Noty.show(
-                                '❌ Transmission: ' +
-                                result
+                    Lampa.Select.show({
+
+                        title: 'Протокол',
+
+                        items: [
+                            {
+                                title: 'HTTPS',
+                                value: 'https',
+                                selected:
+                                    profile.protocol !== 'http'
+                            },
+                            {
+                                title: 'HTTP',
+                                value: 'http',
+                                selected:
+                                    profile.protocol === 'http'
+                            }
+                        ],
+
+                        onSelect: function (protocol) {
+
+                            profile.protocol =
+                                protocol.value;
+
+                            setTimeout(
+                                openEditor,
+                                200
                             );
-                            return;
+                        },
+
+                        onBack: function () {
+                            setTimeout(
+                                openEditor,
+                                200
+                            );
                         }
 
-                        var args =
-                            result &&
-                            result.result === 'success'
-                                ? result.arguments || {}
-                                : {};
+                    });
 
-                        var version =
-                            args.version ||
-                            args.rpc_version_semver ||
-                            'версія невідома';
+                    return;
+                }
 
+                /*
+                 * Адреса
+                 */
+                if (item.action === 'host') {
+
+                    inputDialog(
+                        'Адреса Transmission',
+                        profile.host,
+                        function (value) {
+
+                            if (
+                                value !== undefined &&
+                                value !== null
+                            ) {
+                                profile.host =
+                                    String(value)
+                                        .trim()
+                                        .replace(
+                                            /^https?:\/\//i,
+                                            ''
+                                        )
+                                        .replace(
+                                            /\/+$/,
+                                            ''
+                                        );
+                            }
+
+                            setTimeout(
+                                openEditor,
+                                200
+                            );
+                        }
+                    );
+
+                    return;
+                }
+
+                /*
+                 * Порт
+                 */
+                if (item.action === 'port') {
+
+                    inputDialog(
+                        'Порт Transmission',
+                        profile.port,
+                        function (value) {
+
+                            if (
+                                value !== undefined &&
+                                value !== null
+                            ) {
+                                profile.port =
+                                    String(value)
+                                        .trim();
+                            }
+
+                            setTimeout(
+                                openEditor,
+                                200
+                            );
+                        }
+                    );
+
+                    return;
+                }
+
+                /*
+                 * Логін
+                 */
+                if (item.action === 'username') {
+
+                    inputDialog(
+                        'Логін',
+                        profile.username,
+                        function (value) {
+
+                            if (
+                                value !== undefined &&
+                                value !== null
+                            ) {
+                                profile.username =
+                                    String(value);
+                            }
+
+                            setTimeout(
+                                openEditor,
+                                200
+                            );
+                        }
+                    );
+
+                    return;
+                }
+
+                /*
+                 * Пароль
+                 */
+                if (item.action === 'password') {
+
+                    inputDialog(
+                        'Пароль',
+                        profile.password,
+                        function (value) {
+
+                            if (
+                                value !== undefined &&
+                                value !== null
+                            ) {
+                                profile.password =
+                                    String(value);
+                            }
+
+                            setTimeout(
+                                openEditor,
+                                200
+                            );
+                        }
+                    );
+
+                    return;
+                }
+
+                /*
+                 * Movies
+                 */
+                if (item.action === 'movies') {
+
+                    inputDialog(
+                        'Папка Movies',
+                        profile.movies,
+                        function (value) {
+
+                            if (
+                                value !== undefined &&
+                                value !== null
+                            ) {
+                                profile.movies =
+                                    String(value).trim();
+                            }
+
+                            setTimeout(
+                                openEditor,
+                                200
+                            );
+                        }
+                    );
+
+                    return;
+                }
+
+                /*
+                 * Shows
+                 */
+                if (item.action === 'shows') {
+
+                    inputDialog(
+                        'Папка Shows',
+                        profile.shows,
+                        function (value) {
+
+                            if (
+                                value !== undefined &&
+                                value !== null
+                            ) {
+                                profile.shows =
+                                    String(value).trim();
+                            }
+
+                            setTimeout(
+                                openEditor,
+                                200
+                            );
+                        }
+                    );
+
+                    return;
+                }
+
+                /*
+                 * Cartoons
+                 */
+                if (item.action === 'cartoons') {
+
+                    inputDialog(
+                        'Папка Cartoons',
+                        profile.cartoons,
+                        function (value) {
+
+                            if (
+                                value !== undefined &&
+                                value !== null
+                            ) {
+                                profile.cartoons =
+                                    String(value).trim();
+                            }
+
+                            setTimeout(
+                                openEditor,
+                                200
+                            );
+                        }
+                    );
+
+                    return;
+                }
+
+                /*
+                 * Перевірка підключення
+                 */
+                if (item.action === 'test') {
+
+                    if (!profile.host) {
                         Lampa.Noty.show(
-                            '✅ Transmission підключено: ' +
-                            version
+                            '❌ Спочатку вкажи адресу Transmission'
+                        );
+
+                        setTimeout(
+                            openEditor,
+                            500
+                        );
+
+                        return;
+                    }
+
+                    Lampa.Noty.show(
+                        'Перевіряємо Transmission...'
+                    );
+
+                    testConnection(
+                        profile,
+                        function (ok, result) {
+
+                            if (!ok) {
+
+                                Lampa.Noty.show(
+                                    '❌ Transmission: ' +
+                                    result
+                                );
+
+                            } else {
+
+                                var args =
+                                    result &&
+                                    result.result === 'success'
+                                        ? result.arguments || {}
+                                        : {};
+
+                                var version =
+                                    args.version ||
+                                    args.rpc_version_semver ||
+                                    'версія невідома';
+
+                                Lampa.Noty.show(
+                                    '✅ Transmission підключено: ' +
+                                    version
+                                );
+                            }
+
+                            setTimeout(
+                                openEditor,
+                                700
+                            );
+                        }
+                    );
+
+                    return;
+                }
+
+                /*
+                 * Зберегти
+                 */
+                if (item.action === 'save') {
+
+                    profile.name =
+                        String(
+                            profile.name || ''
+                        ).trim() ||
+                        'Transmission';
+
+                    profile.protocol =
+                        profile.protocol === 'http'
+                            ? 'http'
+                            : 'https';
+
+                    profile.host =
+                        String(
+                            profile.host || ''
+                        )
+                        .trim()
+                        .replace(
+                            /^https?:\/\//i,
+                            ''
+                        )
+                        .replace(
+                            /\/+$/,
+                            ''
+                        );
+
+                    profile.port =
+                        String(
+                            profile.port || ''
+                        ).trim();
+
+                    profile.username =
+                        String(
+                            profile.username || ''
+                        );
+
+                    profile.password =
+                        String(
+                            profile.password || ''
+                        );
+
+                    profile.movies =
+                        String(
+                            profile.movies || ''
+                        ).trim();
+
+                    profile.shows =
+                        String(
+                            profile.shows || ''
+                        ).trim();
+
+                    profile.cartoons =
+                        String(
+                            profile.cartoons || ''
+                        ).trim();
+
+                    profile.rpc_path =
+                        profile.rpc_path ||
+                        '/transmission/rpc';
+
+                    var profiles =
+                        getProfiles();
+
+                    var found = false;
+
+                    for (
+                        var i = 0;
+                        i < profiles.length;
+                        i++
+                    ) {
+                        if (
+                            profiles[i].id ===
+                            profile.id
+                        ) {
+                            profiles[i] =
+                                profile;
+
+                            found = true;
+                            break;
+                        }
+                    }
+
+                    if (!found) {
+                        profiles.push(
+                            profile
                         );
                     }
+
+                    saveProfiles(
+                        profiles
+                    );
+
+                    setActiveId(
+                        profile.id
+                    );
+
+                    Lampa.Noty.show(
+                        '✅ Профіль Transmission збережено'
+                    );
+
+                    Lampa.Controller.toggle(
+                        'content'
+                    );
+
+                    return;
+                }
+            },
+
+            onBack: function () {
+
+                /*
+                 * Якщо це новий профіль і
+                 * користувач натиснув назад —
+                 * нічого не створюємо.
+                 */
+
+                Lampa.Controller.toggle(
+                    'content'
                 );
             }
+
         });
-
-        /*
-         * Відкриваємо компонент налаштувань.
-         */
-
-        setTimeout(function () {
-            try {
-                Lampa.Settings.open(
-                    EDIT_COMPONENT
-                );
-            } catch (e) {
-                Lampa.Controller.toggle('content');
-            }
-        }, 100);
     }
+
+    openEditor();
+}
 
     /*
      * ---------------------------------------------------------
