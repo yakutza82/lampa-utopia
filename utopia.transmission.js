@@ -171,6 +171,11 @@ console.log('[UTOPIA TRANSMISSION] USER:', profile.username);
 console.log('[UTOPIA TRANSMISSION] AUTH:', headers.Authorization);
 console.log('[UTOPIA TRANSMISSION] OPTIONS:', options);
 
+console.log('[UTOPIA TRANSMISSION] URL:', url);
+console.log('[UTOPIA TRANSMISSION] USER:', profile.username);
+console.log('[UTOPIA TRANSMISSION] AUTH:', headers.Authorization);
+console.log('[UTOPIA TRANSMISSION] OPTIONS:', options);
+
 req.native(
     url,
     function (data, response) {
@@ -207,9 +212,6 @@ req.native(
     JSON.stringify(body),
     options
 );
-
-    send();
-}
 
     function testConnection(profile, callback) {
         request(
