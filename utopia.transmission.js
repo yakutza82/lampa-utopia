@@ -5,8 +5,8 @@
 
     var STORAGE_KEY = 'utopia_transmission_profiles';
     var ACTIVE_KEY = 'utopia_transmission_active';
-
     var EDIT_COMPONENT = 'utopia_transmission_edit';
+    var sessionIdCache = '';
 
     function uuid() {
         return 'tr_' + Date.now() + '_' + Math.floor(Math.random() * 100000);
@@ -14,12 +14,7 @@
 
     function getProfiles() {
         var profiles = Lampa.Storage.get(STORAGE_KEY, []);
-
-        if (!Array.isArray(profiles)) {
-            profiles = [];
-        }
-
-        return profiles;
+        return Array.isArray(profiles) ? profiles : [];
     }
 
     function saveProfiles(profiles) {
@@ -54,11 +49,9 @@
 
         if (!host) return '';
 
-        host = host.replace(/^https?:\/\//i, '');
-        host = host.replace(/\/+$/, '');
+        host = host.replace(/^https?:\/\//i, '').replace(/\/+$/, '');
 
         var url = protocol + '://' + host;
-
         if (port) {
             url += ':' + port;
         }
@@ -66,19 +59,11 @@
         return url;
     }
 
-    /*
-     * RPC шлях користувачеві не показуємо.
-     * За замовчуванням використовуємо стандартний шлях Transmission.
-     */
     function getRpcUrl(profile) {
         var base = normalizeUrl(profile);
-
         if (!base) return '';
 
-        var path = String(
-            profile.rpc_path || '/transmission/rpc'
-        ).trim();
-
+        var path = String(profile.rpc_path || '/transmission/rpc').trim();
         if (path.charAt(0) !== '/') {
             path = '/' + path;
         }
@@ -86,201 +71,100 @@
         return base + path;
     }
 
-    function basicAuth(profile) {
-        var text =
-            String(profile.username || '') +
-            ':' +
-            String(profile.password || '');
-
-        try {
-            return 'Basic ' +
-                btoa(unescape(encodeURIComponent(text)));
-        } catch (e) {
-            return 'Basic ' + btoa(text);
-        }
-    }
-
     function request(profile, body, callback) {
-    var url = getRpcUrl(profile);
+        var url = getRpcUrl(profile);
 
-    if (!url) {
-        callback(
-            false,
-            null,
-            'Не вказана адреса Transmission'
-        );
-        return;
-    }
+        if (!url) {
+            callback(false, null, 'Не вказана адреса Transmission');
+            return;
+        }
 
-    var auth = '';
-
-    try {
-        auth = btoa(
-            String(profile.username || '') +
-            ':' +
-            String(profile.password || '')
-        );
-    } catch (e) {
-        callback(
-            false,
-            null,
-            'Не вдалося сформувати авторизацію'
-        );
-        return;
-    }
-
-    var headers = {
-        'Content-Type': 'application/json',
-        'Authorization': 'Basic ' + auth
-    };
-
-    function send(sessionId) {
-
-    if (
-        !Lampa.Reguest ||
-        typeof Lampa.Reguest !== 'function'
-    ) {
-        callback(
-            false,
-            null,
-            'Lampa.Reguest недоступний'
-        );
-        return;
-    }
-
-    var req = new Lampa.Reguest();
-
-    var requestHeaders = {
-        'Content-Type': 'application/json',
-        'Authorization': 'Basic ' + auth
-    };
-
-    if (sessionId) {
-        requestHeaders[
-            'X-Transmission-Session-Id'
-        ] = sessionId;
-    }
-
-    var options = {
-        dataType: 'text',
-        headers: requestHeaders
-    };
-
-    console.log('[UTOPIA TRANSMISSION] URL:', url);
-console.log('[UTOPIA TRANSMISSION] USER:', profile.username);
-console.log('[UTOPIA TRANSMISSION] AUTH:', headers.Authorization);
-console.log('[UTOPIA TRANSMISSION] OPTIONS:', options);
-
-console.log('[UTOPIA TRANSMISSION] URL:', url);
-console.log('[UTOPIA TRANSMISSION] USER:', profile.username);
-console.log('[UTOPIA TRANSMISSION] AUTH:', headers.Authorization);
-console.log('[UTOPIA TRANSMISSION] OPTIONS:', options);
-
-req.native(
-    url,
-    function (data, response) {
-        console.log('[UTOPIA TRANSMISSION] SUCCESS:', data);
-        console.log('[UTOPIA TRANSMISSION] RESPONSE:', response);
-
+        var auth = '';
         try {
-            var json =
-                typeof data === 'string'
-                    ? JSON.parse(data)
-                    : data;
-
-            callback(true, json, null);
-
+            auth = btoa(
+                String(profile.username || '') +
+                ':' +
+                String(profile.password || '')
+            );
         } catch (e) {
-            callback(
-                false,
-                null,
-                'Некоректна відповідь Transmission'
+            callback(false, null, 'Не вдалося сформувати авторизацію');
+            return;
+        }
+
+        function send(sessionId, isRetry) {
+            var RequestClass = Lampa.Reguest || Lampa.Request;
+            if (!RequestClass || typeof RequestClass !== 'function') {
+                callback(false, null, 'Lampa.Request недоступний');
+                return;
+            }
+
+            var req = new RequestClass();
+            var requestHeaders = {
+                'Content-Type': 'application/json',
+                'Authorization': 'Basic ' + auth
+            };
+
+            if (sessionId) {
+                requestHeaders['X-Transmission-Session-Id'] = sessionId;
+            }
+
+            var options = {
+                dataType: 'text',
+                headers: requestHeaders
+            };
+
+            req.native(
+                url,
+                function (data, response) {
+                    try {
+                        var json = typeof data === 'string' ? JSON.parse(data) : data;
+                        callback(true, json, null);
+                    } catch (e) {
+                        callback(false, null, 'Некоректна відповідь Transmission');
+                    }
+                },
+                function (error, response) {
+                    var status = 0;
+                    if (response) {
+                        status = response.status || response.statusCode || 0;
+                    }
+
+                    var newSession = '';
+                    try {
+                        if (response && typeof response.getResponseHeader === 'function') {
+                            newSession = response.getResponseHeader('X-Transmission-Session-Id') || '';
+                        }
+                    } catch (e) {}
+
+                    // Автоматичне отримання X-Transmission-Session-Id при 409 Conflict
+                    if (status === 409 && newSession && !isRetry) {
+                        sessionIdCache = newSession;
+                        send(newSession, true);
+                        return;
+                    }
+
+                    callback(
+                        false,
+                        null,
+                        (status ? 'HTTP ' + status + ': ' : '') +
+                        (error && error.message ? error.message : String(error || 'Помилка запиту'))
+                    );
+                },
+                JSON.stringify(body),
+                options
             );
         }
-    },
-    function (error, response) {
 
-    console.log(
-        '[UTOPIA TRANSMISSION] ERROR OBJECT:',
-        error
-    );
-
-    console.log(
-        '[UTOPIA TRANSMISSION] ERROR RESPONSE:',
-        response
-    );
-
-    var status = '';
-
-    try {
-        if (response) {
-            status =
-                response.status ||
-                response.statusCode ||
-                '';
-        }
-    } catch (e) {}
-
-    console.log(
-        '[UTOPIA TRANSMISSION] STATUS:',
-        status
-    );
-
-    var session = '';
-
-    try {
-        if (
-            response &&
-            typeof response.getResponseHeader === 'function'
-        ) {
-            session =
-                response.getResponseHeader(
-                    'X-Transmission-Session-Id'
-                ) || '';
-        }
-    } catch (e) {}
-
-    console.log(
-        '[UTOPIA TRANSMISSION] SESSION:',
-        session
-    );
-
-    callback(
-        false,
-        null,
-        (
-            status
-                ? 'HTTP ' + status + ': '
-                : ''
-        ) +
-        (
-            error && error.message
-                ? error.message
-                : String(
-                    error ||
-                    'Помилка запиту'
-                )
-        )
-    );
-},
-    JSON.stringify(body),
-    options
-);
+        send(sessionIdCache, false);
+    }
 
     function testConnection(profile, callback) {
         request(
             profile,
             {
-                jsonrpc: '2.0',
-                method: 'session_get',
-                id: 1,
-                params: {
-                    fields: [
-                        'version',
-                        'rpc_version',
-                        'rpc_version_semver',
-                        'download_dir'
-                    ]
+                method: 'session-get',
+                arguments: {
+                    fields: ['version', 'rpc-version', 'download-dir']
                 }
             },
             function (ok, data, error) {
@@ -289,11 +173,8 @@ req.native(
                     return;
                 }
 
-                if (data && data.error) {
-                    callback(
-                        false,
-                        data.error.message || 'RPC помилка'
-                    );
+                if (data && data.result && data.result !== 'success') {
+                    callback(false, data.result || 'RPC помилка');
                     return;
                 }
 
@@ -303,21 +184,19 @@ req.native(
     }
 
     function addTorrent(profile, url, downloadDir, callback) {
-        var params = {
+        var args = {
             filename: url
         };
 
         if (downloadDir) {
-            params.download_dir = downloadDir;
+            args['download-dir'] = downloadDir;
         }
 
         request(
             profile,
             {
-                jsonrpc: '2.0',
-                method: 'torrent_add',
-                id: 1,
-                params: params
+                method: 'torrent-add',
+                arguments: args
             },
             function (ok, data, error) {
                 if (!ok) {
@@ -325,12 +204,8 @@ req.native(
                     return;
                 }
 
-                if (data && data.error) {
-                    callback(
-                        false,
-                        data.error.message ||
-                        'Помилка додавання торента'
-                    );
+                if (data && data.result && data.result !== 'success') {
+                    callback(false, data.result || 'Помилка додавання торента');
                     return;
                 }
 
@@ -339,634 +214,224 @@ req.native(
         );
     }
 
-    /*
-     * ---------------------------------------------------------
-     * РЕДАГУВАННЯ ПРОФІЛЮ
-     * ---------------------------------------------------------
-     */
-
     function inputDialog(title, value, callback) {
-    if (
-        Lampa.Input &&
-        typeof Lampa.Input.edit === 'function'
-    ) {
-        Lampa.Input.edit({
-            title: title,
-            value: value || '',
-            free: true,
-            nosave: true
-        }, function (newValue) {
-            callback(newValue);
-        });
-    } else {
-        var result = prompt(
-            title,
-            value || ''
-        );
-
-        if (result !== null) {
-            callback(result);
+        if (Lampa.Input && typeof Lampa.Input.edit === 'function') {
+            Lampa.Input.edit({
+                title: title,
+                value: value || '',
+                free: true,
+                nosave: true
+            }, function (newValue) {
+                callback(newValue);
+            });
+        } else {
+            var result = prompt(title, value || '');
+            if (result !== null) {
+                callback(result);
+            }
         }
     }
-}
 
+    function editProfile(profile) {
+        var isNew = !profile;
 
-function editProfile(profile) {
+        if (!profile) {
+            profile = {
+                id: uuid(),
+                name: 'Transmission',
+                protocol: 'https',
+                host: '',
+                port: '9091',
+                rpc_path: '/transmission/rpc',
+                username: '',
+                password: '',
+                movies: '',
+                shows: '',
+                cartoons: ''
+            };
+        }
 
-    var isNew = !profile;
+        function openEditor() {
+            var items = [
+                { title: 'Назва профілю', subtitle: profile.name || 'Transmission', action: 'name' },
+                { title: 'Протокол', subtitle: profile.protocol === 'http' ? 'HTTP' : 'HTTPS', action: 'protocol' },
+                { title: 'Адреса сервера', subtitle: profile.host || 'Не вказана', action: 'host' },
+                { title: 'Порт', subtitle: profile.port || 'Не вказаний', action: 'port' },
+                { title: 'Логін', subtitle: profile.username || 'Не вказаний', action: 'username' },
+                { title: 'Пароль', subtitle: profile.password ? '••••••••' : 'Не вказаний', action: 'password' },
+                { title: 'Папка Movies', subtitle: profile.movies || 'Не вказана', action: 'movies' },
+                { title: 'Папка Shows', subtitle: profile.shows || 'Не вказана', action: 'shows' },
+                { title: 'Папка Cartoons', subtitle: profile.cartoons || 'Не вказана', action: 'cartoons' },
+                { title: '🔌 Перевірити підключення', action: 'test' },
+                { title: '💾 Зберегти профіль', action: 'save' }
+            ];
 
-    if (!profile) {
-        profile = {
-            id: uuid(),
-            name: 'Transmission',
-            protocol: 'https',
-            host: '',
-            port: '9091',
-            rpc_path: '/transmission/rpc',
-            username: '',
-            password: '',
-            movies: '',
-            shows: '',
-            cartoons: ''
-        };
-    }
-
-    /*
-     * Меню редагування одного профілю.
-     * Ніяких Settings.open().
-     */
-
-    function openEditor() {
-
-        var items = [
-            {
-                title: 'Назва профілю',
-                subtitle: profile.name || 'Transmission',
-                action: 'name'
-            },
-            {
-                title: 'Протокол',
-                subtitle:
-                    profile.protocol === 'http'
-                        ? 'HTTP'
-                        : 'HTTPS',
-                action: 'protocol'
-            },
-            {
-                title: 'Адреса сервера',
-                subtitle:
-                    profile.host ||
-                    'Не вказана',
-                action: 'host'
-            },
-            {
-                title: 'Порт',
-                subtitle:
-                    profile.port ||
-                    'Не вказаний',
-                action: 'port'
-            },
-            {
-                title: 'Логін',
-                subtitle:
-                    profile.username ||
-                    'Не вказаний',
-                action: 'username'
-            },
-            {
-                title: 'Пароль',
-                subtitle:
-                    profile.password
-                        ? '••••••••'
-                        : 'Не вказаний',
-                action: 'password'
-            },
-            {
-                title: 'Папка Movies',
-                subtitle:
-                    profile.movies ||
-                    'Не вказана',
-                action: 'movies'
-            },
-            {
-                title: 'Папка Shows',
-                subtitle:
-                    profile.shows ||
-                    'Не вказана',
-                action: 'shows'
-            },
-            {
-                title: 'Папка Cartoons',
-                subtitle:
-                    profile.cartoons ||
-                    'Не вказана',
-                action: 'cartoons'
-            },
-            {
-                title: '🔌 Перевірити підключення',
-                action: 'test'
-            },
-            {
-                title: '💾 Зберегти профіль',
-                action: 'save'
-            }
-        ];
-
-        Lampa.Select.show({
-
-            title:
-                isNew
-                    ? 'Новий профіль Transmission'
-                    : 'Редагування: ' +
-                      (
-                          profile.name ||
-                          'Transmission'
-                      ),
-
-            items: items,
-
-            onSelect: function (item) {
-
-                /*
-                 * Назва
-                 */
-                if (item.action === 'name') {
-
-                    inputDialog(
-                        'Назва профілю',
-                        profile.name,
-                        function (value) {
-
-                            if (
-                                value !== undefined &&
-                                value !== null
-                            ) {
-                                profile.name =
-                                    String(value).trim() ||
-                                    'Transmission';
+            Lampa.Select.show({
+                title: isNew ? 'Новий профіль Transmission' : 'Редагування: ' + (profile.name || 'Transmission'),
+                items: items,
+                onSelect: function (item) {
+                    if (item.action === 'name') {
+                        inputDialog('Назва профілю', profile.name, function (value) {
+                            if (value !== undefined && value !== null) {
+                                profile.name = String(value).trim() || 'Transmission';
                             }
-
-                            setTimeout(
-                                openEditor,
-                                200
-                            );
-                        }
-                    );
-
-                    return;
-                }
-
-                /*
-                 * Протокол
-                 */
-                if (item.action === 'protocol') {
-
-                    Lampa.Select.show({
-
-                        title: 'Протокол',
-
-                        items: [
-                            {
-                                title: 'HTTPS',
-                                value: 'https',
-                                selected:
-                                    profile.protocol !== 'http'
-                            },
-                            {
-                                title: 'HTTP',
-                                value: 'http',
-                                selected:
-                                    profile.protocol === 'http'
-                            }
-                        ],
-
-                        onSelect: function (protocol) {
-
-                            profile.protocol =
-                                protocol.value;
-
-                            setTimeout(
-                                openEditor,
-                                200
-                            );
-                        },
-
-                        onBack: function () {
-                            setTimeout(
-                                openEditor,
-                                200
-                            );
-                        }
-
-                    });
-
-                    return;
-                }
-
-                /*
-                 * Адреса
-                 */
-                if (item.action === 'host') {
-
-                    inputDialog(
-                        'Адреса Transmission',
-                        profile.host,
-                        function (value) {
-
-                            if (
-                                value !== undefined &&
-                                value !== null
-                            ) {
-                                profile.host =
-                                    String(value)
-                                        .trim()
-                                        .replace(
-                                            /^https?:\/\//i,
-                                            ''
-                                        )
-                                        .replace(
-                                            /\/+$/,
-                                            ''
-                                        );
-                            }
-
-                            setTimeout(
-                                openEditor,
-                                200
-                            );
-                        }
-                    );
-
-                    return;
-                }
-
-                /*
-                 * Порт
-                 */
-                if (item.action === 'port') {
-
-                    inputDialog(
-                        'Порт Transmission',
-                        profile.port,
-                        function (value) {
-
-                            if (
-                                value !== undefined &&
-                                value !== null
-                            ) {
-                                profile.port =
-                                    String(value)
-                                        .trim();
-                            }
-
-                            setTimeout(
-                                openEditor,
-                                200
-                            );
-                        }
-                    );
-
-                    return;
-                }
-
-                /*
-                 * Логін
-                 */
-                if (item.action === 'username') {
-
-                    inputDialog(
-                        'Логін',
-                        profile.username,
-                        function (value) {
-
-                            if (
-                                value !== undefined &&
-                                value !== null
-                            ) {
-                                profile.username =
-                                    String(value);
-                            }
-
-                            setTimeout(
-                                openEditor,
-                                200
-                            );
-                        }
-                    );
-
-                    return;
-                }
-
-                /*
-                 * Пароль
-                 */
-                if (item.action === 'password') {
-
-                    inputDialog(
-                        'Пароль',
-                        profile.password,
-                        function (value) {
-
-                            if (
-                                value !== undefined &&
-                                value !== null
-                            ) {
-                                profile.password =
-                                    String(value);
-                            }
-
-                            setTimeout(
-                                openEditor,
-                                200
-                            );
-                        }
-                    );
-
-                    return;
-                }
-
-                /*
-                 * Movies
-                 */
-                if (item.action === 'movies') {
-
-                    inputDialog(
-                        'Папка Movies',
-                        profile.movies,
-                        function (value) {
-
-                            if (
-                                value !== undefined &&
-                                value !== null
-                            ) {
-                                profile.movies =
-                                    String(value).trim();
-                            }
-
-                            setTimeout(
-                                openEditor,
-                                200
-                            );
-                        }
-                    );
-
-                    return;
-                }
-
-                /*
-                 * Shows
-                 */
-                if (item.action === 'shows') {
-
-                    inputDialog(
-                        'Папка Shows',
-                        profile.shows,
-                        function (value) {
-
-                            if (
-                                value !== undefined &&
-                                value !== null
-                            ) {
-                                profile.shows =
-                                    String(value).trim();
-                            }
-
-                            setTimeout(
-                                openEditor,
-                                200
-                            );
-                        }
-                    );
-
-                    return;
-                }
-
-                /*
-                 * Cartoons
-                 */
-                if (item.action === 'cartoons') {
-
-                    inputDialog(
-                        'Папка Cartoons',
-                        profile.cartoons,
-                        function (value) {
-
-                            if (
-                                value !== undefined &&
-                                value !== null
-                            ) {
-                                profile.cartoons =
-                                    String(value).trim();
-                            }
-
-                            setTimeout(
-                                openEditor,
-                                200
-                            );
-                        }
-                    );
-
-                    return;
-                }
-
-                /*
-                 * Перевірка підключення
-                 */
-                if (item.action === 'test') {
-
-                    if (!profile.host) {
-                        Lampa.Noty.show(
-                            '❌ Спочатку вкажи адресу Transmission'
-                        );
-
-                        setTimeout(
-                            openEditor,
-                            500
-                        );
-
+                            setTimeout(openEditor, 200);
+                        });
                         return;
                     }
 
-                    Lampa.Noty.show(
-                        'Перевіряємо Transmission...'
-                    );
-
-                    testConnection(
-                        profile,
-                        function (ok, result) {
-
-                            if (!ok) {
-
-                                Lampa.Noty.show(
-                                    '❌ Transmission: ' +
-                                    result
-                                );
-
-                            } else {
-
-                                var args =
-                                    result &&
-                                    result.result === 'success'
-                                        ? result.arguments || {}
-                                        : {};
-
-                                var version =
-                                    args.version ||
-                                    args.rpc_version_semver ||
-                                    'версія невідома';
-
-                                Lampa.Noty.show(
-                                    '✅ Transmission підключено: ' +
-                                    version
-                                );
+                    if (item.action === 'protocol') {
+                        Lampa.Select.show({
+                            title: 'Протокол',
+                            items: [
+                                { title: 'HTTPS', value: 'https', selected: profile.protocol !== 'http' },
+                                { title: 'HTTP', value: 'http', selected: profile.protocol === 'http' }
+                            ],
+                            onSelect: function (protocol) {
+                                profile.protocol = protocol.value;
+                                setTimeout(openEditor, 200);
+                            },
+                            onBack: function () {
+                                setTimeout(openEditor, 200);
                             }
-
-                            setTimeout(
-                                openEditor,
-                                700
-                            );
-                        }
-                    );
-
-                    return;
-                }
-
-                /*
-                 * Зберегти
-                 */
-                if (item.action === 'save') {
-
-                    profile.name =
-                        String(
-                            profile.name || ''
-                        ).trim() ||
-                        'Transmission';
-
-                    profile.protocol =
-                        profile.protocol === 'http'
-                            ? 'http'
-                            : 'https';
-
-                    profile.host =
-                        String(
-                            profile.host || ''
-                        )
-                        .trim()
-                        .replace(
-                            /^https?:\/\//i,
-                            ''
-                        )
-                        .replace(
-                            /\/+$/,
-                            ''
-                        );
-
-                    profile.port =
-                        String(
-                            profile.port || ''
-                        ).trim();
-
-                    profile.username =
-                        String(
-                            profile.username || ''
-                        );
-
-                    profile.password =
-                        String(
-                            profile.password || ''
-                        );
-
-                    profile.movies =
-                        String(
-                            profile.movies || ''
-                        ).trim();
-
-                    profile.shows =
-                        String(
-                            profile.shows || ''
-                        ).trim();
-
-                    profile.cartoons =
-                        String(
-                            profile.cartoons || ''
-                        ).trim();
-
-                    profile.rpc_path =
-                        profile.rpc_path ||
-                        '/transmission/rpc';
-
-                    var profiles =
-                        getProfiles();
-
-                    var found = false;
-
-                    for (
-                        var i = 0;
-                        i < profiles.length;
-                        i++
-                    ) {
-                        if (
-                            profiles[i].id ===
-                            profile.id
-                        ) {
-                            profiles[i] =
-                                profile;
-
-                            found = true;
-                            break;
-                        }
+                        });
+                        return;
                     }
 
-                    if (!found) {
-                        profiles.push(
-                            profile
-                        );
+                    if (item.action === 'host') {
+                        inputDialog('Адреса Transmission', profile.host, function (value) {
+                            if (value !== undefined && value !== null) {
+                                profile.host = String(value).trim().replace(/^https?:\/\//i, '').replace(/\/+$/, '');
+                            }
+                            setTimeout(openEditor, 200);
+                        });
+                        return;
                     }
 
-                    saveProfiles(
-                        profiles
-                    );
+                    if (item.action === 'port') {
+                        inputDialog('Порт Transmission', profile.port, function (value) {
+                            if (value !== undefined && value !== null) {
+                                profile.port = String(value).trim();
+                            }
+                            setTimeout(openEditor, 200);
+                        });
+                        return;
+                    }
 
-                    setActiveId(
-                        profile.id
-                    );
+                    if (item.action === 'username') {
+                        inputDialog('Логін', profile.username, function (value) {
+                            if (value !== undefined && value !== null) {
+                                profile.username = String(value);
+                            }
+                            setTimeout(openEditor, 200);
+                        });
+                        return;
+                    }
 
-                    Lampa.Noty.show(
-                        '✅ Профіль Transmission збережено'
-                    );
+                    if (item.action === 'password') {
+                        inputDialog('Пароль', profile.password, function (value) {
+                            if (value !== undefined && value !== null) {
+                                profile.password = String(value);
+                            }
+                            setTimeout(openEditor, 200);
+                        });
+                        return;
+                    }
 
-                    Lampa.Controller.toggle(
-                        'content'
-                    );
+                    if (item.action === 'movies') {
+                        inputDialog('Папка Movies', profile.movies, function (value) {
+                            if (value !== undefined && value !== null) {
+                                profile.movies = String(value).trim();
+                            }
+                            setTimeout(openEditor, 200);
+                        });
+                        return;
+                    }
 
-                    return;
+                    if (item.action === 'shows') {
+                        inputDialog('Папка Shows', profile.shows, function (value) {
+                            if (value !== undefined && value !== null) {
+                                profile.shows = String(value).trim();
+                            }
+                            setTimeout(openEditor, 200);
+                        });
+                        return;
+                    }
+
+                    if (item.action === 'cartoons') {
+                        inputDialog('Папка Cartoons', profile.cartoons, function (value) {
+                            if (value !== undefined && value !== null) {
+                                profile.cartoons = String(value).trim();
+                            }
+                            setTimeout(openEditor, 200);
+                        });
+                        return;
+                    }
+
+                    if (item.action === 'test') {
+                        if (!profile.host) {
+                            Lampa.Noty.show('❌ Спочатку вкажи адресу Transmission');
+                            setTimeout(openEditor, 500);
+                            return;
+                        }
+
+                        Lampa.Noty.show('Перевіряємо Transmission...');
+                        testConnection(profile, function (ok, result) {
+                            if (!ok) {
+                                Lampa.Noty.show('❌ Transmission: ' + result);
+                            } else {
+                                var args = (result && result.result === 'success') ? (result.arguments || {}) : {};
+                                var version = args.version || args['rpc-version'] || 'версія невідома';
+                                Lampa.Noty.show('✅ Transmission підключено: ' + version);
+                            }
+                            setTimeout(openEditor, 700);
+                        });
+                        return;
+                    }
+
+                    if (item.action === 'save') {
+                        profile.name = String(profile.name || '').trim() || 'Transmission';
+                        profile.protocol = profile.protocol === 'http' ? 'http' : 'https';
+                        profile.host = String(profile.host || '').trim().replace(/^https?:\/\//i, '').replace(/\/+$/, '');
+                        profile.port = String(profile.port || '').trim();
+                        profile.username = String(profile.username || '');
+                        profile.password = String(profile.password || '');
+                        profile.movies = String(profile.movies || '').trim();
+                        profile.shows = String(profile.shows || '').trim();
+                        profile.cartoons = String(profile.cartoons || '').trim();
+                        profile.rpc_path = profile.rpc_path || '/transmission/rpc';
+
+                        var profiles = getProfiles();
+                        var found = false;
+
+                        for (var i = 0; i < profiles.length; i++) {
+                            if (profiles[i].id === profile.id) {
+                                profiles[i] = profile;
+                                found = true;
+                                break;
+                            }
+                        }
+
+                        if (!found) {
+                            profiles.push(profile);
+                        }
+
+                        saveProfiles(profiles);
+                        setActiveId(profile.id);
+
+                        Lampa.Noty.show('✅ Профіль Transmission збережено');
+                        Lampa.Controller.toggle('content');
+                        return;
+                    }
+                },
+                onBack: function () {
+                    Lampa.Controller.toggle('content');
                 }
-            },
+            });
+        }
 
-            onBack: function () {
-
-                /*
-                 * Якщо це новий профіль і
-                 * користувач натиснув назад —
-                 * нічого не створюємо.
-                 */
-
-                Lampa.Controller.toggle(
-                    'content'
-                );
-            }
-
-        });
+        openEditor();
     }
-
-    openEditor();
-}
-
-    /*
-     * ---------------------------------------------------------
-     * СПИСОК ПРОФІЛІВ
-     * ---------------------------------------------------------
-     */
 
     function showProfiles() {
         var profiles = getProfiles();
@@ -980,38 +445,20 @@ function editProfile(profile) {
 
         profiles.forEach(function (profile) {
             items.push({
-                title:
-                    profile.name ||
-                    'Без назви',
-
-                subtitle:
-                    normalizeUrl(profile) ||
-                    'Адреса не вказана',
-
+                title: profile.name || 'Без назви',
+                subtitle: normalizeUrl(profile) || 'Адреса не вказана',
                 profile: profile,
                 action: 'select'
             });
         });
 
-        items.push({
-            title: '➕ Додати профіль',
-            action: 'add'
-        });
-
-        items.push({
-            title: '✏️ Редагувати профіль',
-            action: 'edit'
-        });
-
-        items.push({
-            title: '🗑 Видалити профіль',
-            action: 'delete'
-        });
+        items.push({ title: '➕ Додати профіль', action: 'add' });
+        items.push({ title: '✏️ Редагувати профіль', action: 'edit' });
+        items.push({ title: '🗑 Видалити профіль', action: 'delete' });
 
         Lampa.Select.show({
             title: 'Transmission',
             items: items,
-
             onSelect: function (item) {
                 if (item.action === 'add') {
                     editProfile(null);
@@ -1019,276 +466,128 @@ function editProfile(profile) {
                 }
 
                 if (item.action === 'edit') {
-                    editProfile(
-                        getActiveProfile()
-                    );
+                    editProfile(getActiveProfile());
                     return;
                 }
 
                 if (item.action === 'delete') {
-                    deleteProfile(
-                        getActiveProfile()
-                    );
+                    deleteProfile(getActiveProfile());
                     return;
                 }
 
-                if (
-                    item.action === 'select' &&
-                    item.profile
-                ) {
-                    setActiveId(
-                        item.profile.id
-                    );
-
-                    Lampa.Noty.show(
-                        'Transmission: ' +
-                        (
-                            item.profile.name ||
-                            'профіль'
-                        ) +
-                        ' вибрано'
-                    );
+                if (item.action === 'select' && item.profile) {
+                    setActiveId(item.profile.id);
+                    Lampa.Noty.show('Transmission: ' + (item.profile.name || 'профіль') + ' вибрано');
                 }
 
-                Lampa.Controller.toggle(
-                    'content'
-                );
+                Lampa.Controller.toggle('content');
             },
-
             onBack: function () {
-                Lampa.Controller.toggle(
-                    'content'
-                );
+                Lampa.Controller.toggle('content');
             }
         });
     }
-
-    /*
-     * ---------------------------------------------------------
-     * ВИДАЛЕННЯ
-     * ---------------------------------------------------------
-     */
 
     function deleteProfile(profile) {
         if (!profile) return;
 
-        var profiles =
-            getProfiles().filter(function (item) {
-                return item.id !== profile.id;
-            });
+        var profiles = getProfiles().filter(function (item) {
+            return item.id !== profile.id;
+        });
 
         saveProfiles(profiles);
 
         if (getActiveId() === profile.id) {
-            setActiveId(
-                profiles.length
-                    ? profiles[0].id
-                    : ''
-            );
+            setActiveId(profiles.length ? profiles[0].id : '');
         }
 
-        Lampa.Noty.show(
-            'Профіль видалено'
-        );
+        Lampa.Noty.show('Профіль видалено');
     }
 
-    /*
-     * ---------------------------------------------------------
-     * ПЕРЕВІРКА АКТИВНОГО
-     * ---------------------------------------------------------
-     */
-
     function showTest() {
-        var profile =
-            getActiveProfile();
+        var profile = getActiveProfile();
 
         if (!profile) {
-            Lampa.Noty.show(
-                'Спочатку додай профіль Transmission'
-            );
+            Lampa.Noty.show('Спочатку додай профіль Transmission');
             return;
         }
 
-        Lampa.Noty.show(
-            'Перевіряємо Transmission...'
-        );
+        Lampa.Noty.show('Перевіряємо Transmission...');
 
-        testConnection(
-            profile,
-            function (ok, result) {
-                if (!ok) {
-                    Lampa.Noty.show(
-                        '❌ Transmission: ' +
-                        result
-                    );
-                    return;
-                }
-
-                var args =
-                    result &&
-                    result.result === 'success'
-                        ? result.arguments || {}
-                        : {};
-
-                var version =
-                    args.version ||
-                    args.rpc_version_semver ||
-                    'невідома версія';
-
-                Lampa.Noty.show(
-                    '✅ Transmission підключено: ' +
-                    version
-                );
+        testConnection(profile, function (ok, result) {
+            if (!ok) {
+                Lampa.Noty.show('❌ Transmission: ' + result);
+                return;
             }
-        );
+
+            var args = (result && result.result === 'success') ? (result.arguments || {}) : {};
+            var version = args.version || args['rpc-version'] || 'невідома версія';
+
+            Lampa.Noty.show('✅ Transmission підключено: ' + version);
+        });
     }
 
-    /*
-     * ---------------------------------------------------------
-     * ПУБЛІЧНИЙ API
-     * ---------------------------------------------------------
-     */
-
     window.UTOPIA_TRANSMISSION = {
-
         isReady: function () {
             return getProfiles().length > 0;
         },
-
         getProfiles: function () {
             return getProfiles();
         },
-
         getActiveProfile: function () {
             return getActiveProfile();
         },
-
         testConnection: function (callback) {
-            var profile =
-                getActiveProfile();
-
+            var profile = getActiveProfile();
             if (!profile) {
-                callback(
-                    false,
-                    'Немає активного профілю'
-                );
+                if (callback) callback(false, 'Немає активного профілю');
                 return;
             }
-
-            testConnection(
-                profile,
-                callback
-            );
+            testConnection(profile, callback);
         },
-
-        addTorrent: function (
-            url,
-            downloadDir,
-            callback
-        ) {
-            var profile =
-                getActiveProfile();
-
+        addTorrent: function (url, downloadDir, callback) {
+            var profile = getActiveProfile();
             if (!profile) {
-                if (callback) {
-                    callback(
-                        false,
-                        'Немає активного профілю'
-                    );
-                }
+                if (callback) callback(false, 'Немає активного профілю');
                 return;
             }
-
-            addTorrent(
-                profile,
-                url,
-                downloadDir,
-                callback ||
-                function () {}
-            );
+            addTorrent(profile, url, downloadDir, callback || function () {});
         },
-
-        showProfiles:
-            showProfiles
+        showProfiles: showProfiles
     };
 
-    /*
-     * ---------------------------------------------------------
-     * LAMPA SETTINGS
-     * ---------------------------------------------------------
-     */
-
     function initSettings() {
-        if (
-            !window.Lampa ||
-            !Lampa.SettingsApi
-        ) {
-            return;
-        }
+        if (!window.Lampa || !Lampa.SettingsApi) return;
 
         Lampa.SettingsApi.addComponent({
-            component:
-                'utopia_transmission',
-
-            name:
-                'Transmission',
-
-            icon:
-                '📡'
+            component: 'utopia_transmission',
+            name: 'Transmission',
+            icon: '📡'
         });
 
         Lampa.SettingsApi.addParam({
-            component:
-                'utopia_transmission',
-
-            param: {
-                name: 'profiles',
-                type: 'button'
-            },
-
+            component: 'utopia_transmission',
+            param: { name: 'profiles', type: 'button' },
             field: {
-                name:
-                    'Профілі Transmission',
-
-                description:
-                    'Сервери, логін, пароль і папки'
+                name: 'Профілі Transmission',
+                description: 'Сервери, логін, пароль і папки'
             },
-
-            onChange:
-                showProfiles
+            onChange: showProfiles
         });
 
         Lampa.SettingsApi.addParam({
-            component:
-                'utopia_transmission',
-
-            param: {
-                name: 'test',
-                type: 'button'
-            },
-
-            field: {
-                name:
-                    'Перевірити підключення'
-            },
-
-            onChange:
-                showTest
+            component: 'utopia_transmission',
+            param: { name: 'test', type: 'button' },
+            field: { name: 'Перевірити підключення' },
+            onChange: showTest
         });
     }
 
-    if (
-        window.Lampa &&
-        Lampa.Listener
-    ) {
-        Lampa.Listener.follow(
-            'app',
-            function (e) {
-                if (e.type === 'ready') {
-                    initSettings();
-                }
+    if (window.Lampa && Lampa.Listener) {
+        Lampa.Listener.follow('app', function (e) {
+            if (e.type === 'ready') {
+                initSettings();
             }
-        );
+        });
     }
-
 })();
