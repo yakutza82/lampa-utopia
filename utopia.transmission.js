@@ -101,85 +101,108 @@
     }
 
     function request(profile, body, callback) {
-        var url = getRpcUrl(profile);
+    var url = getRpcUrl(profile);
 
-        if (!url) {
+    if (!url) {
+        callback(
+            false,
+            null,
+            'Не вказана адреса Transmission'
+        );
+        return;
+    }
+
+    var headers = {
+        'Content-Type': 'application/json'
+    };
+
+    if (profile.username || profile.password) {
+        try {
+            headers.Authorization =
+                'Basic ' +
+                btoa(
+                    String(profile.username || '') +
+                    ':' +
+                    String(profile.password || '')
+                );
+        } catch (e) {}
+    }
+
+    function send() {
+
+        if (
+            !Lampa.Reguest ||
+            typeof Lampa.Reguest !== 'function'
+        ) {
             callback(
                 false,
                 null,
-                'Не вказана адреса Transmission'
+                'Lampa.Reguest недоступний'
             );
             return;
         }
 
-        var headers = {
-            'Content-Type': 'application/json',
-            'Authorization': basicAuth(profile)
-        };
+        var request = new Lampa.Reguest();
 
-        function send() {
-            fetch(url, {
-                method: 'POST',
-                headers: headers,
-                body: JSON.stringify(body)
-            })
-                .then(function (response) {
-                    if (response.status === 409) {
-                        var sid = response.headers.get(
-                            'X-Transmission-Session-Id'
-                        );
+        request.native(
+            url,
+            function (data) {
 
-                        if (!sid) {
-                            throw new Error(
-                                'Transmission не повернув Session ID'
-                            );
-                        }
+                /*
+                 * Успішна відповідь Transmission.
+                 */
+                try {
+                    var json =
+                        typeof data === 'string'
+                            ? JSON.parse(data)
+                            : data;
 
-                        headers['X-Transmission-Session-Id'] = sid;
-
-                        return fetch(url, {
-                            method: 'POST',
-                            headers: headers,
-                            body: JSON.stringify(body)
-                        });
-                    }
-
-                    return response;
-                })
-                .then(function (response) {
-                    if (!response.ok) {
-                        return response.text().then(function (text) {
-                            throw new Error(
-                                'HTTP ' +
-                                response.status +
-                                (text ? ': ' + text : '')
-                            );
-                        });
-                    }
-
-                    return response.json();
-                })
-                .then(function (data) {
-                    callback(true, data, null);
-                })
-                .catch(function (error) {
-                    console.error(
-                        '[UTOPIA TRANSMISSION]',
-                        error
+                    callback(
+                        true,
+                        json,
+                        null
                     );
-
+                } catch (e) {
                     callback(
                         false,
                         null,
-                        error && error.message
-                            ? error.message
-                            : String(error)
+                        'Некоректна відповідь Transmission'
                     );
-                });
-        }
+                }
 
-        send();
+            },
+            function (error) {
+
+                /*
+                 * Помилка native-запиту.
+                 */
+                console.error(
+                    '[UTOPIA TRANSMISSION]',
+                    error
+                );
+
+                callback(
+                    false,
+                    null,
+                    error && error.message
+                        ? error.message
+                        : String(error || 'Помилка запиту')
+                );
+            },
+            {
+                method: 'POST',
+
+                headers: headers,
+
+                data: JSON.stringify(body),
+
+                dataType: 'json'
+            }
+        );
     }
+
+    send();
+}
 
     function testConnection(profile, callback) {
         request(
