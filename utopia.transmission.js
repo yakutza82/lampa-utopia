@@ -112,6 +112,107 @@
         return;
     }
 
+    var auth = '';
+
+    try {
+        auth = btoa(
+            String(profile.username || '') +
+            ':' +
+            String(profile.password || '')
+        );
+    } catch (e) {
+        callback(
+            false,
+            null,
+            'Не вдалося сформувати авторизацію'
+        );
+        return;
+    }
+
+    var headers = {
+        'Content-Type': 'application/json',
+        'Authorization': 'Basic ' + auth
+    };
+
+    function send(sessionId) {
+
+        if (
+            !Lampa.Reguest ||
+            typeof Lampa.Reguest !== 'function'
+        ) {
+            callback(
+                false,
+                null,
+                'Lampa.Reguest недоступний'
+            );
+            return;
+        }
+
+        var req = new Lampa.Reguest();
+
+        var options = {
+            method: 'POST',
+            headers: headers,
+            data: JSON.stringify(body),
+            dataType: 'json'
+        };
+
+        if (sessionId) {
+            options.headers[
+                'X-Transmission-Session-Id'
+            ] = sessionId;
+        }
+
+        req.native(
+            url,
+            function (data, response) {
+
+                try {
+                    var json =
+                        typeof data === 'string'
+                            ? JSON.parse(data)
+                            : data;
+
+                    callback(
+                        true,
+                        json,
+                        null
+                    );
+
+                } catch (e) {
+
+                    callback(
+                        false,
+                        null,
+                        'Некоректна відповідь Transmission'
+                    );
+                }
+            },
+            function (error) {
+
+                console.error(
+                    '[UTOPIA TRANSMISSION]',
+                    error
+                );
+
+                callback(
+                    false,
+                    null,
+                    error && error.message
+                        ? error.message
+                        : String(
+                            error ||
+                            'Помилка запиту'
+                        )
+                );
+            },
+            options
+        );
+    }
+
+    send();
+}
+
     var headers = {
         'Content-Type': 'application/json'
     };
