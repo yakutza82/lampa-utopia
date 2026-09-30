@@ -6,7 +6,7 @@
 
     var API_BASE = 'https://utp.to/api';
     var PER_PAGE = 99;
-    var VERSION = 'v0.9.30 build 1311';
+    var VERSION = 'v0.9.30 build 1329';
 
     var TRACKERS = [
         'udp://tracker.opentrackr.org:1337/announce',
@@ -567,7 +567,7 @@
         'height:11.25em;' +
     '}' +
 
-            '.utopia-list{' +
+    '.utopia-list{' +
         'grid-column:2;' +
         'grid-row:2;' +
         'min-width:0;' +
@@ -580,8 +580,8 @@
         'margin-top:-3em;' +
         'padding-top:3em;' +
         'padding-bottom:1.8em;' +
-        '-webkit-mask-image:linear-gradient(to bottom,rgba(0,0,0,0) 0,rgba(0,0,0,.35) 1em,rgba(0,0,0,.65) 2em,#000 3em,#000 calc(100% - 1.8em),rgba(0,0,0,.55) calc(100% - 1.2em),rgba(0,0,0,.35) calc(100% - .6em),rgba(0,0,0,0) 100%);' +
-        'mask-image:linear-gradient(to bottom,rgba(0,0,0,0) 0,rgba(0,0,0,.35) 1em,rgba(0,0,0,.65) 2em,#000 3em,#000 calc(100% - 1.8em),rgba(0,0,0,.55) calc(100% - 1.2em),rgba(0,0,0,.35) calc(100% - .6em),rgba(0,0,0,0) 100%);' +
+        '-webkit-mask-image:linear-gradient(to bottom,rgba(0,0,0,0) 0,rgba(0,0,0,.25) 1em,rgba(0,0,0,.55) 2em,#000 3em,#000 calc(100% - 1.8em),rgba(0,0,0,.55) calc(100% - 1.2em),rgba(0,0,0,.35) calc(100% - .6em),rgba(0,0,0,0) 100%);' +
+        'mask-image:linear-gradient(to bottom,rgba(0,0,0,0) 0,rgba(0,0,0,.25) 1em,rgba(0,0,0,.55) 2em,#000 3em,#000 calc(100% - 1.8em),rgba(0,0,0,.55) calc(100% - 1.2em),rgba(0,0,0,.35) calc(100% - .6em),rgba(0,0,0,0) 100%);' +
     '}' +
 
     '.utopia-portrait-back{' +
@@ -639,7 +639,7 @@
             param: { name: 'utopia_api_key', type: 'input', values: '', default: '' },
             field: {
                 name: 'API ключ UTOPIA',
-                description: 'Встав ключ доступу до utp.to. Версія плагіна: ' + VERSION
+                description: 'Вставте ключ доступу до utp.to. Версія плагіна: ' + VERSION
             },
             onChange: function (value) {
                 var key = (value || '').trim();
@@ -865,8 +865,8 @@
 
     function errorMessage(code) {
         var map = {
-            no_key: 'Спочатку вкажи API ключ у налаштуваннях плагіна UTOPIA.',
-            unauthorized: 'Неправильний API ключ (401). Перевір його в налаштуваннях.',
+            no_key: 'Спочатку вкажіть API ключ у налаштуваннях плагіна UTOPIA.',
+            unauthorized: 'Неправильний API ключ (401). Перевірте його в налаштуваннях.',
             forbidden: 'Заблоковано сервером/браузером (403 або CORS).',
             parse_error: 'Сервер повернув некоректну відповідь.',
             network: 'Помилка мережі або CORS (заблоковано сервером/браузером).',
@@ -1318,7 +1318,7 @@ var moviePanel = $(
                 $('<div class="utopia-state">' +
                 '<div class="utopia-state__icon">\ud83d\udd11</div>' +
                 '<div class="utopia-state__title">Ключ не вказано</div>' +
-                '<div class="utopia-state__text">Щоб шукати торренти на UTOPIA, спочатку додай API ключ у налаштуваннях плагіна.</div>' +
+                '<div class="utopia-state__text">Щоб шукати торренти на UTOPIA, спочатку додайте API ключ у налаштуваннях плагіна.</div>' +
                 '</div>')
             );
         }
@@ -1444,7 +1444,7 @@ var moviePanel = $(
             Lampa.Storage.set('utopia_last_torrent_url', text);
 
             function ok() {
-                Lampa.Noty.show('UTOPIA: посилання скопійовано. Встав його в Transmission (Add by URL)');
+                Lampa.Noty.show('UTOPIA: посилання скопійовано. Вставте його у додаток для торрентів (Add by URL)');
             }
             function fail() {
                 showDebugModal('Скопіюй посилання вручну', text);
@@ -1712,7 +1712,7 @@ function showTorrentActionMenu(item) {
         if (!title) return;
 
         var button = $(
-    '<div class="full-start__button selector utopia-search-btn" data-subtitle="v0.9.30 build 1311">' +
+    '<div class="full-start__button selector utopia-search-btn">' + VERSION
         '<span style="display:flex;align-items:center;gap:.45em;">' +
             '<svg width="1.5em" height="1.5em" viewBox="0 0 64 64" ' +
                 'xmlns="http://www.w3.org/2000/svg" ' +
@@ -1727,7 +1727,7 @@ function showTorrentActionMenu(item) {
 
         button.on('click hover:enter', function () {
             if (!hasKey()) {
-                Lampa.Noty.show('UTOPIA: спочатку вкажи API ключ у налаштуваннях плагіна');
+                Lampa.Noty.show('UTOPIA: спочатку вкажіть API ключ у налаштуваннях плагіна');
                 return;
             }
             Lampa.Activity.push({
