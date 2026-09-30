@@ -541,8 +541,8 @@
             });
         });
 
-        items.push({ title: '💾 Зберегти', action: 'save_active' });
         items.push({ title: '➕ Додати профіль', action: 'add' });
+        items.push({ title: '💾 Зберегти', action: 'save_active' });
         items.push({ title: '✏️ Редагувати вибраний профіль', action: 'edit' });
         items.push({ title: '🗑 Видалити вибраний профіль', action: 'delete' });
 
