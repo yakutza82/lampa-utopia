@@ -614,7 +614,7 @@
         'xmlns="http://www.w3.org/2000/svg" ' +
         'style="display:block;flex-shrink:0;">' +
             '<image href="https://raw.githubusercontent.com/yakutza82/lampa-utopia/c1ba69b9bcb19acd39e3c7b9704352c46e38a725/transdroneWH.png" ' +
-            'x="0" y="0" width="76" height="76" />' +
+            'x="0" y="0" width="68" height="68" />' +
         '</svg>'
 });
 
