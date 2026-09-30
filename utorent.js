@@ -631,7 +631,13 @@
         Lampa.SettingsApi.addComponent({
             component: 'utopia',
             name: 'UTOPIA',
-            icon: '<svg width="26" height="26" viewBox="0 0 26 26" xmlns="http://www.w3.org/2000/svg"><circle cx="13" cy="13" r="10" stroke="currentColor" stroke-width="2" fill="none"/></svg>'
+            icon:
+        '<svg width="1.5em" height="1.5em" viewBox="0 0 64 64" ' +
+        'xmlns="http://www.w3.org/2000/svg" ' +
+        'style="display:block;flex-shrink:0;">' +
+            '<image href="https://raw.githubusercontent.com/yakutza82/lampa-utopia/refs/heads/main/pngegg2wh.png" ' +
+            'x="0" y="0" width="64" height="64" />' +
+        '</svg>'
         });
 
         Lampa.SettingsApi.addParam({
