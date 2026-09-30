@@ -1712,7 +1712,7 @@ function showTorrentActionMenu(item) {
         if (!title) return;
 
         var button = $(
-    '<div class="full-start__button selector utopia-search-btn" data-subtitle="v0.9.29 build 1559">' +
+    '<div class="full-start__button selector utopia-search-btn">' +
         '<span style="display:flex;align-items:center;gap:.45em;">' +
             '<svg width="1.5em" height="1.5em" viewBox="0 0 64 64" ' +
                 'xmlns="http://www.w3.org/2000/svg" ' +
