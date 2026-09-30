@@ -7,6 +7,11 @@
     var ACTIVE_KEY = 'utopia_transmission_active';
     var sessionCache = {};
 
+    var activeInfoField = {
+        name: '📌 Активний профіль',
+        description: 'Не вибрано'
+    };
+
     function uuid() {
         return 'tr_' + Date.now() + '_' + Math.floor(Math.random() * 100000);
     }
@@ -27,6 +32,7 @@
     function saveProfiles(profiles) {
         var data = JSON.stringify(profiles || []);
         Lampa.Storage.set(STORAGE_KEY, data);
+        updateActiveProfileDisplay();
     }
 
     function getActiveId() {
@@ -35,6 +41,7 @@
 
     function setActiveId(id) {
         Lampa.Storage.set(ACTIVE_KEY, String(id || ''));
+        updateActiveProfileDisplay();
     }
 
     function getActiveProfile() {
@@ -46,6 +53,16 @@
         }
 
         return profiles.length ? profiles[0] : null;
+    }
+
+    function updateActiveProfileDisplay() {
+        var profile = getActiveProfile();
+        if (profile) {
+            var url = normalizeUrl(profile);
+            activeInfoField.description = (profile.name || 'Transmission') + (url ? ' (' + url + ')' : '');
+        } else {
+            activeInfoField.description = 'Не вибрано';
+        }
     }
 
     function normalizeUrl(profile) {
@@ -509,7 +526,7 @@
         });
 
         items.push({ title: '➕ Додати профіль', action: 'add' });
-        items.push({ title: '✏️️ Редагувати активний профіль', action: 'edit' });
+        items.push({ title: '✏️ Редагувати активний профіль', action: 'edit' });
         items.push({ title: '🗑 Видалити активний профіль', action: 'delete' });
 
         Lampa.Select.show({
@@ -616,6 +633,8 @@
     function initSettings() {
         if (!window.Lampa || !Lampa.SettingsApi) return;
 
+        updateActiveProfileDisplay();
+
         Lampa.SettingsApi.addComponent({
             component: 'utopia_transmission',
             name: 'Transmission',
@@ -626,6 +645,15 @@
                     '<image href="https://raw.githubusercontent.com/yakutza82/lampa-utopia/c1ba69b9bcb19acd39e3c7b9704352c46e38a725/transdroneWH.png" ' +
                     'x="0" y="0" width="68" height="68" />' +
                 '</svg>'
+        });
+
+        Lampa.SettingsApi.addParam({
+            component: 'utopia_transmission',
+            param: {
+                name: 'active_profile_info',
+                type: 'title'
+            },
+            field: activeInfoField
         });
 
         Lampa.SettingsApi.addParam({
