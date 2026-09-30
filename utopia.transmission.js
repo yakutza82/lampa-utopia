@@ -136,79 +136,163 @@
 
     function send(sessionId) {
 
-        if (
-            !Lampa.Reguest ||
-            typeof Lampa.Reguest !== 'function'
-        ) {
-            callback(
-                false,
-                null,
-                'Lampa.Reguest недоступний'
-            );
-            return;
-        }
+    if (
+        !Lampa.Reguest ||
+        typeof Lampa.Reguest !== 'function'
+    ) {
+        callback(
+            false,
+            null,
+            'Lampa.Reguest недоступний'
+        );
+        return;
+    }
 
-        var req = new Lampa.Reguest();
+    var req = new Lampa.Reguest();
 
-        var options = {
-            method: 'POST',
-            headers: headers,
-            data: JSON.stringify(body),
-            dataType: 'json'
-        };
+    var requestHeaders = {
+        'Content-Type': 'application/json',
+        'Authorization': 'Basic ' + auth
+    };
 
-        if (sessionId) {
-            options.headers[
-                'X-Transmission-Session-Id'
-            ] = sessionId;
-        }
+    if (sessionId) {
+        requestHeaders[
+            'X-Transmission-Session-Id'
+        ] = sessionId;
+    }
 
-        req.native(
-            url,
-            function (data, response) {
+    var options = {
+        dataType: 'text',
+        headers: requestHeaders
+    };
 
-                try {
-                    var json =
-                        typeof data === 'string'
-                            ? JSON.parse(data)
-                            : data;
+    req.native(
+        url,
+        function (data, response) {
 
-                    callback(
-                        true,
-                        json,
-                        null
-                    );
+            /*
+             * Успішна відповідь Transmission.
+             */
+            try {
 
-                } catch (e) {
+                var json =
+                    typeof data === 'string'
+                        ? JSON.parse(data)
+                        : data;
 
-                    callback(
-                        false,
-                        null,
-                        'Некоректна відповідь Transmission'
-                    );
-                }
-            },
-            function (error) {
-
-                console.error(
-                    '[UTOPIA TRANSMISSION]',
-                    error
+                callback(
+                    true,
+                    json,
+                    null
                 );
+
+            } catch (e) {
 
                 callback(
                     false,
                     null,
-                    error && error.message
-                        ? error.message
-                        : String(
-                            error ||
-                            'Помилка запиту'
-                        )
+                    'Некоректна відповідь Transmission'
                 );
-            },
-            options
-        );
-    }
+            }
+
+        },
+        function (error) {
+
+            /*
+             * Transmission перший запит навмисно
+             * повертає 409 і X-Transmission-Session-Id.
+             *
+             * Спробуємо витягнути Session ID
+             * з відповіді Lampa.
+             */
+
+            var session = '';
+
+            try {
+
+                if (
+                    error &&
+                    typeof error.getResponseHeader === 'function'
+                ) {
+                    session =
+                        error.getResponseHeader(
+                            'X-Transmission-Session-Id'
+                        ) || '';
+                }
+
+                if (!session && error && error.headers) {
+
+                    if (
+                        typeof error.headers.getResponseHeader ===
+                        'function'
+                    ) {
+                        session =
+                            error.headers.getResponseHeader(
+                                'X-Transmission-Session-Id'
+                            ) || '';
+                    }
+                    else if (
+                        typeof error.headers === 'string'
+                    ) {
+                        var match =
+                            error.headers.match(
+                                /(?:^|\r?\n)X-Transmission-Session-Id:\s*([^\r\n]+)/i
+                            );
+
+                        if (match) {
+                            session = match[1];
+                        }
+                    }
+                }
+
+                if (
+                    !session &&
+                    error &&
+                    typeof error.responseHeaders === 'string'
+                ) {
+                    var match2 =
+                        error.responseHeaders.match(
+                            /(?:^|\r?\n)X-Transmission-Session-Id:\s*([^\r\n]+)/i
+                        );
+
+                    if (match2) {
+                        session = match2[1];
+                    }
+                }
+
+            } catch (e) {}
+
+            /*
+             * Якщо отримали Session ID — повторюємо
+             * запит уже з правильним заголовком.
+             */
+            if (session && !sessionId) {
+                send(session);
+                return;
+            }
+
+            console.error(
+                '[UTOPIA TRANSMISSION]',
+                error
+            );
+
+            callback(
+                false,
+                null,
+                error && error.message
+                    ? error.message
+                    : String(
+                        error ||
+                        'Помилка запиту'
+                    )
+            );
+        },
+
+        JSON.stringify(body),
+
+        options
+    );
+}
 
     send();
 }
