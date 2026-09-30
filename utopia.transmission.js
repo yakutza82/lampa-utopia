@@ -81,7 +81,6 @@
         if (!reqObj) return '';
         var session = '';
 
-        // 1. Спроба зчитати із заголовків відповіді
         try {
             if (typeof reqObj.getResponseHeader === 'function') {
                 session = reqObj.getResponseHeader('X-Transmission-Session-Id') ||
@@ -101,7 +100,6 @@
             } catch (e) {}
         }
 
-        // 2. Парсинг з HTML-тіла (якщо CORS блокує заголовки у відповіді 409)
         if (!session) {
             var bodyText = reqObj.responseText || reqObj.response || '';
             if (typeof bodyText === 'string' && bodyText) {
@@ -203,13 +201,11 @@
                     sessionCache[profileKey] = newSession;
                 }
 
-                // 1. Автоматичний повтор з отриманим Session ID при 409 Conflict
                 if ((status === 409 || newSession) && !isRetry) {
                     request(profile, body, callback, idx, true);
                     return;
                 }
 
-                // 2. Автоматичний перебір альтернативних шляхів при 404 Not Found
                 if (status === 404 && idx + 1 < uniquePaths.length) {
                     request(profile, body, callback, idx + 1, false);
                     return;
@@ -490,8 +486,9 @@
         var activeId = getActiveId();
 
         profiles.forEach(function (profile) {
+            var icon = (profile.id === activeId) ? '● ' : '○ ';
             items.push({
-                title: (profile.id === activeId ? '✅ ' : '') + (profile.name || 'Без назви'),
+                title: icon + (profile.name || 'Без назви'),
                 subtitle: normalizeUrl(profile) || 'Адреса не вказана',
                 profile: profile,
                 action: 'select'
@@ -606,17 +603,17 @@
     function initSettings() {
         if (!window.Lampa || !Lampa.SettingsApi) return;
 
-    Lampa.SettingsApi.addComponent({
-        component: 'utopia_transmission',
-        name: 'Transmission',
-        icon:
+        Lampa.SettingsApi.addComponent({
+            component: 'utopia_transmission',
+            name: 'Transmission',
+            icon:
         '<svg width="1.5em" height="1.5em" viewBox="0 0 64 64" ' +
         'xmlns="http://www.w3.org/2000/svg" ' +
         'style="display:block;flex-shrink:0;">' +
             '<image href="https://raw.githubusercontent.com/yakutza82/lampa-utopia/c1ba69b9bcb19acd39e3c7b9704352c46e38a725/transdroneWH.png" ' +
             'x="0" y="0" width="68" height="68" />' +
         '</svg>'
-});
+        });
 
         Lampa.SettingsApi.addParam({
             component: 'utopia_transmission',
