@@ -198,17 +198,71 @@ req.native(
             );
         }
     },
-    function (error) {
-        console.log('[UTOPIA TRANSMISSION] ERROR:', error);
+    function (error, response) {
 
-        callback(
-            false,
-            null,
+    console.log(
+        '[UTOPIA TRANSMISSION] ERROR OBJECT:',
+        error
+    );
+
+    console.log(
+        '[UTOPIA TRANSMISSION] ERROR RESPONSE:',
+        response
+    );
+
+    var status = '';
+
+    try {
+        if (response) {
+            status =
+                response.status ||
+                response.statusCode ||
+                '';
+        }
+    } catch (e) {}
+
+    console.log(
+        '[UTOPIA TRANSMISSION] STATUS:',
+        status
+    );
+
+    var session = '';
+
+    try {
+        if (
+            response &&
+            typeof response.getResponseHeader === 'function'
+        ) {
+            session =
+                response.getResponseHeader(
+                    'X-Transmission-Session-Id'
+                ) || '';
+        }
+    } catch (e) {}
+
+    console.log(
+        '[UTOPIA TRANSMISSION] SESSION:',
+        session
+    );
+
+    callback(
+        false,
+        null,
+        (
+            status
+                ? 'HTTP ' + status + ': '
+                : ''
+        ) +
+        (
             error && error.message
                 ? error.message
-                : String(error || 'Помилка запиту')
-        );
-    },
+                : String(
+                    error ||
+                    'Помилка запиту'
+                )
+        )
+    );
+},
     JSON.stringify(body),
     options
 );
