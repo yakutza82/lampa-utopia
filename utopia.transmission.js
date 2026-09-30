@@ -5,6 +5,7 @@
 
     var STORAGE_KEY = 'utopia_transmission_profiles';
     var ACTIVE_KEY = 'utopia_transmission_active';
+    var VERSION = 'v0.9.30 build 1623';
 
     var EDIT_COMPONENT = 'utopia_transmission_edit';
 
