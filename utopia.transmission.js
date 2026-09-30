@@ -64,8 +64,12 @@
             activeText = (profile.name || 'Transmission') + (url ? ' (' + url + ')' : '');
         }
 
-        var fullDescr = 'Активний: ' + activeText + ' | Сервери, логін, пароль і папки';
-        profilesField.description = fullDescr;
+        var line1 = 'Сервери, логін, пароль і папки';
+        var line2 = 'Активний: ' + activeText;
+
+        profilesField.description = line1 + '\n' + line2;
+
+        var htmlDescr = line1 + '<br><span style="opacity: 0.8;">' + line2 + '</span>';
 
         // Динамічне оновлення DOM у меню Lampa
         try {
@@ -73,9 +77,9 @@
             if ($el.length) {
                 var $descr = $el.find('.settings-param__descr, .settings-param__descr-text, .settings-param__value');
                 if ($descr.length) {
-                    $descr.text(fullDescr);
+                    $descr.html(htmlDescr);
                 } else {
-                    $el.children().last().text(fullDescr);
+                    $el.children().last().html(htmlDescr);
                 }
             }
         } catch (e) {}
@@ -541,8 +545,8 @@
             });
         });
 
-        items.push({ title: '➕ Додати профіль', action: 'add' });
         items.push({ title: '💾 Зберегти', action: 'save_active' });
+        items.push({ title: '➕ Додати профіль', action: 'add' });
         items.push({ title: '✏️ Редагувати вибраний профіль', action: 'edit' });
         items.push({ title: '🗑 Видалити вибраний профіль', action: 'delete' });
 
