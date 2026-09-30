@@ -57,12 +57,27 @@
 
     function updateActiveProfileDisplay() {
         var profile = getActiveProfile();
+        var desc = 'Не вибрано';
+
         if (profile) {
             var url = normalizeUrl(profile);
-            activeInfoField.description = (profile.name || 'Transmission') + (url ? ' (' + url + ')' : '');
-        } else {
-            activeInfoField.description = 'Не вибрано';
+            desc = (profile.name || 'Transmission') + (url ? ' (' + url + ')' : '');
         }
+
+        activeInfoField.description = desc;
+
+        // Динамічне оновлення DOM у меню Lampa без перезавантаження
+        try {
+            var $el = $('[data-name="active_profile_info"], [data-param="active_profile_info"]');
+            if ($el.length) {
+                var $val = $el.find('.settings-param__value, .settings-param__descr, .settings-param__descr-text');
+                if ($val.length) {
+                    $val.text(desc);
+                } else {
+                    $el.children().last().text(desc);
+                }
+            }
+        } catch (e) {}
     }
 
     function normalizeUrl(profile) {
