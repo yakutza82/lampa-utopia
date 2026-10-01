@@ -1508,7 +1508,6 @@ function downloadTorrent(item) {
 }
 
 function showTorrentActionMenu(item) {
-    function showTorrentActionMenu(item) {
     var items = [
         {
             title: '📥 Завантажити .torrent',
