@@ -16,6 +16,15 @@
         return 'tr_' + Date.now() + '_' + Math.floor(Math.random() * 100000);
     }
 
+    function hideCheckmarks() {
+        setTimeout(function () {
+            $('.select-item__icon, .select-item__checkbox, .select-item svg, .select-item__marker').hide();
+        }, 30);
+        setTimeout(function () {
+            $('.select-item__icon, .select-item__checkbox, .select-item svg, .select-item__marker').hide();
+        }, 150);
+    }
+
     function getProfiles() {
         var raw = Lampa.Storage.get(STORAGE_KEY, '[]');
         if (typeof raw === 'object' && raw !== null) {
@@ -71,7 +80,6 @@
 
         var htmlDescr = line1 + '<br><span style="opacity: 0.8;">' + line2 + '</span>';
 
-        // Динамічне оновлення DOM у меню Lampa
         try {
             var $el = $('[data-name="profiles"], [data-param="profiles"]');
             if ($el.length) {
@@ -380,7 +388,9 @@
                 onSelect: function (item) {
                     if (item.action === 'name') {
                         inputDialog('Назва профілю', profile.name, function (v) {
-                            if (v !== null) profile.name = String(v).trim() || 'Transmission';
+                            if (v !== null && v !== undefined && String(v).trim() !== '') {
+                                profile.name = String(v).trim();
+                            }
                             setTimeout(function () { openEditor('name'); }, 200);
                         });
                         return;
@@ -401,12 +411,15 @@
                             },
                             onBack: function () { setTimeout(function () { openEditor('protocol'); }, 200); }
                         });
+                        hideCheckmarks();
                         return;
                     }
 
                     if (item.action === 'host') {
                         inputDialog('Адреса Transmission', profile.host, function (v) {
-                            if (v !== null) profile.host = String(v).trim().replace(/^https?:\/\//i, '').replace(/\/+$/, '');
+                            if (v !== null && v !== undefined && String(v).trim() !== '') {
+                                profile.host = String(v).trim().replace(/^https?:\/\//i, '').replace(/\/+$/, '');
+                            }
                             setTimeout(function () { openEditor('host'); }, 200);
                         });
                         return;
@@ -414,7 +427,9 @@
 
                     if (item.action === 'port') {
                         inputDialog('Порт Transmission', profile.port, function (v) {
-                            if (v !== null) profile.port = String(v).trim();
+                            if (v !== null && v !== undefined && String(v).trim() !== '') {
+                                profile.port = String(v).trim();
+                            }
                             setTimeout(function () { openEditor('port'); }, 200);
                         });
                         return;
@@ -422,7 +437,9 @@
 
                     if (item.action === 'username') {
                         inputDialog('Логін', profile.username, function (v) {
-                            if (v !== null) profile.username = String(v);
+                            if (v !== null && v !== undefined && String(v).trim() !== '') {
+                                profile.username = String(v).trim();
+                            }
                             setTimeout(function () { openEditor('username'); }, 200);
                         });
                         return;
@@ -430,7 +447,9 @@
 
                     if (item.action === 'password') {
                         inputDialog('Пароль', profile.password, function (v) {
-                            if (v !== null) profile.password = String(v);
+                            if (v !== null && v !== undefined && String(v).trim() !== '') {
+                                profile.password = String(v).trim();
+                            }
                             setTimeout(function () { openEditor('password'); }, 200);
                         });
                         return;
@@ -438,7 +457,9 @@
 
                     if (item.action === 'movies') {
                         inputDialog('Папка Movies', profile.movies, function (v) {
-                            if (v !== null) profile.movies = String(v).trim();
+                            if (v !== null && v !== undefined && String(v).trim() !== '') {
+                                profile.movies = String(v).trim();
+                            }
                             setTimeout(function () { openEditor('movies'); }, 200);
                         });
                         return;
@@ -446,7 +467,9 @@
 
                     if (item.action === 'shows') {
                         inputDialog('Папка Shows', profile.shows, function (v) {
-                            if (v !== null) profile.shows = String(v).trim();
+                            if (v !== null && v !== undefined && String(v).trim() !== '') {
+                                profile.shows = String(v).trim();
+                            }
                             setTimeout(function () { openEditor('shows'); }, 200);
                         });
                         return;
@@ -454,7 +477,9 @@
 
                     if (item.action === 'cartoons') {
                         inputDialog('Папка Cartoons', profile.cartoons, function (v) {
-                            if (v !== null) profile.cartoons = String(v).trim();
+                            if (v !== null && v !== undefined && String(v).trim() !== '') {
+                                profile.cartoons = String(v).trim();
+                            }
                             setTimeout(function () { openEditor('cartoons'); }, 200);
                         });
                         return;
@@ -509,14 +534,24 @@
                         setActiveId(profile.id);
 
                         Lampa.Noty.show('✅ Профіль Transmission збережено');
-                        closeSelect();
+                        setTimeout(function () {
+                            showProfiles();
+                        }, 200);
                         return;
                     }
                 },
                 onBack: function () {
-                    closeSelect();
+                    if (getProfiles().length > 0) {
+                        setTimeout(function () {
+                            showProfiles();
+                        }, 200);
+                    } else {
+                        closeSelect();
+                    }
                 }
             });
+
+            hideCheckmarks();
         }
 
         openEditor();
@@ -608,6 +643,8 @@
                 closeSelect();
             }
         });
+
+        hideCheckmarks();
     }
 
     function deleteProfile(profile) {
