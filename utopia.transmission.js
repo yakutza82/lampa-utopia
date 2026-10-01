@@ -18,6 +18,7 @@
                 $('head').append(
                     '<style id="utopia-transmission-style">' +
                         '.select-item svg, .select-item__icon, .select-item__checkbox, .select-item__marker, .select-item__svg { display: none !important; }' +
+                        '.settings-param__descr, .settings-param__descr-text, [data-name="profiles"] .settings-param__descr { white-space: pre-line !important; }' +
                     '</style>'
                 );
             }
@@ -764,6 +765,12 @@
         Lampa.Listener.follow('app', function (e) {
             if (e.type === 'ready') {
                 initSettings();
+            }
+        });
+
+        Lampa.Listener.follow('settings', function (e) {
+            if (e.type === 'open' || e.name === 'utopia_transmission') {
+                setTimeout(updateActiveProfileDisplay, 100);
             }
         });
     }
