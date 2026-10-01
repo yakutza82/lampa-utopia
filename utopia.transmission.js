@@ -854,14 +854,124 @@
             testConnection(profile, callback);
         },
         addTorrent: function (url, downloadDir, callback) {
-            var profile = getActiveProfile();
-            if (!profile) {
-                if (callback) callback(false, 'Немає активного профілю');
-                return;
+    var profile = getActiveProfile();
+    if (!profile) {
+        if (callback) callback(false, 'Немає активного профілю');
+        return;
+    }
+    addTorrent(profile, url, downloadDir, callback || function () {});
+},
+
+showAddTorrent: function (url) {
+    if (!url) {
+        Lampa.Noty.show('❌ Не вказано посилання на торрент');
+        return;
+    }
+
+    var profiles = getProfiles();
+
+    if (!profiles.length) {
+        return;
+    }
+
+    function selectFolder(profile) {
+        var items = [];
+
+        if (profile.movies) {
+            items.push({
+                title: '🎬 Movies',
+                value: profile.movies
+            });
+        }
+
+        if (profile.shows) {
+            items.push({
+                title: '📺 Shows',
+                value: profile.shows
+            });
+        }
+
+        if (profile.cartoons) {
+            items.push({
+                title: '🐱 Cartoons',
+                value: profile.cartoons
+            });
+        }
+
+        if (!items.length) {
+            Lampa.Noty.show('❌ У профілі не налаштовані папки');
+            return;
+        }
+
+        Lampa.Select.show({
+            title: 'Куди завантажити?',
+            items: items,
+            onSelect: function (item) {
+                Lampa.Noty.show('📡 Відправляємо в Transmission...');
+
+                addTorrent(
+                    profile,
+                    url,
+                    item.value,
+                    function (ok, data, error) {
+                        if (ok) {
+                            Lampa.Noty.show('✅ Торрент додано в Transmission');
+                        } else {
+                            Lampa.Noty.show(
+                                '❌ Transmission: ' +
+                                (error || 'Помилка додавання')
+                            );
+                        }
+                    }
+                );
+            },
+            onBack: function () {
+                setTimeout(function () {
+                    selectProfile();
+                }, 200);
             }
-            addTorrent(profile, url, downloadDir, callback || function () {});
-        },
-        showProfiles: showProfiles
+        });
+    }
+
+    function selectProfile() {
+        var items = [];
+
+        profiles.forEach(function (profile) {
+            items.push({
+                title: profile.name || 'Transmission',
+                subtitle: normalizeUrl(profile),
+                profile: profile
+            });
+        });
+
+        Lampa.Select.show({
+            title: 'Виберіть Transmission',
+            items: items,
+            active: Math.max(
+                0,
+                profiles.findIndex(function (p) {
+                    return p.id === getActiveId();
+                })
+            ),
+            onSelect: function (item) {
+                if (!item.profile) return;
+
+                setActiveId(item.profile.id);
+
+                setTimeout(function () {
+                    selectFolder(item.profile);
+                }, 200);
+            },
+            onBack: function () {
+                closeSelect();
+            }
+        });
+    }
+
+    selectProfile();
+},
+
+showProfiles: showProfiles
     };
 
     function initSettings() {
