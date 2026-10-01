@@ -1508,31 +1508,69 @@ function downloadTorrent(item) {
 }
 
 function showTorrentActionMenu(item) {
+    function showTorrentActionMenu(item) {
+    var items = [
+        {
+            title: '📥 Завантажити .torrent',
+            action: 'download'
+        }
+    ];
+
+    // Transmission додаємо тільки якщо модуль існує
+    // і має хоча б один налаштований профіль.
+    if (
+        window.UTOPIA_TRANSMISSION &&
+        typeof window.UTOPIA_TRANSMISSION.isReady === 'function' &&
+        window.UTOPIA_TRANSMISSION.isReady()
+    ) {
+        items.push({
+            title: '📡 Відправити в Transmission',
+            action: 'transmission'
+        });
+    }
+
+    items.push(
+        {
+            title: '📋 Скопіювати посилання',
+            action: 'copy'
+        },
+        {
+            title: '❌ Скасувати',
+            action: 'cancel'
+        }
+    );
+
     Lampa.Select.show({
         title: 'Торрент',
-        items: [
-            {
-                title: '📥 Завантажити .torrent',
-                action: 'download'
-            },
-            {
-                title: '📋 Скопіювати посилання',
-                action: 'copy'
-            },
-            {
-                title: '❌ Скасувати',
-                action: 'cancel'
-            }
-        ],
+        items: items,
+
         onSelect: function (selected) {
             if (selected.action === 'download') {
                 downloadTorrent(item);
+
+            } else if (selected.action === 'transmission') {
+                var url = item && item.magnet
+                    ? item.magnet
+                    : Lampa.Storage.get('utopia_last_torrent_url', '');
+
+                if (
+                    window.UTOPIA_TRANSMISSION &&
+                    typeof window.UTOPIA_TRANSMISSION.showAddTorrent === 'function'
+                ) {
+                    window.UTOPIA_TRANSMISSION.showAddTorrent(url);
+                } else {
+                    Lampa.Noty.show(
+                        'UTOPIA: Transmission недоступний'
+                    );
+                }
+
             } else if (selected.action === 'copy') {
                 copyLink(item);
             }
 
             Lampa.Controller.toggle('content');
         },
+
         onBack: function () {
             Lampa.Controller.toggle('content');
         }
