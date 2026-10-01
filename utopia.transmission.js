@@ -269,12 +269,20 @@
                     return;
                 }
 
-                callback(
-                    false,
-                    null,
-                    (status ? 'HTTP ' + status + ': ' : '') +
-                    (reqObj && reqObj.statusText ? reqObj.statusText : (statusText || 'Помилка мережі'))
-                );
+                var bodyText = '';
+try {
+  bodyText = String((reqObj && (reqObj.responseText || reqObj.response)) || '')
+    .replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 140);
+} catch (e) {}
+
+callback(
+  false,
+  null,
+  (status ? 'HTTP ' + status + ': ' : '') +
+  (reqObj && reqObj.statusText ? reqObj.statusText : (statusText || 'Помилка мережі')) +
+  (bodyText ? ' | ' + bodyText : '') +
+  ' [' + currentPath + ']'
+);
             },
             JSON.stringify(body),
             options
@@ -378,6 +386,7 @@
                 { title: 'Протокол', subtitle: profile.protocol === 'http' ? 'HTTP' : 'HTTPS', action: 'protocol' },
                 { title: 'Адреса сервера', subtitle: profile.host || 'Не вказана', action: 'host' },
                 { title: 'Порт', subtitle: profile.port || 'За замовчуванням', action: 'port' },
+                { title: 'Шлях RPC', subtitle: profile.rpc_path || '/transmission/rpc', action: 'rpc_path', selected: currentActive === 'rpc_path' },
                 { title: 'Логін', subtitle: profile.username || 'Не вказаний', action: 'username' },
                 { title: 'Пароль', subtitle: profile.password ? '••••••••' : 'Не вказаний', action: 'password' },
                 { title: 'Папка Movies', subtitle: profile.movies || 'Не вказана', action: 'movies' },
@@ -448,6 +457,14 @@
                         });
                         return;
                     }
+
+                    if (item.action === 'rpc_path') {
+  inputDialog('Шлях RPC', profile.rpc_path, function (v) {
+    if (v !== null) profile.rpc_path = String(v).trim() || '/transmission/rpc';
+    setTimeout(function () { openEditor('rpc_path'); }, 200);
+  });
+  return;
+}
 
                     if (item.action === 'username') {
                         inputDialog('Логін', profile.username, function (v) {
