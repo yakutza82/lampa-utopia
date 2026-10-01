@@ -12,17 +12,20 @@
         description: 'Сервери, логін, пароль і папки'
     };
 
-    function uuid() {
-        return 'tr_' + Date.now() + '_' + Math.floor(Math.random() * 100000);
+    function injectCustomStyles() {
+        try {
+            if (!$('#utopia-transmission-style').length) {
+                $('head').append(
+                    '<style id="utopia-transmission-style">' +
+                        '.select-item svg, .select-item__icon, .select-item__checkbox, .select-item__marker, .select-item__svg { display: none !important; }' +
+                    '</style>'
+                );
+            }
+        } catch (e) {}
     }
 
-    function hideCheckmarks() {
-        setTimeout(function () {
-            $('.select-item__icon, .select-item__checkbox, .select-item svg, .select-item__marker').hide();
-        }, 30);
-        setTimeout(function () {
-            $('.select-item__icon, .select-item__checkbox, .select-item svg, .select-item__marker').hide();
-        }, 150);
+    function uuid() {
+        return 'tr_' + Date.now() + '_' + Math.floor(Math.random() * 100000);
     }
 
     function getProfiles() {
@@ -347,6 +350,7 @@
     }
 
     function editProfile(profile, initialAction) {
+        injectCustomStyles();
         var isNew = !profile;
 
         if (!profile) {
@@ -369,22 +373,31 @@
             var currentActive = activeAction || initialAction || 'name';
 
             var items = [
-                { title: 'Назва профілю', subtitle: profile.name || 'Transmission', action: 'name', selected: currentActive === 'name' },
-                { title: 'Протокол', subtitle: profile.protocol === 'http' ? 'HTTP' : 'HTTPS', action: 'protocol', selected: currentActive === 'protocol' },
-                { title: 'Адреса сервера', subtitle: profile.host || 'Не вказана', action: 'host', selected: currentActive === 'host' },
-                { title: 'Порт', subtitle: profile.port || 'За замовчуванням', action: 'port', selected: currentActive === 'port' },
-                { title: 'Логін', subtitle: profile.username || 'Не вказаний', action: 'username', selected: currentActive === 'username' },
-                { title: 'Пароль', subtitle: profile.password ? '••••••••' : 'Не вказаний', action: 'password', selected: currentActive === 'password' },
-                { title: 'Папка Movies', subtitle: profile.movies || 'Не вказана', action: 'movies', selected: currentActive === 'movies' },
-                { title: 'Папка Shows', subtitle: profile.shows || 'Не вказана', action: 'shows', selected: currentActive === 'shows' },
-                { title: 'Папка Cartoons', subtitle: profile.cartoons || 'Не вказана', action: 'cartoons', selected: currentActive === 'cartoons' },
-                { title: '🔌 Перевірити підключення', action: 'test', selected: currentActive === 'test' },
-                { title: '💾 Зберегти профіль', action: 'save', selected: currentActive === 'save' }
+                { title: 'Назва профілю', subtitle: profile.name || 'Transmission', action: 'name' },
+                { title: 'Протокол', subtitle: profile.protocol === 'http' ? 'HTTP' : 'HTTPS', action: 'protocol' },
+                { title: 'Адреса сервера', subtitle: profile.host || 'Не вказана', action: 'host' },
+                { title: 'Порт', subtitle: profile.port || 'За замовчуванням', action: 'port' },
+                { title: 'Логін', subtitle: profile.username || 'Не вказаний', action: 'username' },
+                { title: 'Пароль', subtitle: profile.password ? '••••••••' : 'Не вказаний', action: 'password' },
+                { title: 'Папка Movies', subtitle: profile.movies || 'Не вказана', action: 'movies' },
+                { title: 'Папка Shows', subtitle: profile.shows || 'Не вказана', action: 'shows' },
+                { title: 'Папка Cartoons', subtitle: profile.cartoons || 'Не вказана', action: 'cartoons' },
+                { title: '🔌 Перевірити підключення', action: 'test' },
+                { title: '💾 Зберегти профіль', action: 'save' }
             ];
+
+            var activeIndex = 0;
+            for (var a = 0; a < items.length; a++) {
+                if (items[a].action === currentActive) {
+                    activeIndex = a;
+                    break;
+                }
+            }
 
             Lampa.Select.show({
                 title: isNew ? 'Новий профіль Transmission' : 'Редагування: ' + (profile.name || 'Transmission'),
                 items: items,
+                active: activeIndex,
                 onSelect: function (item) {
                     if (item.action === 'name') {
                         inputDialog('Назва профілю', profile.name, function (v) {
@@ -400,9 +413,10 @@
                         Lampa.Select.show({
                             title: 'Протокол',
                             items: [
-                                { title: 'HTTPS', value: 'https', selected: profile.protocol !== 'http' },
-                                { title: 'HTTP', value: 'http', selected: profile.protocol === 'http' }
+                                { title: 'HTTPS', value: 'https' },
+                                { title: 'HTTP', value: 'http' }
                             ],
+                            active: profile.protocol === 'http' ? 1 : 0,
                             onSelect: function (p) {
                                 profile.protocol = p.value;
                                 if (profile.protocol === 'https' && profile.port === '9091') profile.port = '443';
@@ -411,7 +425,6 @@
                             },
                             onBack: function () { setTimeout(function () { openEditor('protocol'); }, 200); }
                         });
-                        hideCheckmarks();
                         return;
                     }
 
@@ -550,14 +563,13 @@
                     }
                 }
             });
-
-            hideCheckmarks();
         }
 
         openEditor();
     }
 
     function showProfiles(pendingActiveId) {
+        injectCustomStyles();
         var profiles = getProfiles();
 
         if (!profiles.length) {
@@ -567,16 +579,17 @@
 
         var activeId = (pendingActiveId !== undefined) ? pendingActiveId : getActiveId();
         var items = [];
+        var activeIndex = 0;
 
-        profiles.forEach(function (profile) {
+        profiles.forEach(function (profile, index) {
             var isActive = (profile.id === activeId);
+            if (isActive) activeIndex = index;
             var icon = isActive ? '◉ ' : '○ ';
             items.push({
                 title: icon + (profile.name || 'Без назви'),
                 subtitle: normalizeUrl(profile) || 'Адреса не вказана',
                 profile: profile,
-                action: 'select_temp',
-                selected: isActive
+                action: 'select_temp'
             });
         });
 
@@ -588,6 +601,7 @@
         Lampa.Select.show({
             title: 'Transmission',
             items: items,
+            active: activeIndex,
             onSelect: function (item) {
                 if (item.action === 'select_temp' && item.profile) {
                     setTimeout(function () {
@@ -643,8 +657,6 @@
                 closeSelect();
             }
         });
-
-        hideCheckmarks();
     }
 
     function deleteProfile(profile) {
@@ -718,6 +730,7 @@
     function initSettings() {
         if (!window.Lampa || !Lampa.SettingsApi) return;
 
+        injectCustomStyles();
         updateActiveProfileDisplay();
 
         Lampa.SettingsApi.addComponent({
