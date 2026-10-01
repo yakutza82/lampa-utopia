@@ -605,9 +605,17 @@
             active: activeIndex,
             onSelect: function (item) {
                 if (item.action === 'select_temp' && item.profile) {
-                    setTimeout(function () {
-                        showProfiles(item.profile.id);
-                    }, 50);
+                    activeId = item.profile.id;
+                    try {
+                        $('.select-item').slice(0, profiles.length).each(function (idx) {
+                            var p = profiles[idx];
+                            if (p) {
+                                var isCurr = (p.id === activeId);
+                                var icon = isCurr ? '◉ ' : '○ ';
+                                $(this).find('.select-item__title').text(icon + (p.name || 'Без назви'));
+                            }
+                        });
+                    } catch (e) {}
                     return;
                 }
 
