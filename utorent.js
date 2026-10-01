@@ -1548,22 +1548,24 @@ function showTorrentActionMenu(item) {
                 downloadTorrent(item);
 
             } else if (selected.action === 'transmission') {
-                var url = item && item.magnet
-                    ? item.magnet
-                    : Lampa.Storage.get('utopia_last_torrent_url', '');
+    var url = item && item.magnet
+        ? item.magnet
+        : Lampa.Storage.get('utopia_last_torrent_url', '');
 
-                if (
-                    window.UTOPIA_TRANSMISSION &&
-                    typeof window.UTOPIA_TRANSMISSION.showAddTorrent === 'function'
-                ) {
-                    window.UTOPIA_TRANSMISSION.showAddTorrent(url);
-                } else {
-                    Lampa.Noty.show(
-                        'UTOPIA: Transmission недоступний'
-                    );
-                }
+    if (
+        window.UTOPIA_TRANSMISSION &&
+        typeof window.UTOPIA_TRANSMISSION.showAddTorrent === 'function'
+    ) {
+        window.UTOPIA_TRANSMISSION.showAddTorrent(url);
+    } else {
+        Lampa.Noty.show(
+            'UTOPIA: Transmission недоступний'
+        );
+    }
 
-            } else if (selected.action === 'copy') {
+    return;
+
+} else if (selected.action === 'copy') {
                 copyLink(item);
             }
 
