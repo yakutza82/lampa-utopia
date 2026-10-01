@@ -569,7 +569,7 @@
         openEditor();
     }
 
-    function showProfiles(pendingActiveId) {
+    function showProfiles() {
         injectCustomStyles();
         var profiles = getProfiles();
 
@@ -578,7 +578,7 @@
             return;
         }
 
-        var activeId = (pendingActiveId !== undefined) ? pendingActiveId : getActiveId();
+        var activeId = getActiveId();
         var items = [];
         var activeIndex = 0;
 
@@ -590,40 +590,22 @@
                 title: icon + (profile.name || 'Без назви'),
                 subtitle: normalizeUrl(profile) || 'Адреса не вказана',
                 profile: profile,
-                action: 'select_temp'
+                action: 'select'
             });
         });
 
-        items.push({ title: '💾 Зберегти', action: 'save_active' });
         items.push({ title: '➕ Додати профіль', action: 'add' });
-        items.push({ title: '✏️ Редагувати вибраний профіль', action: 'edit' });
-        items.push({ title: '🗑 Видалити вибраний профіль', action: 'delete' });
+        items.push({ title: '✏️ Редагувати активний профіль', action: 'edit' });
+        items.push({ title: '🗑 Видалити активний профіль', action: 'delete' });
 
         Lampa.Select.show({
             title: 'Transmission',
             items: items,
             active: activeIndex,
             onSelect: function (item) {
-                if (item.action === 'select_temp' && item.profile) {
-                    activeId = item.profile.id;
-                    try {
-                        $('.select-item').slice(0, profiles.length).each(function (idx) {
-                            var p = profiles[idx];
-                            if (p) {
-                                var isCurr = (p.id === activeId);
-                                var icon = isCurr ? '◉ ' : '○ ';
-                                $(this).find('.select-item__title').text(icon + (p.name || 'Без назви'));
-                            }
-                        });
-                    } catch (e) {}
-                    return;
-                }
-
-                if (item.action === 'save_active') {
-                    setActiveId(activeId);
-                    var selectedProf = getActiveProfile();
-                    var name = selectedProf ? (selectedProf.name || 'профіль') : '';
-                    Lampa.Noty.show('✅ Transmission: ' + name + ' збережено');
+                if (item.action === 'select' && item.profile) {
+                    setActiveId(item.profile.id);
+                    Lampa.Noty.show('✅ Transmission: ' + (item.profile.name || 'профіль') + ' вибрано');
                     closeSelect();
                     return;
                 }
@@ -634,26 +616,12 @@
                 }
 
                 if (item.action === 'edit') {
-                    var profToEdit = null;
-                    for (var i = 0; i < profiles.length; i++) {
-                        if (profiles[i].id === activeId) {
-                            profToEdit = profiles[i];
-                            break;
-                        }
-                    }
-                    editProfile(profToEdit || getActiveProfile());
+                    editProfile(getActiveProfile());
                     return;
                 }
 
                 if (item.action === 'delete') {
-                    var profToDelete = null;
-                    for (var d = 0; d < profiles.length; d++) {
-                        if (profiles[d].id === activeId) {
-                            profToDelete = profiles[d];
-                            break;
-                        }
-                    }
-                    deleteProfile(profToDelete || getActiveProfile());
+                    deleteProfile(getActiveProfile());
                     setTimeout(function () {
                         showProfiles();
                     }, 200);
