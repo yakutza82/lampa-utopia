@@ -863,6 +863,8 @@
 },
 
 showAddTorrent: function (url) {
+    Lampa.Noty.show('Transmission: showAddTorrent запущено');
+    
     if (!url) {
         Lampa.Noty.show('❌ Не вказано посилання на торрент');
         return;
