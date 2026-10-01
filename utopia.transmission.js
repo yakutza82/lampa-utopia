@@ -270,9 +270,14 @@
                 }
 
                 var bodyText = '';
+var dbg = '';
 try {
   bodyText = String((reqObj && (reqObj.responseText || reqObj.response)) || '')
     .replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 140);
+  dbg = ' {' + typeof reqObj +
+    ' hdr:' + typeof (reqObj && reqObj.getResponseHeader) +
+    ' body:' + String((reqObj && reqObj.responseText) || '').length +
+    ' st:' + (reqObj && reqObj.status) + '}';
 } catch (e) {}
 
 callback(
@@ -281,7 +286,7 @@ callback(
   (status ? 'HTTP ' + status + ': ' : '') +
   (reqObj && reqObj.statusText ? reqObj.statusText : (statusText || 'Помилка мережі')) +
   (bodyText ? ' | ' + bodyText : '') +
-  ' [' + currentPath + ']'
+  ' [' + currentPath + ']' + dbg
 );
             },
             JSON.stringify(body),
