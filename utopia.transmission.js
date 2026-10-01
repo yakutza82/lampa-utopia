@@ -606,10 +606,10 @@
             onSelect: function (item) {
                 if (item.action === 'select_temp' && item.profile) {
                     setTimeout(function () {
-                        showProfiles(item.profile.id);
-                    }, 50);
+                    showProfiles(item.profile.id);
+                    }, 200); // 200ms замість 50ms
                     return;
-                }
+            }
 
                 if (item.action === 'save_active') {
                     setActiveId(activeId);
