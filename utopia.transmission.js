@@ -177,122 +177,236 @@
     }
 
     function request(profile, body, callback, pathIndex, isRetry) {
-        var paths = [
-            profile.rpc_path || '/transmission/rpc',
-            '/transmission/rpc',
-            '/rpc',
-            '/'
-        ];
 
-        var uniquePaths = [];
-        for (var p = 0; p < paths.length; p++) {
-            if (paths[p] && uniquePaths.indexOf(paths[p]) === -1) {
-                uniquePaths.push(paths[p]);
-            }
+    var paths = [
+        profile.rpc_path || '/transmission/rpc',
+        '/transmission/rpc',
+        '/rpc',
+        '/'
+    ];
+
+    var uniquePaths = [];
+
+    for (var p = 0; p < paths.length; p++) {
+        if (paths[p] && uniquePaths.indexOf(paths[p]) === -1) {
+            uniquePaths.push(paths[p]);
         }
+    }
 
-        var idx = pathIndex || 0;
-        var currentPath = uniquePaths[idx] || uniquePaths[0];
-        var url = getRpcUrl(profile, currentPath);
+    var idx = pathIndex || 0;
+    var currentPath = uniquePaths[idx] || uniquePaths[0];
 
-        if (!url) {
-            callback(false, null, 'Не вказана адреса Transmission');
-            return;
+    var url = getRpcUrl(profile, currentPath);
+
+    if (!url) {
+        callback(false, null, 'Не вказана адреса Transmission');
+        return;
+    }
+
+    var auth = '';
+
+    try {
+        if (profile.username || profile.password) {
+            auth = btoa(
+                String(profile.username || '') +
+                ':' +
+                String(profile.password || '')
+            );
         }
+    } catch (e) {}
 
-        var auth = '';
+    var profileKey = profile.id || url;
+
+    var xhr = new XMLHttpRequest();
+
+    var headers = {
+        'Content-Type': 'application/json'
+    };
+
+    if (auth) {
+        headers['Authorization'] = 'Basic ' + auth;
+    }
+
+    if (sessionCache[profileKey]) {
+        headers['X-Transmission-Session-Id'] =
+            sessionCache[profileKey];
+    }
+
+    xhr.open('POST', url, true);
+
+    for (var headerName in headers) {
         try {
-            if (profile.username || profile.password) {
-                auth = btoa(String(profile.username || '') + ':' + String(profile.password || ''));
-            }
+            xhr.setRequestHeader(headerName, headers[headerName]);
+        } catch (e) {}
+    }
+
+    xhr.onreadystatechange = function () {
+
+        if (xhr.readyState !== 4) return;
+
+        var status = xhr.status || 0;
+
+        /*
+         * Transmission відповідає 409, якщо немає
+         * X-Transmission-Session-Id.
+         *
+         * Тут уже маємо справжній XMLHttpRequest,
+         * тому можемо прочитати response header.
+         */
+        var newSession = '';
+
+        try {
+            newSession =
+                xhr.getResponseHeader(
+                    'X-Transmission-Session-Id'
+                ) || '';
         } catch (e) {}
 
-        var RequestClass = Lampa.Reguest || Lampa.Request;
-        if (!RequestClass || typeof RequestClass !== 'function') {
-            callback(false, null, 'Lampa Request недоступний');
+        if (newSession) {
+            sessionCache[profileKey] = newSession;
+        }
+
+        /*
+         * Отримали session ID → повторюємо запит один раз.
+         */
+        if (status === 409 && newSession && !isRetry) {
+
+            request(
+                profile,
+                body,
+                callback,
+                idx,
+                true
+            );
+
             return;
         }
 
-        var req = new RequestClass();
-        var requestHeaders = {
-            'Content-Type': 'application/json'
-        };
+        /*
+         * Якщо сервер не відповідає по поточному RPC-шляху,
+         * пробуємо наступний.
+         */
+        if (status === 404 && idx + 1 < uniquePaths.length) {
 
-        if (auth) {
-            requestHeaders['Authorization'] = 'Basic ' + auth;
+            request(
+                profile,
+                body,
+                callback,
+                idx + 1,
+                false
+            );
+
+            return;
         }
 
-        var profileKey = profile.id || url;
-        if (sessionCache[profileKey]) {
-            requestHeaders['X-Transmission-Session-Id'] = sessionCache[profileKey];
+        var responseText = xhr.responseText || '';
+
+        /*
+         * Успішна відповідь Transmission.
+         */
+        if (status >= 200 && status < 300) {
+
+            try {
+
+                var json = JSON.parse(responseText);
+
+                if (currentPath !== profile.rpc_path) {
+                    profile.rpc_path = currentPath;
+                }
+
+                callback(true, json, null);
+
+            } catch (e) {
+
+                callback(
+                    false,
+                    null,
+                    'Некоректний JSON від Transmission [' +
+                    currentPath +
+                    ']'
+                );
+            }
+
+            return;
         }
 
-        var options = {
-            method: 'POST',
-            type: 'POST',
-            dataType: 'text',
-            headers: requestHeaders
-        };
+        /*
+         * Діагностика помилки.
+         */
+        var bodyText = '';
 
-        req.native(
-            url,
-            function (data) {
-                if (typeof data === 'string' && (data.trim().indexOf('<') === 0 || data.indexOf('<!DOCTYPE') !== -1)) {
-                    callback(false, null, 'Сервер повернув HTML замість JSON (перевірте Nginx/шлях)');
-                    return;
-                }
-                try {
-                    var json = typeof data === 'string' ? JSON.parse(data) : data;
-                    if (currentPath !== profile.rpc_path) {
-                        profile.rpc_path = currentPath;
-                    }
-                    callback(true, json, null);
-                } catch (e) {
-                    callback(false, null, 'Некоректний JSON від Transmission');
-                }
-            },
-            function (reqObj, statusText) {
-                var status = reqObj ? (reqObj.status || reqObj.statusCode || 0) : 0;
-                var newSession = getSessionFromResponse(reqObj);
+        try {
+            bodyText = String(responseText)
+                .replace(/<[^>]*>/g, ' ')
+                .replace(/\s+/g, ' ')
+                .trim()
+                .slice(0, 180);
+        } catch (e) {}
 
-                if (newSession) {
-                    sessionCache[profileKey] = newSession;
-                }
+        var debug = '';
 
-                if ((status === 409 || newSession) && !isRetry) {
-                    request(profile, body, callback, idx, true);
-                    return;
-                }
+        try {
+            debug =
+                ' {xhr:' + typeof xhr +
+                ' hdr:' + typeof xhr.getResponseHeader +
+                ' body:' + responseText.length +
+                ' st:' + status +
+                '}';
+        } catch (e) {}
 
-                if (status === 404 && idx + 1 < uniquePaths.length) {
-                    request(profile, body, callback, idx + 1, false);
-                    return;
-                }
+        callback(
+            false,
+            null,
+            (status ? 'HTTP ' + status + ': ' : '') +
+            (xhr.statusText || 'Помилка мережі') +
+            (bodyText ? ' | ' + bodyText : '') +
+            ' [' + currentPath + ']' +
+            debug
+        );
+    };
 
-                var bodyText = '';
-var dbg = '';
-try {
-  bodyText = String((reqObj && (reqObj.responseText || reqObj.response)) || '')
-    .replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 140);
-  dbg = ' {' + typeof reqObj +
-    ' hdr:' + typeof (reqObj && reqObj.getResponseHeader) +
-    ' body:' + String((reqObj && reqObj.responseText) || '').length +
-    ' st:' + (reqObj && reqObj.status) + '}';
-} catch (e) {}
+    xhr.onerror = function () {
 
-callback(
-  false,
-  null,
-  (status ? 'HTTP ' + status + ': ' : '') +
-  (reqObj && reqObj.statusText ? reqObj.statusText : (statusText || 'Помилка мережі')) +
-  (bodyText ? ' | ' + bodyText : '') +
-  ' [' + currentPath + ']' + dbg
-);
-            },
-            JSON.stringify(body),
-            options
+        callback(
+            false,
+            null,
+            'Помилка мережі [' +
+            currentPath +
+            '] {xhr:' +
+            typeof xhr +
+            ' st:' +
+            (xhr.status || 0) +
+            '}'
+        );
+    };
+
+    xhr.ontimeout = function () {
+
+        callback(
+            false,
+            null,
+            'Таймаут Transmission [' +
+            currentPath +
+            ']'
+        );
+    };
+
+    xhr.timeout = 15000;
+
+    try {
+
+        xhr.send(JSON.stringify(body));
+
+    } catch (e) {
+
+        callback(
+            false,
+            null,
+            'Помилка відправки: ' +
+            (e && e.message ? e.message : String(e))
         );
     }
+}
 
     function testConnection(profile, callback) {
         request(
