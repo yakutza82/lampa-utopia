@@ -106,9 +106,9 @@
         profilesField.description = line1 + '\n' + lines.join('\n');
 
         var htmlDescr = line1 +
-            '<br><span style="opacity: 0.8;">' +
-            lines.map(escapeHtml).join('<br>') +
-            '</span>';
+    '<span style="display:block; margin-top:0.35em; opacity:0.8;">' +
+    lines.map(escapeHtml).join('<br>') +
+    '</span>';
 
         try {
             var $el = $('[data-name="profiles"], [data-param="profiles"]');
@@ -966,7 +966,7 @@
 },
 
 showAddTorrent: function (url) {
-    Lampa.Noty.show('Transmission: showAddTorrent запущено');
+    // Lampa.Noty.show('Transmission: showAddTorrent запущено');
     
     if (!url) {
         Lampa.Noty.show('❌ Не вказано посилання на торрент');
