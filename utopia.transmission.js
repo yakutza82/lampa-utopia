@@ -19,6 +19,8 @@
                     '<style id="utopia-transmission-style">' +
                         '.select-item svg, .select-item__icon, .select-item__checkbox, .select-item__marker, .select-item__svg { display: none !important; }' +
                         '.settings-param__descr, .settings-param__descr-text, [data-name="profiles"] .settings-param__descr { white-space: pre-line !important; }' +
+                        // Вимикає анімацію виїзду для вікон вибору профілю (див. showSelect)
+                        '.selectbox.utopia-noanim, .selectbox.utopia-noanim * { animation: none !important; transition: none !important; }' +
                     '</style>'
                 );
             }
@@ -27,6 +29,13 @@
 
     function uuid() {
         return 'tr_' + Date.now() + '_' + Math.floor(Math.random() * 100000);
+    }
+
+    function escapeHtml(text) {
+        return String(text)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;');
     }
 
     function getProfiles() {
@@ -68,21 +77,34 @@
         return profiles.length ? profiles[0] : null;
     }
 
-    function updateActiveProfileDisplay() {
-        var profile = getActiveProfile();
-        var activeText = 'Не вибрано';
+    function profileLabel(profile) {
+        var url = normalizeUrl(profile);
+        return (profile.name || 'Transmission') + (url ? ' (' + url + ')' : '');
+    }
 
-        if (profile) {
-            var url = normalizeUrl(profile);
-            activeText = (profile.name || 'Transmission') + (url ? ' (' + url + ')' : '');
-        }
+    // Підпис під пунктом "Профілі Transmission" у налаштуваннях:
+    //   Основний: ...        (або "Основний: відсутній", якщо профілів немає)
+    //   Додатковий: ...      (рядок з'являється лише тоді, коли такий профіль доданий)
+    function updateActiveProfileDisplay() {
+        var profiles = getProfiles();
+        var main = getActiveProfile();
+        var lines = [];
+
+        lines.push(main ? 'Основний: ' + profileLabel(main) : 'Основний: відсутній');
+
+        profiles.forEach(function (profile) {
+            if (main && profile.id === main.id) return;
+            lines.push('Додатковий: ' + profileLabel(profile));
+        });
 
         var line1 = 'Сервери, логін, пароль і папки';
-        var line2 = 'Активний: ' + activeText;
 
-        profilesField.description = line1 + '\n' + line2;
+        profilesField.description = line1 + '\n' + lines.join('\n');
 
-        var htmlDescr = line1 + '<br><span style="opacity: 0.8;">' + line2 + '</span>';
+        var htmlDescr = line1 +
+            '<br><span style="opacity: 0.8;">' +
+            lines.map(escapeHtml).join('<br>') +
+            '</span>';
 
         try {
             var $el = $('[data-name="profiles"], [data-param="profiles"]');
@@ -133,6 +155,20 @@
         try {
             Lampa.Controller.toggle('settings_component');
         } catch (e) {}
+    }
+
+    // Те саме, що Lampa.Select.show, але вікно відкривається БЕЗ анімації виїзду.
+    // Клас utopia-noanim ставиться лише на це вікно і зникає разом із ним,
+    // тож решта вікон Lampa анімується як раніше.
+    function showSelect(config) {
+        Lampa.Select.show(config);
+
+        function mark() {
+            try { $('.selectbox').addClass('utopia-noanim'); } catch (e) {}
+        }
+
+        mark();
+        setTimeout(mark, 0);
     }
 
     function getSessionFromResponse(reqObj) {
@@ -461,19 +497,58 @@
         );
     }
 
-    function inputDialog(title, value, callback) {
+    // Діалог введення тексту.
+    //
+    // Клавіатура Lampa повертає тільки текст і не каже, чим її закрили:
+    // "ОК" чи "Назад". Тому щоб "Назад" не зберігало недописану правку,
+    // після введення (якщо текст змінився) показується вікно підтвердження:
+    //   ✅ Застосувати  /  ✖ Скасувати   (і "Назад" там = скасувати).
+    //
+    // callback(значення) - користувач підтвердив зміну
+    // callback(null)     - зміну скасовано або нічого не змінилось
+    function inputDialog(title, value, callback, secret) {
+        var original = (value === null || value === undefined) ? '' : String(value);
+
+        function confirmChange(newValue) {
+            newValue = (newValue === null || newValue === undefined) ? '' : String(newValue);
+
+            // Нічого не змінилось - питати нема про що
+            if (newValue === original) {
+                callback(null);
+                return;
+            }
+
+            var shown = secret ? '••••••••' : newValue;
+            if (shown === '') shown = '(порожньо)';
+
+            setTimeout(function () {
+                showSelect({
+                    title: title,
+                    items: [
+                        { title: '✅ Застосувати: ' + shown, action: 'apply' },
+                        { title: '✖ Скасувати', action: 'cancel' }
+                    ],
+                    onSelect: function (item) {
+                        callback(item.action === 'apply' ? newValue : null);
+                    },
+                    onBack: function () {
+                        callback(null);
+                    }
+                });
+            }, 200);
+        }
+
         if (Lampa.Input && typeof Lampa.Input.edit === 'function') {
             Lampa.Input.edit({
                 title: title,
-                value: value || '',
+                value: original,
                 free: true,
                 nosave: true
-            }, function (newValue) {
-                callback(newValue);
-            });
+            }, confirmChange);
         } else {
-            var result = prompt(title, value || '');
-            if (result !== null) callback(result);
+            // У prompt є справжня кнопка "Скасувати", підтвердження не потрібне
+            var result = prompt(title, original);
+            callback(result === null ? null : result);
         }
     }
 
@@ -523,7 +598,7 @@
                 }
             }
 
-            Lampa.Select.show({
+            showSelect({
                 title: isNew ? 'Новий профіль Transmission' : 'Редагування: ' + (profile.name || 'Transmission'),
                 items: items,
                 active: activeIndex,
@@ -539,7 +614,7 @@
                     }
 
                     if (item.action === 'protocol') {
-                        Lampa.Select.show({
+                        showSelect({
                             title: 'Протокол',
                             items: [
                                 { title: 'HTTPS', value: 'https' },
@@ -578,12 +653,12 @@
                     }
 
                     if (item.action === 'rpc_path') {
-  inputDialog('Шлях RPC', profile.rpc_path, function (v) {
-    if (v !== null) profile.rpc_path = String(v).trim() || '/transmission/rpc';
-    setTimeout(function () { openEditor('rpc_path'); }, 200);
-  });
-  return;
-}
+                        inputDialog('Шлях RPC', profile.rpc_path, function (v) {
+                            if (v !== null) profile.rpc_path = String(v).trim() || '/transmission/rpc';
+                            setTimeout(function () { openEditor('rpc_path'); }, 200);
+                        });
+                        return;
+                    }
 
                     if (item.action === 'username') {
                         inputDialog('Логін', profile.username, function (v) {
@@ -601,7 +676,7 @@
                                 profile.password = String(v).trim();
                             }
                             setTimeout(function () { openEditor('password'); }, 200);
-                        });
+                        }, true);
                         return;
                     }
 
@@ -730,22 +805,26 @@
             });
         });
 
-        items.push({ title: '💾 Зберегти', action: 'save_active' });
-        items.push({ title: '➕ Додати профіль', action: 'add' });
+        // Порядок пунктів під списком профілів
         items.push({ title: '✏️ Редагувати вибраний профіль', action: 'edit' });
+        items.push({ title: '➕ Додати профіль', action: 'add' });
         items.push({ title: '🗑 Видалити вибраний профіль', action: 'delete' });
+        items.push({ title: '💾 Зберегти', action: 'save_active' });
 
-        Lampa.Select.show({
+        showSelect({
             title: 'Transmission',
             items: items,
             active: activeIndex,
             onSelect: function (item) {
                 if (item.action === 'select_temp' && item.profile) {
+                    // Lampa закриває вікно після вибору, тому список відкривається
+                    // заново (вже без анімації) з оновленою крапкою.
+                    // Якщо після вибору список не з'являється - збільш 200 (мс).
                     setTimeout(function () {
-                    showProfiles(item.profile.id);
-                    }, 200); // 200ms замість 50ms
+                        showProfiles(item.profile.id);
+                    }, 200);
                     return;
-            }
+                }
 
                 if (item.action === 'save_active') {
                     setActiveId(activeId);
