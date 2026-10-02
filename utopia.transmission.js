@@ -7,6 +7,10 @@
     var ACTIVE_KEY = 'utopia_transmission_active';
     var sessionCache = {};
 
+    // true  - вікна вибору профілю відкриваються без анімації виїзду
+    // false - анімація Lampa як раніше (постав false, якщо вікна зникають або їх не видно)
+    var NO_SELECT_ANIMATION = true;
+
     var profilesField = {
         name: 'Профілі Transmission',
         description: 'Сервери, логін, пароль і папки'
@@ -19,8 +23,8 @@
                     '<style id="utopia-transmission-style">' +
                         '.select-item svg, .select-item__icon, .select-item__checkbox, .select-item__marker, .select-item__svg { display: none !important; }' +
                         '.settings-param__descr, .settings-param__descr-text, [data-name="profiles"] .settings-param__descr { white-space: pre-line !important; }' +
-                        // Вимикає анімацію виїзду для вікон вибору профілю (див. showSelect)
-                        '.selectbox.utopia-noanim, .selectbox.utopia-noanim * { animation: none !important; transition: none !important; }' +
+                        // Робить анімацію виїзду миттєвою для вікон вибору профілю (див. showSelect)
+                        '.selectbox.utopia-noanim, .selectbox.utopia-noanim * { animation-duration: 0s !important; animation-delay: 0s !important; transition-duration: 0s !important; transition-delay: 0s !important; }' +
                     '</style>'
                 );
             }
@@ -157,6 +161,23 @@
         } catch (e) {}
     }
 
+    // Повертає курсор на екран торентів (контролер 'content' з utorent.js).
+    // Потрібно, коли ми закриваємо вікна, відкриті з екрана торентів:
+    // closeSelect() повертає контролер налаштувань, і на екрані торентів курсор зникає.
+    function restoreContent() {
+        setTimeout(function () {
+            try { Lampa.Controller.toggle('content'); } catch (e) {}
+        }, 200);
+    }
+
+    function closeToContent() {
+        if (Lampa.Select && typeof Lampa.Select.hide === 'function') {
+            Lampa.Select.hide();
+        }
+        try { Lampa.Controller.toggle('content'); } catch (e) {}
+        restoreContent();
+    }
+
     // Те саме, що Lampa.Select.show, але вікно відкривається БЕЗ анімації виїзду.
     // Клас utopia-noanim ставиться лише на це вікно і зникає разом із ним,
     // тож решта вікон Lampa анімується як раніше.
@@ -167,8 +188,10 @@
             try { $('.selectbox').addClass('utopia-noanim'); } catch (e) {}
         }
 
-        mark();
-        setTimeout(mark, 0);
+        if (NO_SELECT_ANIMATION) {
+            mark();
+            setTimeout(mark, 0);
+        }
     }
 
     function getSessionFromResponse(reqObj) {
@@ -947,12 +970,14 @@ showAddTorrent: function (url) {
     
     if (!url) {
         Lampa.Noty.show('❌ Не вказано посилання на торрент');
+        restoreContent();
         return;
     }
 
     var profiles = getProfiles();
 
     if (!profiles.length) {
+        restoreContent();
         return;
     }
 
@@ -982,6 +1007,7 @@ showAddTorrent: function (url) {
 
         if (!items.length) {
             Lampa.Noty.show('❌ У профілі не налаштовані папки');
+            restoreContent();
             return;
         }
 
@@ -1006,6 +1032,8 @@ showAddTorrent: function (url) {
                         }
                     }
                 );
+
+                restoreContent();
             },
             onBack: function () {
                 setTimeout(function () {
@@ -1045,7 +1073,7 @@ showAddTorrent: function (url) {
                 }, 200);
             },
             onBack: function () {
-                closeSelect();
+                closeToContent();
             }
         });
     }
