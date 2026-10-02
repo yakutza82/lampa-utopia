@@ -609,7 +609,7 @@
                 { title: 'Папка Movies', subtitle: profile.movies || 'Не вказана', action: 'movies' },
                 { title: 'Папка Shows', subtitle: profile.shows || 'Не вказана', action: 'shows' },
                 { title: 'Папка Cartoons', subtitle: profile.cartoons || 'Не вказана', action: 'cartoons' },
-                { title: '🔌 Перевірити підключення', action: 'test' },
+                { title: '🔗 Перевірити підключення', action: 'test' },
                 { title: '💾 Зберегти профіль', action: 'save' }
             ];
 
@@ -986,21 +986,21 @@ showAddTorrent: function (url) {
 
         if (profile.movies) {
             items.push({
-                title: '🎬 Movies',
+                title: '🍿 Movies',
                 value: profile.movies
             });
         }
 
         if (profile.shows) {
             items.push({
-                title: '📺 Shows',
+                title: '🎞️ Shows',
                 value: profile.shows
             });
         }
 
         if (profile.cartoons) {
             items.push({
-                title: '🐱 Cartoons',
+                title: '🧸 Cartoons',
                 value: profile.cartoons
             });
         }
