@@ -1561,13 +1561,6 @@ function downloadTorrent(item) {
 }
 
 function showTorrentActionMenu(item) {
-    var items = [
-        {
-            title: '📥 Завантажити .torrent',
-            action: 'download'
-        }
-    ];
-
     // Додаємо всі зареєстровані torrent receiver'и
     if (
         window.LampaTorrentReceivers &&
@@ -1583,7 +1576,14 @@ function showTorrentActionMenu(item) {
             });
         });
     }
-
+    
+    var items = [
+        {
+            title: '📥 Завантажити .torrent',
+            action: 'download'
+        }
+    ];
+  
     items.push(
         {
             title: '📋 Скопіювати посилання',
