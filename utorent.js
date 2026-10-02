@@ -1568,16 +1568,19 @@ function showTorrentActionMenu(item) {
         }
     ];
 
-    // Transmission додаємо тільки якщо модуль існує
-    // і має хоча б один налаштований профіль.
+    // Додаємо всі зареєстровані torrent receiver'и
     if (
-        window.UTOPIA_TRANSMISSION &&
-        typeof window.UTOPIA_TRANSMISSION.isReady === 'function' &&
-        window.UTOPIA_TRANSMISSION.isReady()
+        window.LampaTorrentReceivers &&
+        typeof window.LampaTorrentReceivers.getAvailable === 'function'
     ) {
-        items.push({
-            title: '📡 Відправити в Transmission',
-            action: 'transmission'
+        var receivers = window.LampaTorrentReceivers.getAvailable();
+
+        receivers.forEach(function (receiver) {
+            items.push({
+                title: 'µ Відправити в ' + receiver.title,
+                action: 'receiver',
+                receiver: receiver
+            });
         });
     }
 
@@ -1598,31 +1601,55 @@ function showTorrentActionMenu(item) {
 
         onSelect: function (selected) {
             if (selected.action === 'download') {
+
                 downloadTorrent(item);
 
-            } else if (selected.action === 'transmission') {
-    var url = item && item.magnet
-        ? item.magnet
-        : Lampa.Storage.get('utopia_last_torrent_url', '');
+                Lampa.Controller.toggle('content');
 
-    if (
-        window.UTOPIA_TRANSMISSION &&
-        typeof window.UTOPIA_TRANSMISSION.showAddTorrent === 'function'
-    ) {
-        window.UTOPIA_TRANSMISSION.showAddTorrent(url);
-    } else {
-        Lampa.Noty.show(
-            'UTOPIA: Transmission недоступний'
-        );
-    }
+            } else if (selected.action === 'receiver') {
 
-    return;
+                var url = item && item.magnet
+                    ? item.magnet
+                    : Lampa.Storage.get(
+                        'utopia_last_torrent_url',
+                        ''
+                    );
 
-} else if (selected.action === 'copy') {
+                if (
+                    selected.receiver &&
+                    typeof selected.receiver.send === 'function'
+                ) {
+                    try {
+                        selected.receiver.send(url);
+                    } catch (e) {
+                        console.error(
+                            '[TORRENT RECEIVER]',
+                            selected.receiver.id,
+                            e
+                        );
+
+                        Lampa.Noty.show(
+                            'Помилка відправки в ' +
+                            selected.receiver.title
+                        );
+                    }
+                }
+
+                // ВАЖЛИВО:
+                // receiver сам відкриває свій наступний Select.
+                // Тому тут НЕ робимо toggle('content').
+                return;
+
+            } else if (selected.action === 'copy') {
+
                 copyLink(item);
-            }
 
-            Lampa.Controller.toggle('content');
+                Lampa.Controller.toggle('content');
+
+            } else if (selected.action === 'cancel') {
+
+                Lampa.Controller.toggle('content');
+            }
         },
 
         onBack: function () {
