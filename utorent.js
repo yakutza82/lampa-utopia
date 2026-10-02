@@ -1575,16 +1575,13 @@ function showTorrentActionMenu(item) {
     ) {
         var receivers = window.LampaTorrentReceivers.getAvailable();
 
-        items.push({
-    title:
-        '<span style="display:inline-flex;align-items:center;">' +
-            '<img src="https://raw.githubusercontent.com/yakutza82/lampa-utopia/refs/heads/main/utorrent.png" ' +
-            'style="width:1.4em;height:1.4em;margin-right:.45em;border-radius:50%;object-fit:cover;vertical-align:middle;">' +
-            '<span>Відправити в ' + receiver.title + '</span>' +
-        '</span>',
-    action: 'receiver',
-    receiver: receiver
-});
+        receivers.forEach(function (receiver) {
+            items.push({
+                title: '⇩ Відправити в ' + receiver.title,
+                action: 'receiver',
+                receiver: receiver
+            });
+        });
     }
 
     items.push(
