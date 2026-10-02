@@ -1561,29 +1561,30 @@ function downloadTorrent(item) {
 }
 
 function showTorrentActionMenu(item) {
-    // Додаємо всі зареєстровані torrent receiver'и
-    if (
-        window.LampaTorrentReceivers &&
-        typeof window.LampaTorrentReceivers.getAvailable === 'function'
-    ) {
-        var receivers = window.LampaTorrentReceivers.getAvailable();
+    var items = [];
 
-        receivers.forEach(function (receiver) {
-            items.push({
-                title: '➤ Відправити в ' + receiver.title,
-                action: 'receiver',
-                receiver: receiver
-            });
+// Спочатку receiver'и
+if (
+    window.LampaTorrentReceivers &&
+    typeof window.LampaTorrentReceivers.getAvailable === 'function'
+) {
+    var receivers = window.LampaTorrentReceivers.getAvailable();
+
+    receivers.forEach(function (receiver) {
+        items.push({
+            title: '➤ Відправити в ' + receiver.title,
+            action: 'receiver',
+            receiver: receiver
         });
-    }
-    
-    var items = [
-        {
-            title: '📥 Завантажити .torrent',
-            action: 'download'
-        }
-    ];
-  
+    });
+}
+
+// Потім завантаження
+items.push({
+    title: '📥 Завантажити .torrent',
+    action: 'download'
+});
+
     items.push(
         {
             title: '📋 Скопіювати посилання',
