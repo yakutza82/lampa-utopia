@@ -1,6 +1,59 @@
 (function () {
     'use strict';
 
+        // ============================================================
+    // Універсальний реєстр торрент-приймачів
+    // ============================================================
+    if (!window.LampaTorrentReceivers) {
+        window.LampaTorrentReceivers = {
+            receivers: {},
+
+            register: function (receiver) {
+                if (!receiver || !receiver.id || !receiver.title) {
+                    return;
+                }
+
+                if (typeof receiver.send !== 'function') {
+                    return;
+                }
+
+                this.receivers[receiver.id] = receiver;
+            },
+
+            unregister: function (id) {
+                if (!id) return;
+
+                delete this.receivers[id];
+            },
+
+            getAvailable: function () {
+                var result = [];
+                var receivers = this.receivers;
+
+                Object.keys(receivers).forEach(function (id) {
+                    var receiver = receivers[id];
+
+                    try {
+                        if (
+                            typeof receiver.isReady !== 'function' ||
+                            receiver.isReady()
+                        ) {
+                            result.push(receiver);
+                        }
+                    } catch (e) {
+                        console.error(
+                            '[TORRENT RECEIVER]',
+                            receiver.id,
+                            e
+                        );
+                    }
+                });
+
+                return result;
+            }
+        };
+    }
+
     if (window.UTOPIA_PLUGIN) return;
     window.UTOPIA_PLUGIN = true;
 
