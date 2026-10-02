@@ -859,6 +859,30 @@
         if (callback) callback(false, 'Немає активного профілю');
         return;
     }
+    if (window.LampaTorrentReceivers) {
+    window.LampaTorrentReceivers.register({
+        id: 'transmission',
+        type: 'torrent_receiver',
+        title: 'Відправити в Transmission',
+
+        isReady: function () {
+            return (
+                window.UTOPIA_TRANSMISSION &&
+                typeof window.UTOPIA_TRANSMISSION.isReady === 'function' &&
+                window.UTOPIA_TRANSMISSION.isReady()
+            );
+        },
+
+        send: function (url) {
+            if (
+                window.UTOPIA_TRANSMISSION &&
+                typeof window.UTOPIA_TRANSMISSION.showAddTorrent === 'function'
+            ) {
+                window.UTOPIA_TRANSMISSION.showAddTorrent(url);
+            }
+        }
+    });
+}
     addTorrent(profile, url, downloadDir, callback || function () {});
 },
 
