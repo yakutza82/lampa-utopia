@@ -1577,7 +1577,7 @@ function showTorrentActionMenu(item) {
 
         receivers.forEach(function (receiver) {
             items.push({
-                title: '⇩ Відправити в ' + receiver.title,
+                title: '➤ Відправити в ' + receiver.title,
                 action: 'receiver',
                 receiver: receiver
             });
