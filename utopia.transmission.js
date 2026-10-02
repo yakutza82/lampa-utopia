@@ -859,30 +859,7 @@
         if (callback) callback(false, 'Немає активного профілю');
         return;
     }
-    if (window.LampaTorrentReceivers) {
-    window.LampaTorrentReceivers.register({
-        id: 'transmission',
-        type: 'torrent_receiver',
-        title: 'Відправити в Transmission',
-
-        isReady: function () {
-            return (
-                window.UTOPIA_TRANSMISSION &&
-                typeof window.UTOPIA_TRANSMISSION.isReady === 'function' &&
-                window.UTOPIA_TRANSMISSION.isReady()
-            );
-        },
-
-        send: function (url) {
-            if (
-                window.UTOPIA_TRANSMISSION &&
-                typeof window.UTOPIA_TRANSMISSION.showAddTorrent === 'function'
-            ) {
-                window.UTOPIA_TRANSMISSION.showAddTorrent(url);
-            }
-        }
-    });
-}
+    
     addTorrent(profile, url, downloadDir, callback || function () {});
 },
 
@@ -999,6 +976,46 @@ showAddTorrent: function (url) {
 
 showProfiles: showProfiles
     };
+
+        function registerTorrentReceiver() {
+        if (
+            !window.LampaTorrentReceivers ||
+            typeof window.LampaTorrentReceivers.register !== 'function'
+        ) {
+            return false;
+        }
+
+        window.LampaTorrentReceivers.register({
+            id: 'transmission',
+            type: 'torrent_receiver',
+            title: 'Відправити в Transmission',
+
+            isReady: function () {
+                return getProfiles().length > 0;
+            },
+
+            send: function (url) {
+                if (
+                    window.UTOPIA_TRANSMISSION &&
+                    typeof window.UTOPIA_TRANSMISSION.showAddTorrent === 'function'
+                ) {
+                    window.UTOPIA_TRANSMISSION.showAddTorrent(url);
+                }
+            }
+        });
+
+        return true;
+    }
+
+    registerTorrentReceiver();
+
+    if (window.Lampa && Lampa.Listener) {
+        Lampa.Listener.follow('app', function (e) {
+            if (e.type === 'ready') {
+                registerTorrentReceiver();
+            }
+        });
+    }
 
     function initSettings() {
         if (!window.Lampa || !Lampa.SettingsApi) return;
