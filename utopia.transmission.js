@@ -988,7 +988,7 @@ showProfiles: showProfiles
         window.LampaTorrentReceivers.register({
             id: 'transmission',
             type: 'torrent_receiver',
-            title: 'Відправити в Transmission',
+            title: 'Transmission',
 
             isReady: function () {
                 return getProfiles().length > 0;
