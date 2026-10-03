@@ -481,8 +481,6 @@
                 }
             },
             function (ok, data, error) {
-                console.log('UTOPIA SESSION:', ok, data, error);
-
                 if (!ok) {
                     callback(false, error);
                     return;
@@ -497,93 +495,6 @@
             }
         );
     }
-
-    function getDiskSpace(profile, callback) {
-    console.log('UTOPIA DISK START:', profile.name, profile);
-
-    request(
-        profile,
-        {
-            method: 'session-get',
-            arguments: {
-                fields: ['download-dir']
-            }
-        },
-        function (ok, data, error) {
-            if (!ok) {
-                callback(false, null, error);
-                return;
-            }
-
-            var args = data && data.arguments ? data.arguments : {};
-            var downloadDir = args['download-dir'] || '';
-
-            if (!downloadDir) {
-                callback(false, null, 'Не визначена папка завантажень');
-                return;
-            }
-
-            request(
-                profile,
-                {
-                    method: 'free-space',
-                    arguments: {
-                        path: downloadDir
-                    }
-                },
-                function (ok2, data2, error2) {
-                    if (!ok2) {
-                        callback(false, null, error2);
-                        return;
-                    }
-
-                    var result = data2 && data2.arguments
-                        ? data2.arguments
-                        : {};
-
-                    var free = Number(result['size-bytes'] || 0);
-                    var total = Number(result['total_size'] || 0);
-
-                    if (!free || !total) {
-                        callback(false, null, 'Transmission не повернув дані про диск');
-                        return;
-                    }
-
-                    callback(true, {
-                        free: free,
-                        total: total
-                    });
-                }
-            );
-        }
-    );
-}
-
-function formatDiskSize(bytes) {
-    bytes = Number(bytes) || 0;
-
-    var units = ['B', 'KB', 'MB', 'GB', 'TB', 'PB'];
-    var i = 0;
-
-    while (bytes >= 1000 && i < units.length - 1) {
-        bytes /= 1000;
-        i++;
-    }
-
-    var value;
-
-    if (bytes >= 100) {
-        value = bytes.toFixed(0);
-    } else if (bytes >= 10) {
-        value = bytes.toFixed(1);
-    } else {
-        value = bytes.toFixed(2);
-    }
-
-    value = value.replace(/\.0+$|(\.\d*[1-9])0+$/, '$1');
-
-    return value + ' ' + units[i];
-}
 
     function addTorrent(profile, url, downloadDir, callback) {
         var args = { filename: url };
@@ -1139,101 +1050,39 @@ showAddTorrent: function (url, returnTo) {
     }
 
     function selectProfile() {
-    var items = [];
+        var items = [];
 
-    profiles.forEach(function (profile) {
-        items.push({
-            title: profile.name || 'Transmission',
-            subtitle:
-                (normalizeUrl(profile) || 'Адреса не вказана') +
-                '<br><span class="utopia-transmission-space">Перевіряємо вільне місце...</span>',
-            profile: profile
+        profiles.forEach(function (profile) {
+            items.push({
+                title: profile.name || 'Transmission',
+                subtitle: normalizeUrl(profile),
+                profile: profile
+            });
         });
-    });
 
-    Lampa.Select.show({
-        title: 'Виберіть Transmission',
-        items: items,
-        active: Math.max(
-            0,
-            profiles.findIndex(function (p) {
-                return p.id === getActiveId();
-            })
-        ),
-        onSelect: function (item) {
-            if (!item.profile) return;
+        Lampa.Select.show({
+            title: 'Виберіть Transmission',
+            items: items,
+            active: Math.max(
+                0,
+                profiles.findIndex(function (p) {
+                    return p.id === getActiveId();
+                })
+            ),
+            onSelect: function (item) {
+                if (!item.profile) return;
 
-            setActiveId(item.profile.id);
+                setActiveId(item.profile.id);
 
-            setTimeout(function () {
-                selectFolder(item.profile);
-            }, 200);
-        },
-        onBack: function () {
-            closeToContent();
-        }
-    });
-
-    /*
-     * Оновлюємо інформацію про місце після відкриття списку.
-     * Запити виконуються паралельно для всіх профілів.
-     */
-    profiles.forEach(function (profile, index) {
-    getDiskSpace(profile, function (ok, space) {
-
-        console.log('UTOPIA DISK:', profile.name, ok, space);
-            var text;
-
-            if (ok && space) {
-                text =
-                    'Вільно: ' +
-                    formatDiskSize(space.free) +
-                    ' (Всього: ' +
-                    formatDiskSize(space.total) +
-                    ')';
-            } else {
-                text =
-                    'Місце: Помилка отримання даних, перевірте зв\'язок із сервером...';
+                setTimeout(function () {
+                    selectFolder(item.profile);
+                }, 200);
+            },
+            onBack: function () {
+                closeToContent();
             }
-
-            /*
-             * Знаходимо відповідний пункт у вже відкритому списку.
-             */
-            setTimeout(function () {
-                try {
-                    var $items = $('.selectbox .selectbox__item');
-
-                    if (!$items.length) {
-                        $items = $('.selectbox .selector');
-                    }
-
-                    var $item = $items.eq(index);
-
-                    if (!$item.length) return;
-
-                    var $subtitle = $item.find('.selectbox__text');
-
-                    if (!$subtitle.length) {
-                        $subtitle = $item.find('.selector__text');
-                    }
-
-                    if (!$subtitle.length) return;
-
-                    var html = $subtitle.html() || '';
-
-                    html = html.replace(
-                        /<br><span class="utopia-transmission-space">[\s\S]*?<\/span>/,
-                        '<br><span class="utopia-transmission-space">' +
-                        text +
-                        '</span>'
-                    );
-
-                    $subtitle.html(html);
-                } catch (e) {}
-            }, 50);
         });
-    });
-}
+    }
 
     selectProfile();
 },
