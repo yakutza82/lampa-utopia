@@ -11,6 +11,10 @@
     // false - анімація Lampa як раніше (постав false, якщо вікна зникають або їх не видно)
     var NO_SELECT_ANIMATION = true;
 
+    // Назва контролера Lampa, на який повертається курсор після відправки торента.
+    // 'content' - екран торентів utorent.js; для рідного списку Lampa береться з поточного екрана.
+    var returnController = 'content';
+
     var profilesField = {
         name: 'Профілі Transmission',
         description: 'Сервери, логін, пароль і папки'
@@ -106,9 +110,9 @@
         profilesField.description = line1 + '\n' + lines.join('\n');
 
         var htmlDescr = line1 +
-    '<span style="display:block; margin-top:0.35em; opacity:0.8;">' +
-    lines.map(escapeHtml).join('<br>') +
-    '</span>';
+            '<span style="display:block; margin-top:0.35em; opacity:0.8;">' +
+            lines.map(escapeHtml).join('<br>') +
+            '</span>';
 
         try {
             var $el = $('[data-name="profiles"], [data-param="profiles"]');
@@ -161,12 +165,12 @@
         } catch (e) {}
     }
 
-    // Повертає курсор на екран торентів (контролер 'content' з utorent.js).
+    // Повертає курсор на екран торентів (контролер returnController).
     // Потрібно, коли ми закриваємо вікна, відкриті з екрана торентів:
     // closeSelect() повертає контролер налаштувань, і на екрані торентів курсор зникає.
     function restoreContent() {
         setTimeout(function () {
-            try { Lampa.Controller.toggle('content'); } catch (e) {}
+            try { Lampa.Controller.toggle(returnController); } catch (e) {}
         }, 200);
     }
 
@@ -174,7 +178,7 @@
         if (Lampa.Select && typeof Lampa.Select.hide === 'function') {
             Lampa.Select.hide();
         }
-        try { Lampa.Controller.toggle('content'); } catch (e) {}
+        try { Lampa.Controller.toggle(returnController); } catch (e) {}
         restoreContent();
     }
 
@@ -965,7 +969,9 @@
     addTorrent(profile, url, downloadDir, callback || function () {});
 },
 
-showAddTorrent: function (url) {
+showAddTorrent: function (url, returnTo) {
+    returnController = returnTo || 'content';
+
     // Lampa.Noty.show('Transmission: showAddTorrent запущено');
     
     if (!url) {
@@ -986,21 +992,21 @@ showAddTorrent: function (url) {
 
         if (profile.movies) {
             items.push({
-                title: '🍿 Movies',
+                title: '🍿 Художні фільми',
                 value: profile.movies
             });
         }
 
         if (profile.shows) {
             items.push({
-                title: '🎞️ Shows',
+                title: '🎞️ Телесеріали',
                 value: profile.shows
             });
         }
 
         if (profile.cartoons) {
             items.push({
-                title: '🧸 Cartoons',
+                title: '🧸 Анімаційні фільми',
                 value: profile.cartoons
             });
         }
@@ -1115,6 +1121,75 @@ showProfiles: showProfiles
     }
 
     registerTorrentReceiver();
+
+    // ------------------------------------------------------------------
+    // Рідний список торентів Lampa (його використовує і pubtorr.js:
+    // він лише підставляє парсер, а список малює сама Lampa).
+    // Lampa розсилає подію 'torrent' з type 'onlong' при довгому натисканні
+    // на торент і дозволяє додати свій пункт у меню (e.menu).
+    // ------------------------------------------------------------------
+    function hookNativeTorrentMenu() {
+        if (window.UTOPIA_TRANSMISSION_MENU_HOOK) return;
+        if (!window.Lampa || !Lampa.Listener || typeof Lampa.Listener.follow !== 'function') return;
+
+        window.UTOPIA_TRANSMISSION_MENU_HOOK = true;
+
+        Lampa.Listener.follow('torrent', function (e) {
+            if (!e || e.type !== 'onlong' || !Array.isArray(e.menu) || !e.element) return;
+            if (!getProfiles().length) return;
+
+            var link = e.element.MagnetUri || e.element.Link || '';
+            if (!link) return;
+
+            var backTo = 'content';
+            try { backTo = Lampa.Controller.enabled().name || 'content'; } catch (err) {}
+
+            e.menu.push({
+                title: '➤ Відправити в Transmission',
+                utopia_transmission: true
+            });
+
+            // Одноразово підміняємо Select.show: меню відкривається одразу після події,
+            // тож ми "підхоплюємо" вибір нашого пункту, а решту віддаємо Lampa.
+            var originalShow = Lampa.Select.show;
+            var restored = false;
+
+            function restoreShow() {
+                if (restored) return;
+                restored = true;
+                Lampa.Select.show = originalShow;
+            }
+
+            Lampa.Select.show = function (config) {
+                restoreShow();
+
+                var ours = config && Array.isArray(config.items) && config.items.some(function (item) {
+                    return item && item.utopia_transmission;
+                });
+
+                if (ours) {
+                    var originalSelect = config.onSelect;
+
+                    config.onSelect = function (item) {
+                        if (item && item.utopia_transmission) {
+                            window.UTOPIA_TRANSMISSION.showAddTorrent(link, backTo);
+                            return;
+                        }
+                        if (typeof originalSelect === 'function') {
+                            return originalSelect.apply(this, arguments);
+                        }
+                    };
+                }
+
+                return originalShow.apply(this, arguments);
+            };
+
+            // Якщо меню чомусь не відкрилось - повертаємо Select.show на місце
+            setTimeout(restoreShow, 1000);
+        });
+    }
+
+    hookNativeTorrentMenu();
 
     if (window.Lampa && Lampa.Listener) {
         Lampa.Listener.follow('app', function (e) {
