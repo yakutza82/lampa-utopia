@@ -2,7 +2,7 @@
     'use strict';
 
         // ============================================================
-    // Універсальний реєстр торрент-приймачів
+    // Універсальний реєстр торент-приймачів
     // ============================================================
     if (!window.LampaTorrentReceivers) {
         window.LampaTorrentReceivers = {
@@ -59,7 +59,7 @@
 
     var API_BASE = 'https://utp.to/api';
     var PER_PAGE = 99;
-    var VERSION = 'v0.9.30 build 1329';
+    var VERSION = 'v1.0.3 build 1753';
 
     var TRACKERS = [
         'udp://tracker.opentrackr.org:1337/announce',
@@ -396,7 +396,7 @@
     'padding-bottom:1em;' +
 '}' +
 
-        /* Торренти */
+        /* торенти */
         '.utopia-list{' +
             'display:flex;' +
             'flex-direction:column;' +
@@ -1377,7 +1377,7 @@ var moviePanel = $(
                 $('<div class="utopia-state">' +
                 '<div class="utopia-state__icon">\ud83d\udd11</div>' +
                 '<div class="utopia-state__title">Ключ не вказано</div>' +
-                '<div class="utopia-state__text">Щоб шукати торренти на UTOPIA, спочатку додайте API ключ у налаштуваннях плагіна.</div>' +
+                '<div class="utopia-state__text">Щоб шукати торенти на UTOPIA, спочатку додайте API ключ у налаштуваннях плагіна.</div>' +
                 '</div>')
             );
         }
@@ -1503,7 +1503,7 @@ var moviePanel = $(
             Lampa.Storage.set('utopia_last_torrent_url', text);
 
             function ok() {
-                Lampa.Noty.show('UTOPIA: посилання скопійовано. Вставте його у додаток для торрентів (Add by URL)');
+                Lampa.Noty.show('UTOPIA: посилання скопійовано. Вставте його у додаток для торентів (Add by URL)');
             }
             function fail() {
                 showDebugModal('Скопіюй посилання вручну', text);
@@ -1597,7 +1597,7 @@ items.push({
     );
 
     Lampa.Select.show({
-        title: 'Торрент',
+        title: 'торент',
         items: items,
 
         onSelect: function (selected) {
@@ -1846,7 +1846,7 @@ items.push({
                 '<image href="https://raw.githubusercontent.com/yakutza82/lampa-utopia/refs/heads/main/pngegg2wh.png" ' +
                     'x="0" y="0" width="64" height="64" />' +
             '</svg>' +
-            'UTOPIA - Торрент' +
+            'UTOPIA - торент' +
         '</span>' +
     '</div>'
 );
