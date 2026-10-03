@@ -1457,7 +1457,7 @@ showProfiles: showProfiles
                     if (!item || !item.profile) return;
 
                     var line = spaceLine(space[item.profile.id], reasons[item.profile.id]);
-                    item.subtitle = (item.subtitle ? item.subtitle + '\n' : '') + line;
+                    item.subtitle = (item.subtitle ? item.subtitle + '<br>' : '') + line;
                 });
 
                 originalShow.call(self, config);
@@ -1467,5 +1467,5 @@ showProfiles: showProfiles
 
     installFreeSpaceLines();
     setTimeout(installFreeSpaceLines, 1500);
-    
+
 })();
