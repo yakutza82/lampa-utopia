@@ -27,8 +27,6 @@
                     '<style id="utopia-transmission-style">' +
                         '.select-item svg, .select-item__icon, .select-item__checkbox, .select-item__marker, .select-item__svg { display: none !important; }' +
                         '.settings-param__descr, .settings-param__descr-text, [data-name="profiles"] .settings-param__descr { white-space: pre-line !important; }' +
-                        // Підпис пункту може мати кілька рядків (адреса + вільне місце)
-                        '.selectbox [class*="subtitle"] { white-space: pre-line !important; }' +
                         // Робить анімацію виїзду миттєвою для вікон вибору профілю (див. showSelect)
                         '.selectbox.utopia-noanim, .selectbox.utopia-noanim * { animation-duration: 0s !important; animation-delay: 0s !important; transition-duration: 0s !important; transition-delay: 0s !important; }' +
                     '</style>'
@@ -112,7 +110,7 @@
         profilesField.description = line1 + '\n' + lines.join('\n');
 
         var htmlDescr = line1 +
-            '<br><span style="opacity: 0.8;">' +
+            '<span style="display:block; margin-top:0.35em; opacity:0.8;">' +
             lines.map(escapeHtml).join('<br>') +
             '</span>';
 
@@ -526,132 +524,6 @@
         );
     }
 
-    // ------------------------------------------------------------------
-    // Вільне місце на диску сервера Transmission
-    // ------------------------------------------------------------------
-    var freeSpaceCache = {};
-    var FREE_SPACE_TTL = 60 * 1000;   // скільки секунд тримати відповідь (мс)
-    var FREE_SPACE_WAIT = 2500;       // скільки максимум чекати на всі сервери (мс)
-
-    function formatBytes(bytes) {
-        var units = ['Б', 'КБ', 'МБ', 'ГБ', 'ТБ', 'ПБ'];
-        var n = Number(bytes) || 0;
-        var i = 0;
-
-        while (n >= 1024 && i < units.length - 1) {
-            n /= 1024;
-            i++;
-        }
-
-        var digits = i === 0 ? 0 : (n >= 100 ? 0 : (n >= 10 ? 1 : 2));
-
-        return parseFloat(n.toFixed(digits)) + ' ' + units[i];
-    }
-
-    function profileFolder(profile) {
-        return profile.movies || profile.shows || profile.cartoons || '';
-    }
-
-    // Вільне місце на диску профілю: { free, total } у байтах (total = 0, якщо сервер
-    // не повідомив повний розмір) або null, якщо дізнатись не вдалось.
-    // Спочатку питаємо про диск першої налаштованої папки (Movies/Shows/Cartoons),
-    // а якщо її немає або сервер не відповів - про стандартну папку завантажень.
-    function getFreeSpace(profile, callback) {
-        var folder = profileFolder(profile);
-
-        function viaFreeSpace(path, done) {
-            request(
-                profile,
-                { method: 'free-space', arguments: { path: path } },
-                function (ok, data) {
-                    var args = (ok && data && data.result === 'success' && data.arguments) ? data.arguments : null;
-                    var size = args ? args['size-bytes'] : null;
-                    var total = args ? args['total_size'] : null;
-
-                    if (typeof size === 'number' && size >= 0) {
-                        // total_size є лише в нових версіях Transmission (4.0+)
-                        done({ free: size, total: (typeof total === 'number' && total > 0) ? total : 0 });
-                    } else {
-                        done(null);
-                    }
-                }
-            );
-        }
-
-        function viaSession() {
-            request(
-                profile,
-                { method: 'session-get', arguments: { fields: ['download-dir', 'download-dir-free-space'] } },
-                function (ok, data) {
-                    var args = (ok && data && data.result === 'success') ? (data.arguments || {}) : {};
-                    var dir = args['download-dir'];
-                    var legacy = args['download-dir-free-space'];
-                    var legacyOk = typeof legacy === 'number' && legacy >= 0;
-
-                    if (dir) {
-                        viaFreeSpace(dir, function (info) {
-                            callback(info !== null ? info : (legacyOk ? { free: legacy, total: 0 } : null));
-                        });
-                    } else {
-                        callback(legacyOk ? { free: legacy, total: 0 } : null);
-                    }
-                }
-            );
-        }
-
-        if (folder) {
-            viaFreeSpace(folder, function (info) {
-                if (info !== null) callback(info);
-                else viaSession();
-            });
-        } else {
-            viaSession();
-        }
-    }
-
-    // Збирає вільне місце для всіх профілів паралельно.
-    // done(result) викликається, коли відповіли всі, або через FREE_SPACE_WAIT мс.
-    // result[id] - { free, total } або undefined, якщо відповіді не було.
-    function collectFreeSpace(profiles, done) {
-        var result = {};
-        var pending = 0;
-        var finished = false;
-        var timer = null;
-
-        function finish() {
-            if (finished) return;
-            finished = true;
-            clearTimeout(timer);
-            done(result);
-        }
-
-        timer = setTimeout(finish, FREE_SPACE_WAIT);
-
-        profiles.forEach(function (profile) {
-            var key = profile.id + '|' + profileFolder(profile);
-            var cached = freeSpaceCache[key];
-
-            if (cached && Date.now() - cached.time < FREE_SPACE_TTL) {
-                result[profile.id] = cached.info;
-                return;
-            }
-
-            pending++;
-
-            getFreeSpace(profile, function (info) {
-                if (info !== null) {
-                    freeSpaceCache[key] = { info: info, time: Date.now() };
-                    result[profile.id] = info;
-                }
-
-                pending--;
-                if (!pending) finish();
-            });
-        });
-
-        if (!pending) finish();
-    }
-
     // Діалог введення тексту.
     //
     // Клавіатура Lampa повертає тільки текст і не каже, чим її закрили:
@@ -741,7 +613,7 @@
                 { title: 'Папка Movies', subtitle: profile.movies || 'Не вказана', action: 'movies' },
                 { title: 'Папка Shows', subtitle: profile.shows || 'Не вказана', action: 'shows' },
                 { title: 'Папка Cartoons', subtitle: profile.cartoons || 'Не вказана', action: 'cartoons' },
-                { title: '🔌 Перевірити підключення', action: 'test' },
+                { title: '🔗 Перевірити підключення', action: 'test' },
                 { title: '💾 Зберегти профіль', action: 'save' }
             ];
 
@@ -1100,7 +972,7 @@
 showAddTorrent: function (url, returnTo) {
     returnController = returnTo || 'content';
 
-    Lampa.Noty.show('Transmission: showAddTorrent запущено');
+    // Lampa.Noty.show('Transmission: showAddTorrent запущено');
     
     if (!url) {
         Lampa.Noty.show('❌ Не вказано посилання на торрент');
@@ -1120,21 +992,21 @@ showAddTorrent: function (url, returnTo) {
 
         if (profile.movies) {
             items.push({
-                title: '🎬 Movies',
+                title: '🍿 Художні фільми',
                 value: profile.movies
             });
         }
 
         if (profile.shows) {
             items.push({
-                title: '📺 Shows',
+                title: '🎞️ Телесеріали',
                 value: profile.shows
             });
         }
 
         if (profile.cartoons) {
             items.push({
-                title: '🐱 Cartoons',
+                title: '🧸 Анімаційні фільми',
                 value: profile.cartoons
             });
         }
@@ -1178,44 +1050,37 @@ showAddTorrent: function (url, returnTo) {
     }
 
     function selectProfile() {
-        collectFreeSpace(profiles, function (space) {
-            var items = [];
+        var items = [];
 
-            profiles.forEach(function (profile) {
-                var info = space[profile.id];
-                var spaceLine = info
-                    ? 'Вільно: ' + formatBytes(info.free) + (info.total ? ' (Всього: ' + formatBytes(info.total) + ')' : '')
-                    : 'Вільно: Помилка, перевірте зв\'язок із сервером';
-
-                items.push({
-                    title: profile.name || 'Transmission',
-                    subtitle: normalizeUrl(profile) + '\n' + spaceLine,
-                    profile: profile
-                });
+        profiles.forEach(function (profile) {
+            items.push({
+                title: profile.name || 'Transmission',
+                subtitle: normalizeUrl(profile),
+                profile: profile
             });
+        });
 
-            Lampa.Select.show({
-                title: 'Виберіть Transmission',
-                items: items,
-                active: Math.max(
-                    0,
-                    profiles.findIndex(function (p) {
-                        return p.id === getActiveId();
-                    })
-                ),
-                onSelect: function (item) {
-                    if (!item.profile) return;
+        Lampa.Select.show({
+            title: 'Виберіть Transmission',
+            items: items,
+            active: Math.max(
+                0,
+                profiles.findIndex(function (p) {
+                    return p.id === getActiveId();
+                })
+            ),
+            onSelect: function (item) {
+                if (!item.profile) return;
 
-                    setActiveId(item.profile.id);
+                setActiveId(item.profile.id);
 
-                    setTimeout(function () {
-                        selectFolder(item.profile);
-                    }, 200);
-                },
-                onBack: function () {
-                    closeToContent();
-                }
-            });
+                setTimeout(function () {
+                    selectFolder(item.profile);
+                }, 200);
+            },
+            onBack: function () {
+                closeToContent();
+            }
         });
     }
 
@@ -1279,7 +1144,7 @@ showProfiles: showProfiles
             var backTo = 'content';
             try { backTo = Lampa.Controller.enabled().name || 'content'; } catch (err) {}
 
-            var menuItem = {
+                        var menuItem = {
                 title: '➤ Відправити в Transmission',
                 utopia_transmission: true
             };
