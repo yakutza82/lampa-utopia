@@ -1259,4 +1259,213 @@ showProfiles: showProfiles
             }
         });
     }
+
+    // ------------------------------------------------------------------
+    // Вільне місце на диску сервера у вікні "Виберіть Transmission"
+    // ------------------------------------------------------------------
+    var FREE_SPACE_WAIT = 4000;       // скільки максимум чекати на сервери (мс)
+    var FREE_SPACE_TTL = 60 * 1000;   // як довго пам'ятати успішну відповідь (мс)
+    var FREE_SPACE_DEBUG = true;      // true - до тексту помилки дописується причина; потім постав false
+    var freeSpaceCache = {};
+
+    function formatBytes(bytes) {
+        var units = ['Б', 'КБ', 'МБ', 'ГБ', 'ТБ', 'ПБ'];
+        var n = Number(bytes) || 0;
+        var i = 0;
+
+        while (n >= 1024 && i < units.length - 1) {
+            n /= 1024;
+            i++;
+        }
+
+        var digits = i === 0 ? 0 : (n >= 100 ? 0 : (n >= 10 ? 1 : 2));
+
+        return parseFloat(n.toFixed(digits)) + ' ' + units[i];
+    }
+
+    function profileFolder(profile) {
+        return profile.movies || profile.shows || profile.cartoons || '';
+    }
+
+    function shortReason(text) {
+        return String(text || 'невідомо').replace(/\s*\{xhr:[^}]*\}/, '').slice(0, 90);
+    }
+
+    // callback(info, reason)
+    //   info = { free, total } у байтах (total = 0, якщо сервер не повідомив повний розмір)
+    //   info = null, якщо дізнатись не вдалось; reason - коротка причина
+    function getFreeSpace(profile, callback) {
+        var folder = profileFolder(profile);
+        var reason = '';
+
+        function viaFreeSpace(path, done) {
+            request(
+                profile,
+                { method: 'free-space', arguments: { path: path } },
+                function (ok, data, error) {
+                    var args = (ok && data && data.result === 'success' && data.arguments) ? data.arguments : null;
+                    var size = args ? args['size-bytes'] : null;
+                    var total = args ? args['total_size'] : null;
+
+                    if (typeof size === 'number' && size >= 0) {
+                        // total_size є лише в новіших версіях Transmission (4.0+)
+                        done({ free: size, total: (typeof total === 'number' && total > 0) ? total : 0 });
+                        return;
+                    }
+
+                    reason = 'free-space: ' + (ok ? shortReason(data && data.result) : shortReason(error));
+                    done(null);
+                }
+            );
+        }
+
+        function viaSession() {
+            request(
+                profile,
+                { method: 'session-get', arguments: { fields: ['download-dir', 'download-dir-free-space'] } },
+                function (ok, data, error) {
+                    var args = (ok && data && data.result === 'success') ? (data.arguments || {}) : {};
+                    var dir = args['download-dir'];
+                    var legacy = args['download-dir-free-space'];
+                    var legacyOk = typeof legacy === 'number' && legacy >= 0;
+
+                    if (!ok) reason = 'session-get: ' + shortReason(error);
+
+                    if (dir) {
+                        viaFreeSpace(dir, function (info) {
+                            if (info) callback(info, '');
+                            else if (legacyOk) callback({ free: legacy, total: 0 }, '');
+                            else callback(null, reason);
+                        });
+                    } else if (legacyOk) {
+                        callback({ free: legacy, total: 0 }, '');
+                    } else {
+                        callback(null, reason);
+                    }
+                }
+            );
+        }
+
+        if (folder) {
+            viaFreeSpace(folder, function (info) {
+                if (info) callback(info, '');
+                else viaSession();
+            });
+        } else {
+            viaSession();
+        }
+    }
+
+    // Збирає вільне місце для всіх профілів паралельно.
+    // done(result, reasons) викликається, коли відповіли всі, або через FREE_SPACE_WAIT мс.
+    function collectFreeSpace(profiles, done) {
+        var result = {};
+        var reasons = {};
+        var pending = 0;
+        var finished = false;
+        var timer = null;
+
+        function finish() {
+            if (finished) return;
+            finished = true;
+            clearTimeout(timer);
+
+            profiles.forEach(function (profile) {
+                if (!result[profile.id] && !reasons[profile.id]) {
+                    reasons[profile.id] = 'сервер не відповів за ' + (FREE_SPACE_WAIT / 1000) + ' с';
+                }
+            });
+
+            done(result, reasons);
+        }
+
+        timer = setTimeout(finish, FREE_SPACE_WAIT);
+
+        profiles.forEach(function (profile) {
+            var key = profile.id + '|' + profileFolder(profile);
+            var cached = freeSpaceCache[key];
+
+            if (cached && Date.now() - cached.time < FREE_SPACE_TTL) {
+                result[profile.id] = cached.info;
+                return;
+            }
+
+            pending++;
+
+            getFreeSpace(profile, function (info, reason) {
+                if (info) {
+                    freeSpaceCache[key] = { info: info, time: Date.now() };
+                    result[profile.id] = info;
+                } else {
+                    reasons[profile.id] = reason || 'невідомо';
+                }
+
+                pending--;
+                if (!pending) finish();
+            });
+        });
+
+        if (!pending) finish();
+    }
+
+    function spaceLine(info, reason) {
+        if (info) {
+            return 'Вільно: ' + formatBytes(info.free) +
+                (info.total ? ' (Всього: ' + formatBytes(info.total) + ')' : '');
+        }
+
+        return 'Вільно: Помилка, перевірте зв\'язок із сервером' +
+            (FREE_SPACE_DEBUG && reason ? ' [' + reason + ']' : '');
+    }
+
+    // Додає третій рядок у вікно "Виберіть Transmission" (його відкриває showAddTorrent).
+    // Код цього вікна не змінюється: ми перехоплюємо Select.show, чекаємо на відповіді
+    // серверів і тільки потім відкриваємо вікно з готовими підписами.
+    function installFreeSpaceLines() {
+        if (!window.Lampa || !Lampa.Select || typeof Lampa.Select.show !== 'function') return;
+        if (Lampa.Select.utopiaFreeSpace) return;
+
+        Lampa.Select.utopiaFreeSpace = true;
+
+        var originalShow = Lampa.Select.show;
+
+        Lampa.Select.show = function (config) {
+            var self = this;
+
+            var isOurs = config && config.title === 'Виберіть Transmission' &&
+                Array.isArray(config.items) && !config.utopiaSpaceDone;
+
+            if (!isOurs) return originalShow.apply(this, arguments);
+
+            var profiles = [];
+            config.items.forEach(function (item) {
+                if (item && item.profile) profiles.push(item.profile);
+            });
+
+            if (!profiles.length) return originalShow.apply(this, arguments);
+
+            config.utopiaSpaceDone = true;
+
+            var notyTimer = setTimeout(function () {
+                try { Lampa.Noty.show('Transmission: перевіряю вільне місце...'); } catch (e) {}
+            }, 700);
+
+            collectFreeSpace(profiles, function (space, reasons) {
+                clearTimeout(notyTimer);
+
+                config.items.forEach(function (item) {
+                    if (!item || !item.profile) return;
+
+                    var line = spaceLine(space[item.profile.id], reasons[item.profile.id]);
+                    item.subtitle = (item.subtitle ? item.subtitle + '\n' : '') + line;
+                });
+
+                originalShow.call(self, config);
+            });
+        };
+    }
+
+    installFreeSpaceLines();
+    setTimeout(installFreeSpaceLines, 1500);
+    
 })();
