@@ -1175,7 +1175,9 @@ showAddTorrent: function (url, returnTo) {
      * Запити виконуються паралельно для всіх профілів.
      */
     profiles.forEach(function (profile, index) {
-        getDiskSpace(profile, function (ok, space) {
+    getDiskSpace(profile, function (ok, space) {
+
+        console.log('UTOPIA DISK:', profile.name, ok, space);
             var text;
 
             if (ok && space) {
