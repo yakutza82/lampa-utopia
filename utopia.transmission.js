@@ -1144,10 +1144,24 @@ showProfiles: showProfiles
             var backTo = 'content';
             try { backTo = Lampa.Controller.enabled().name || 'content'; } catch (err) {}
 
-            e.menu.push({
+                        var menuItem = {
                 title: '➤ Відправити в Transmission',
                 utopia_transmission: true
-            });
+            };
+
+            // Ставимо пункт одразу під "Додати в мої торенти".
+            // Якщо такого пункту не знайдено - додаємо в кінець меню.
+            var position = -1;
+            for (var m = 0; m < e.menu.length; m++) {
+                var entry = e.menu[m];
+                if (entry && (entry.tomy || /мої|моїх|мои|my torr/i.test(String(entry.title || '')))) {
+                    position = m;
+                    break;
+                }
+            }
+
+            if (position >= 0) e.menu.splice(position + 1, 0, menuItem);
+            else e.menu.push(menuItem);
 
             // Одноразово підміняємо Select.show: меню відкривається одразу після події,
             // тож ми "підхоплюємо" вибір нашого пункту, а решту віддаємо Lampa.
