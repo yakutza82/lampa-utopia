@@ -481,6 +481,8 @@
                 }
             },
             function (ok, data, error) {
+                console.log('UTOPIA SESSION:', ok, data, error);
+                
                 if (!ok) {
                     callback(false, error);
                     return;
@@ -500,6 +502,7 @@
     request(
         profile,
         {
+            console.log('UTOPIA DISK START:', profile.name, profile);
             method: 'session-get',
             arguments: {
                 fields: ['download-dir']
