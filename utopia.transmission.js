@@ -482,7 +482,7 @@
             },
             function (ok, data, error) {
                 console.log('UTOPIA SESSION:', ok, data, error);
-                
+
                 if (!ok) {
                     callback(false, error);
                     return;
@@ -499,10 +499,11 @@
     }
 
     function getDiskSpace(profile, callback) {
+    console.log('UTOPIA DISK START:', profile.name, profile);
+
     request(
         profile,
         {
-            console.log('UTOPIA DISK START:', profile.name, profile);
             method: 'session-get',
             arguments: {
                 fields: ['download-dir']
