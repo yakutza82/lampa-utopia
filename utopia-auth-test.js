@@ -1,107 +1,86 @@
 (function () {
     'use strict';
 
-    if (window.UTOPIA_AUTH_TEST) return;
-    window.UTOPIA_AUTH_TEST = true;
+    if (window.UTOPIA_ANDROID_TEST) return;
+    window.UTOPIA_ANDROID_TEST = true;
 
-    var COMPONENT = 'utopia_auth_test';
-    var TEST_URL = 'https://utp.to/users/yakutza/apikeys';
-
-    function testAuth() {
-        Lampa.Noty.show('UTOPIA: перевіряю авторизацію...');
-
-        var request = new Lampa.Reguest();
-
-        request.native(
-            TEST_URL,
-            function (response) {
-                var html = '';
-
-                if (typeof response === 'string') {
-                    html = response;
-                } else {
-                    try {
-                        html = JSON.stringify(response);
-                    } catch (e) {
-                        html = '';
-                    }
-                }
-
-                var hasActive = html.indexOf('Активний') !== -1;
-                var hasApiKeyPage = html.indexOf('API') !== -1 &&
-                                    html.indexOf('apikey') !== -1;
-
-                console.log('[UTOPIA AUTH TEST]');
-                console.log('Response length:', html.length);
-                console.log('Active:', hasActive);
-                console.log('API key page:', hasApiKeyPage);
-
-                if (hasActive) {
-                    Lampa.Noty.show(
-                        'UTOPIA: авторизована сесія знайдена!'
-                    );
-                } else {
-                    Lampa.Noty.show(
-                        'UTOPIA: сторінка отримана, але сесія не знайдена'
-                    );
-                }
-            },
-            function (error) {
-                console.log('[UTOPIA AUTH TEST] ERROR:', error);
-
-                Lampa.Noty.show(
-                    'UTOPIA: помилка запиту'
-                );
-            },
-            false,
-            {
-                dataType: 'text'
+    function showResult(title, text) {
+        Lampa.Modal.open({
+            title: title,
+            html: '<div style="padding:1em;word-break:break-all;">' +
+                $('<div>').text(text).html() +
+                '</div>',
+            onBack: function () {
+                Lampa.Modal.close();
             }
+        });
+    }
+
+    function testAndroidJS() {
+        var result = [];
+
+        result.push('AndroidJS: ' + (
+            typeof window.AndroidJS === 'undefined'
+                ? 'НІ'
+                : 'ТАК'
+        ));
+
+        if (typeof window.AndroidJS !== 'undefined') {
+            try {
+                result.push(
+                    'Тип: ' + typeof window.AndroidJS
+                );
+
+                result.push(
+                    'Методи: ' +
+                    Object.keys(window.AndroidJS).join(', ')
+                );
+            } catch (e) {
+                result.push(
+                    'Помилка читання: ' + e.message
+                );
+            }
+        }
+
+        showResult(
+            'UTOPIA — Android тест',
+            result.join('\n')
         );
     }
 
-    function addSettings() {
+    function init() {
+        if (!Lampa.SettingsApi) {
+            Lampa.Noty.show('SettingsApi недоступний');
+            return;
+        }
+
         Lampa.SettingsApi.addComponent({
-            component: COMPONENT,
-            name: 'UTOPIA — авторизація',
+            component: 'utopia_android_test',
+            name: 'UTOPIA — Android тест',
             icon: '🔐'
         });
 
         Lampa.SettingsApi.addParam({
-            component: COMPONENT,
+            component: 'utopia_android_test',
             param: {
-                name: 'utopia_auth_test',
+                name: 'android_test',
                 type: 'trigger'
             },
             field: {
-                name: 'Перевірити авторизацію',
-                description: 'Перевірити сесію utp.to'
+                name: 'Перевірити AndroidJS',
+                description: 'Перевірка native bridge Lampa'
             },
             onChange: function () {
-                testAuth();
-
-                setTimeout(function () {
-                    Lampa.Settings.update();
-                }, 100);
+                testAndroidJS();
             }
         });
     }
 
-    function start() {
-        if (!window.Lampa) return;
-
-        if (Lampa.SettingsApi) {
-            addSettings();
-        }
-    }
-
     if (window.appready) {
-        start();
+        init();
     } else {
-        Lampa.Listener.follow('app', function (event) {
-            if (event.type === 'ready') {
-                start();
-            }
+        Lampa.Listener.follow('app', function (e) {
+            if (e.type === 'ready') init();
         });
     }
 
