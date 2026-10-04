@@ -1,29 +1,43 @@
 (function () {
     'use strict';
 
-    if (window.UTOPIA_BROWSER_TEST) return;
-    window.UTOPIA_BROWSER_TEST = true;
+    if (window.UTOPIA_HTTP_TEST) return;
+    window.UTOPIA_HTTP_TEST = true;
 
     var url = 'https://utp.to/users/yakutza/apikeys';
 
     try {
-        if (Lampa.Browser && typeof Lampa.Browser.open === 'function') {
-            Lampa.Browser.open(url);
-            return;
-        }
+        var id = Date.now();
 
-        if (Lampa.Browser && typeof Lampa.Browser.url === 'function') {
-            Lampa.Browser.url(url);
-            return;
-        }
+        var request = {
+            url: url,
+            type: 'GET',
+            headers: {
+                'Accept': 'text/html'
+            }
+        };
 
-        if (window.browser && typeof window.browser.open === 'function') {
-            window.browser.open(url);
-            return;
-        }
+        AndroidJS.httpReq(JSON.stringify(request), id);
 
-        alert('Browser API не знайдено');
+        setTimeout(function () {
+            try {
+                var response = AndroidJS.getResp(id);
+
+                Lampa.Noty.show(
+                    'UTOPIA HTTP TEST<br><br>' +
+                    'getResp:<br>' +
+                    String(response).slice(0, 1000)
+                );
+            } catch (e) {
+                Lampa.Noty.show(
+                    'Помилка getResp:<br>' + e.message
+                );
+            }
+        }, 3000);
+
     } catch (e) {
-        alert('Помилка: ' + e.message);
+        Lampa.Noty.show(
+            'Помилка httpReq:<br>' + e.message
+        );
     }
 })();
