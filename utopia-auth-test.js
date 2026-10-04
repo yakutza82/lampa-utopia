@@ -4,26 +4,13 @@
     if (window.UTOPIA_ANDROID_TEST) return;
     window.UTOPIA_ANDROID_TEST = true;
 
-    function showResult(title, text) {
-        Lampa.Modal.open({
-            title: title,
-            html: '<div style="padding:1em;word-break:break-all;">' +
-                $('<div>').text(text).html() +
-                '</div>',
-            onBack: function () {
-                Lampa.Modal.close();
-            }
-        });
-    }
-
     function testAndroidJS() {
         var result = [];
 
-        result.push('AndroidJS: ' + (
-            typeof window.AndroidJS === 'undefined'
-                ? 'НІ'
-                : 'ТАК'
-        ));
+        result.push(
+            'AndroidJS: ' +
+            (typeof window.AndroidJS === 'undefined' ? 'НІ' : 'ТАК')
+        );
 
         if (typeof window.AndroidJS !== 'undefined') {
             try {
@@ -31,21 +18,47 @@
                     'Тип: ' + typeof window.AndroidJS
                 );
 
+                var keys = Object.keys(window.AndroidJS);
+
                 result.push(
-                    'Методи: ' +
-                    Object.keys(window.AndroidJS).join(', ')
+                    'Кількість методів: ' + keys.length
                 );
+
+                console.log(
+                    '[UTOPIA ANDROID TEST] AndroidJS:',
+                    window.AndroidJS
+                );
+
+                console.log(
+                    '[UTOPIA ANDROID TEST] Методи:',
+                    keys
+                );
+
+                Lampa.Noty.show(
+                    'AndroidJS: ТАК\nМетодів: ' + keys.length
+                );
+
+                setTimeout(function () {
+                    if (keys.length) {
+                        Lampa.Noty.show(
+                            keys.join(', ')
+                        );
+                    } else {
+                        Lampa.Noty.show(
+                            'AndroidJS є, але Object.keys порожній'
+                        );
+                    }
+                }, 1500);
+
+                return;
             } catch (e) {
                 result.push(
-                    'Помилка читання: ' + e.message
+                    'Помилка: ' + e.message
                 );
             }
         }
 
-        showResult(
-            'UTOPIA — Android тест',
-            result.join('\n')
-        );
+        Lampa.Noty.show(result.join('\n'));
     }
 
     function init() {
@@ -80,7 +93,9 @@
         init();
     } else {
         Lampa.Listener.follow('app', function (e) {
-            if (e.type === 'ready') init();
+            if (e.type === 'ready') {
+                init();
+            }
         });
     }
 
