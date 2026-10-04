@@ -1723,7 +1723,7 @@ if (
 
 // Потім завантаження
 items.push({
-    title: '⏬ Завантажити .torrent',
+    title: '↕️ Завантажити .torrent',
     action: 'download'
 });
 
