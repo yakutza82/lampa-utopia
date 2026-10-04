@@ -1581,17 +1581,17 @@ if (
 
 // Потім завантаження
 items.push({
-    title: '📥 Завантажити .torrent',
+    title: '⬇ Завантажити .torrent',
     action: 'download'
 });
 
     items.push(
         {
-            title: '📋 Скопіювати посилання',
+            title: '⧉ Скопіювати посилання',
             action: 'copy'
         },
         {
-            title: '❌ Скасувати',
+            title: '╳ Скасувати',
             action: 'cancel'
         }
     );
