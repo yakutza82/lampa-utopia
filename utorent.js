@@ -677,6 +677,99 @@
         return !!getKey();
     }
 
+    // Поле "API ключ" працює як кнопка: ключ редагується у власному вікні,
+    // а "Назад" у клавіатурі нічого не зберігає (див. editApiKey).
+    var keyField = {
+        name: 'API ключ UTOPIA',
+        description: ''
+    };
+
+    function maskKey(key) {
+        key = String(key || '');
+        if (!key) return 'не вказано';
+        if (key.length <= 8) return '••••';
+        return key.slice(0, 4) + '…' + key.slice(-4);
+    }
+
+    function escapeText(text) {
+        return String(text)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;');
+    }
+
+    function keyDescription() {
+        return 'Ключ: ' + escapeText(maskKey(getKey())) + '<br>Версія плагіна: ' + VERSION;
+    }
+
+    function updateKeyDisplay() {
+        keyField.description = keyDescription();
+
+        try {
+            var $el = $('[data-name="utopia_api_key_btn"], [data-param="utopia_api_key_btn"]');
+            if ($el.length) {
+                var $descr = $el.find('.settings-param__descr, .settings-param__descr-text');
+                if ($descr.length) $descr.html(keyField.description);
+            }
+        } catch (e) {}
+    }
+
+    function backToSettings() {
+        try { Lampa.Controller.toggle('settings_component'); } catch (e) {}
+    }
+
+    function applyApiKey(key) {
+        Lampa.Storage.set('utopia_api_key', key);
+        updateKeyDisplay();
+        if (key) verifyKey(key);
+        backToSettings();
+    }
+
+    // Клавіатура Lampa повертає тільки текст і не каже, чим її закрили ("ОК" чи "Назад"),
+    // тому якщо ключ змінився, показуємо підтвердження: Застосувати / Скасувати.
+    // "Назад" у підтвердженні = скасувати.
+    function editApiKey() {
+        var current = getKey();
+
+        function confirmChange(newValue) {
+            var key = String(newValue === null || newValue === undefined ? '' : newValue).trim();
+
+            if (key === current) {
+                backToSettings();
+                return;
+            }
+
+            setTimeout(function () {
+                Lampa.Select.show({
+                    title: 'API ключ UTOPIA',
+                    items: [
+                        { title: '✅ Застосувати: ' + maskKey(key), action: 'apply' },
+                        { title: '✖ Скасувати', action: 'cancel' }
+                    ],
+                    onSelect: function (item) {
+                        if (item.action === 'apply') applyApiKey(key);
+                        else backToSettings();
+                    },
+                    onBack: function () {
+                        backToSettings();
+                    }
+                });
+            }, 200);
+        }
+
+        if (Lampa.Input && typeof Lampa.Input.edit === 'function') {
+            Lampa.Input.edit({
+                title: 'API ключ UTOPIA',
+                value: current,
+                free: true,
+                nosave: true
+            }, confirmChange);
+        } else {
+            var result = prompt('API ключ UTOPIA', current);
+            if (result !== null) applyApiKey(String(result).trim());
+        }
+    }
+
     // =========================================================
     // 2. Налаштування
     // =========================================================
@@ -693,18 +786,17 @@
         '</svg>'
         });
 
+        keyField.description = keyDescription();
+
         Lampa.SettingsApi.addParam({
             component: 'utopia',
-            param: { name: 'utopia_api_key', type: 'input', values: '', default: '' },
-            field: {
-                name: 'API ключ UTOPIA',
-                description: 'Вставте ключ доступу до utp.to<br> Версія плагіна: ' + VERSION
-            },
-            onChange: function (value) {
-                var key = (value || '').trim();
-                Lampa.Storage.set('utopia_api_key', key);
-                if (key) verifyKey(key);
-            }
+            param: { name: 'utopia_api_key_btn', type: 'button' },
+            field: keyField,
+            onChange: editApiKey
+        });
+
+        Lampa.Listener.follow('settings', function (e) {
+            if (e.type === 'open' || e.name === 'utopia') setTimeout(updateKeyDisplay, 100);
         });
     }
 
