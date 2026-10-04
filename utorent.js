@@ -728,46 +728,96 @@
     // Клавіатура Lampa повертає тільки текст і не каже, чим її закрили ("ОК" чи "Назад"),
     // тому якщо ключ змінився, показуємо підтвердження: Застосувати / Скасувати.
     // "Назад" у підтвердженні = скасувати.
-    function editApiKey() {
+        // Вікно підтвердження: Застосувати / Скасувати ("Назад" = скасувати).
+    function askApply(key) {
+        setTimeout(function () {
+            Lampa.Select.show({
+                title: 'API ключ UTOPIA',
+                items: [
+                    { title: key ? '✅ Застосувати: ' + maskKey(key) : '✅ Видалити ключ', action: 'apply' },
+                    { title: '✖ Скасувати', action: 'cancel' }
+                ],
+                onSelect: function (item) {
+                    if (item.action === 'apply') applyApiKey(key);
+                    else backToSettings();
+                },
+                onBack: function () {
+                    backToSettings();
+                }
+            });
+        }, 200);
+    }
+
+    // Клавіатура Lampa повертає тільки текст і не каже, чим її закрили ("ОК" чи "Назад"),
+    // тому якщо ключ змінився, показуємо підтвердження.
+    // startValue - що буде в рядку введення.
+    // mode 'new' - клавіатура порожня, і порожній результат ігнорується (ключ не стирається).
+    function openKeyboard(startValue, mode) {
         var current = getKey();
 
-        function confirmChange(newValue) {
+        function done(newValue) {
             var key = String(newValue === null || newValue === undefined ? '' : newValue).trim();
 
-            if (key === current) {
+            if (key === current || (mode === 'new' && !key)) {
                 backToSettings();
                 return;
             }
 
-            setTimeout(function () {
-                Lampa.Select.show({
-                    title: 'API ключ UTOPIA',
-                    items: [
-                        { title: '✅ Застосувати: ' + maskKey(key), action: 'apply' },
-                        { title: '✖ Скасувати', action: 'cancel' }
-                    ],
-                    onSelect: function (item) {
-                        if (item.action === 'apply') applyApiKey(key);
-                        else backToSettings();
-                    },
-                    onBack: function () {
-                        backToSettings();
-                    }
-                });
-            }, 200);
+            askApply(key);
         }
 
         if (Lampa.Input && typeof Lampa.Input.edit === 'function') {
             Lampa.Input.edit({
                 title: 'API ключ UTOPIA',
-                value: current,
+                value: startValue,
                 free: true,
                 nosave: true
-            }, confirmChange);
+            }, done);
         } else {
-            var result = prompt('API ключ UTOPIA', current);
-            if (result !== null) applyApiKey(String(result).trim());
+            var result = prompt('API ключ UTOPIA', startValue);
+            if (result !== null) done(result);
+            else backToSettings();
         }
+    }
+
+    function isMobileScreen() {
+        try {
+            return !!(Lampa.Platform && typeof Lampa.Platform.screen === 'function' && Lampa.Platform.screen('mobile'));
+        } catch (e) {
+            return false;
+        }
+    }
+
+    function editApiKey() {
+        var current = getKey();
+
+        // Ключа ще немає або це телефон (там курсор ставиться пальцем) - одразу клавіатура
+        if (!current || isMobileScreen()) {
+            openKeyboard(current, 'edit');
+            return;
+        }
+
+        // На ТБ збережений ключ у рядку введення виходить за межі екрана, а курсор
+        // стоїть на початку - здається, що введення не працює. Тому пропонуємо вибір:
+        // чиста клавіатура або редагування поточного ключа.
+        Lampa.Select.show({
+            title: 'API ключ UTOPIA',
+            items: [
+                { title: '✏️ Ввести новий ключ', subtitle: 'клавіатура буде порожня', action: 'new' },
+                { title: '📝 Редагувати поточний', subtitle: maskKey(current), action: 'edit' },
+                { title: '🗑 Видалити ключ', action: 'delete' },
+                { title: '✖ Скасувати', action: 'cancel' }
+            ],
+            onSelect: function (item) {
+                if (item.action === 'new') setTimeout(function () { openKeyboard('', 'new'); }, 200);
+                else if (item.action === 'edit') setTimeout(function () { openKeyboard(current, 'edit'); }, 200);
+                else if (item.action === 'delete') askApply('');
+                else backToSettings();
+            },
+            onBack: function () {
+                backToSettings();
+            }
+        });
     }
 
     // =========================================================
