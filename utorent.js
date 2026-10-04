@@ -698,7 +698,7 @@
             param: { name: 'utopia_api_key', type: 'input', values: '', default: '' },
             field: {
                 name: 'API ключ UTOPIA',
-                description: 'Вставте ключ доступу до utp.to. Версія плагіна: ' + VERSION
+                description: 'Вставте ключ доступу до utp.to<br> Версія плагіна: ' + VERSION
             },
             onChange: function (value) {
                 var key = (value || '').trim();
@@ -1581,7 +1581,7 @@ if (
 
 // Потім завантаження
 items.push({
-    title: '⬇ Завантажити .torrent',
+    title: '⇩ Завантажити .torrent',
     action: 'download'
 });
 
