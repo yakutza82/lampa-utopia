@@ -1729,7 +1729,7 @@ items.push({
 
     items.push(
         {
-            title: '🔁 Скопіювати посилання',
+            title: '☑️ Скопіювати посилання',
             action: 'copy'
         },
         {
