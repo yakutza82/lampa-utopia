@@ -748,17 +748,18 @@
         }, 200);
     }
 
-    // Клавіатура Lampa повертає тільки текст і не каже, чим її закрили ("ОК" чи "Назад"),
-    // тому якщо ключ змінився, показуємо підтвердження.
-    // startValue - що буде в рядку введення.
-    // mode 'new' - клавіатура порожня, і порожній результат ігнорується (ключ не стирається).
-    function openKeyboard(startValue, mode) {
+    // Клавіатура Lampa повертає тільки текст і не каже, чим її закрили. Кнопка "Скасувати"
+    // віддає порожній рядок, а "Назад" - текст, що є зараз. Тому:
+    //  - порожній результат або той самий ключ = нічого не змінюємо;
+    //  - змінений ключ = показуємо підтвердження "Застосувати / Скасувати".
+    // Видалити ключ можна лише окремим пунктом меню (див. editApiKey).
+    function openKeyboard(startValue) {
         var current = getKey();
 
         function done(newValue) {
             var key = String(newValue === null || newValue === undefined ? '' : newValue).trim();
 
-            if (key === current || (mode === 'new' && !key)) {
+            if (!key || key === current) {
                 backToSettings();
                 return;
             }
@@ -780,26 +781,18 @@
         }
     }
 
-    function isMobileScreen() {
-        try {
-            return !!(Lampa.Platform && typeof Lampa.Platform.screen === 'function' && Lampa.Platform.screen('mobile'));
-        } catch (e) {
-            return false;
-        }
-    }
-
     function editApiKey() {
         var current = getKey();
 
-        // Ключа ще немає або це телефон (там курсор ставиться пальцем) - одразу клавіатура
-        if (!current || isMobileScreen()) {
-            openKeyboard(current, 'edit');
+        // Ключа ще немає - одразу чиста клавіатура
+        if (!current) {
+            openKeyboard('');
             return;
         }
 
-        // На ТБ збережений ключ у рядку введення виходить за межі екрана, а курсор
-        // стоїть на початку - здається, що введення не працює. Тому пропонуємо вибір:
-        // чиста клавіатура або редагування поточного ключа.
+        // Збережений ключ у рядку введення виходить за межі екрана (особливо на ТБ),
+        // а курсор стоїть на початку - здається, що введення не працює. Тому спершу
+        // вибір: чиста клавіатура, редагування поточного ключа або видалення.
         Lampa.Select.show({
             title: 'API ключ UTOPIA',
             items: [
@@ -809,8 +802,8 @@
                 { title: '✖ Скасувати', action: 'cancel' }
             ],
             onSelect: function (item) {
-                if (item.action === 'new') setTimeout(function () { openKeyboard('', 'new'); }, 200);
-                else if (item.action === 'edit') setTimeout(function () { openKeyboard(current, 'edit'); }, 200);
+                if (item.action === 'new') setTimeout(function () { openKeyboard(''); }, 200);
+                else if (item.action === 'edit') setTimeout(function () { openKeyboard(current); }, 200);
                 else if (item.action === 'delete') askApply('');
                 else backToSettings();
             },
