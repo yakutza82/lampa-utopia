@@ -753,10 +753,105 @@
     //  - порожній результат або той самий ключ = нічого не змінюємо;
     //  - змінений ключ = показуємо підтвердження "Застосувати / Скасувати".
     // Видалити ключ можна лише окремим пунктом меню (див. editApiKey).
-    function openKeyboard(startValue) {
+        // Живий перегляд введеного тексту на ТБ.
+    // Рядок введення Lampa показує довгий ключ в один рядок і ховає кінець, тому не видно,
+    // що саме набрано. Ми дублюємо текст угорі екрана з переносом рядків і лічильником символів.
+    var typingPreview = { timer: null, guard: null, box: null, textEl: null, countEl: null, last: null };
+
+    function isMobileScreen() {
+        try {
+            return !!(Lampa.Platform && typeof Lampa.Platform.screen === 'function' && Lampa.Platform.screen('mobile'));
+        } catch (e) {
+            return false;
+        }
+    }
+
+    // Поле, в яке клавіатура Lampa пише введений текст
+    function findKeyboardField() {
+        var field = document.getElementById('orsay-keyboard');
+
+        if (!field) field = document.querySelector('.simple-keyboard-input input, .simple-keyboard-input textarea');
+
+        if (!field) {
+            var list = document.querySelectorAll('input[type="text"], input:not([type]), textarea');
+            for (var i = 0; i < list.length; i++) {
+                if (list[i].offsetParent !== null) {
+                    field = list[i];
+                    break;
+                }
+            }
+        }
+
+        return field;
+    }
+
+    function ensurePreviewBox() {
+        if (typingPreview.box) return;
+
+        var box = document.createElement('div');
+        box.style.cssText = 'position:fixed;left:4%;right:4%;top:1em;z-index:100000;padding:.6em .9em;' +
+            'border-radius:.5em;background:rgba(0,0,0,.88);color:#fff;font-size:1.4em;line-height:1.35;' +
+            'word-break:break-all;overflow-wrap:anywhere;pointer-events:none;';
+
+        var countEl = document.createElement('div');
+        countEl.style.cssText = 'font-size:.6em;opacity:.65;margin-bottom:.2em;';
+
+        var textEl = document.createElement('div');
+
+        box.appendChild(countEl);
+        box.appendChild(textEl);
+        document.body.appendChild(box);
+
+        typingPreview.box = box;
+        typingPreview.countEl = countEl;
+        typingPreview.textEl = textEl;
+    }
+
+    function stopTypingPreview() {
+        clearInterval(typingPreview.timer);
+        clearTimeout(typingPreview.guard);
+
+        if (typingPreview.box && typingPreview.box.parentNode) {
+            typingPreview.box.parentNode.removeChild(typingPreview.box);
+        }
+
+        typingPreview.timer = null;
+        typingPreview.guard = null;
+        typingPreview.box = null;
+        typingPreview.textEl = null;
+        typingPreview.countEl = null;
+        typingPreview.last = null;
+    }
+
+    function startTypingPreview() {
+        stopTypingPreview();
+
+        // На телефоні клавіатура зручна й так
+        if (isMobileScreen()) return;
+
+        typingPreview.timer = setInterval(function () {
+            var field = findKeyboardField();
+            if (!field) return;
+
+            var text = String(field.value !== undefined ? field.value : (field.textContent || ''));
+            if (text === typingPreview.last) return;
+
+            typingPreview.last = text;
+            ensurePreviewBox();
+            typingPreview.countEl.textContent = 'Введено символів: ' + text.length;
+            typingPreview.textEl.textContent = text || '(порожньо)';
+        }, 150);
+
+        // Страховка: якщо вікно клавіатури закрилось без відповіді
+        typingPreview.guard = setTimeout(stopTypingPreview, 10 * 60 * 1000);
+    }
+
+        function openKeyboard(startValue) {
         var current = getKey();
 
         function done(newValue) {
+            stopTypingPreview();
+
             var key = String(newValue === null || newValue === undefined ? '' : newValue).trim();
 
             if (!key || key === current) {
@@ -774,6 +869,8 @@
                 free: true,
                 nosave: true
             }, done);
+
+            startTypingPreview();
         } else {
             var result = prompt('API ключ UTOPIA', startValue);
             if (result !== null) done(result);
