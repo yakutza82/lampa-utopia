@@ -753,48 +753,32 @@
     // startValue - що буде в рядку введення.
     // mode 'new' - клавіатура порожня, і порожній результат ігнорується (ключ не стирається).
     function openKeyboard(startValue, mode) {
-    var current = getKey();
+        var current = getKey();
 
-    function done(newValue) {
-        var key = String(
-            newValue === null || newValue === undefined ? '' : newValue
-        ).trim();
+        function done(newValue) {
+            var key = String(newValue === null || newValue === undefined ? '' : newValue).trim();
 
-        // Порожній результат клавіатури означає "Скасувати".
-        // Видалення ключа робиться окремо через пункт "Видалити ключ".
-        if (!key) {
-            backToSettings();
-            return;
+            if (key === current || (mode === 'new' && !key)) {
+                backToSettings();
+                return;
+            }
+
+            askApply(key);
         }
 
-        // Нічого не змінилося
-        if (key === current) {
-            backToSettings();
-            return;
-        }
-
-        // Ключ змінено — показуємо підтвердження:
-        // "Застосувати" / "Скасувати".
-        askApply(key);
-    }
-
-    if (Lampa.Input && typeof Lampa.Input.edit === 'function') {
-        Lampa.Input.edit({
-            title: 'API ключ UTOPIA',
-            value: startValue,
-            free: true,
-            nosave: true
-        }, done);
-    } else {
-        var result = prompt('API ключ UTOPIA', startValue);
-
-        if (result !== null) {
-            done(result);
+        if (Lampa.Input && typeof Lampa.Input.edit === 'function') {
+            Lampa.Input.edit({
+                title: 'API ключ UTOPIA',
+                value: startValue,
+                free: true,
+                nosave: true
+            }, done);
         } else {
-            backToSettings();
+            var result = prompt('API ключ UTOPIA', startValue);
+            if (result !== null) done(result);
+            else backToSettings();
         }
     }
-}
 
     function isMobileScreen() {
         try {
@@ -1730,7 +1714,7 @@ if (
 
     receivers.forEach(function (receiver) {
         items.push({
-            title: '➤ Відправити в ' + receiver.title,
+            title: '▶️ Відправити в ' + receiver.title,
             action: 'receiver',
             receiver: receiver
         });
@@ -1739,17 +1723,17 @@ if (
 
 // Потім завантаження
 items.push({
-    title: '⇩ Завантажити .torrent',
+    title: '⏬ Завантажити .torrent',
     action: 'download'
 });
 
     items.push(
         {
-            title: '⧉ Скопіювати посилання',
+            title: '🔁 Скопіювати посилання',
             action: 'copy'
         },
         {
-            title: '╳ Скасувати',
+            title: '❎ Скасувати',
             action: 'cancel'
         }
     );
