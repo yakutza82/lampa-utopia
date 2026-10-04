@@ -4,16 +4,15 @@
     if (window.UTOPIA_AUTH_TEST) return;
     window.UTOPIA_AUTH_TEST = true;
 
+    var COMPONENT = 'utopia_auth_test';
     var TEST_URL = 'https://utp.to/users/yakutza/apikeys';
 
     function testAuth() {
-        Lampa.Noty.show('Перевіряю авторизацію UTOPIA...');
+        Lampa.Noty.show('UTOPIA: перевіряю авторизацію...');
 
-        var network = new Lampa.Reguest();
+        var request = new Lampa.Reguest();
 
-        network.timeout(20000);
-
-        network.silent(
+        request.native(
             TEST_URL,
             function (response) {
                 var html = '';
@@ -28,21 +27,31 @@
                     }
                 }
 
-                var active = html.indexOf('Активний') !== -1;
+                var hasActive = html.indexOf('Активний') !== -1;
+                var hasApiKeyPage = html.indexOf('API') !== -1 &&
+                                    html.indexOf('apikey') !== -1;
 
-                console.log('[UTOPIA AUTH TEST] HTTP: success');
-                console.log('[UTOPIA AUTH TEST] HTML length:', html.length);
-                console.log('[UTOPIA AUTH TEST] Active key:', active);
+                console.log('[UTOPIA AUTH TEST]');
+                console.log('Response length:', html.length);
+                console.log('Active:', hasActive);
+                console.log('API key page:', hasApiKeyPage);
 
-                if (active) {
-                    Lampa.Noty.show('UTOPIA: авторизація знайдена');
+                if (hasActive) {
+                    Lampa.Noty.show(
+                        'UTOPIA: авторизована сесія знайдена!'
+                    );
                 } else {
-                    Lampa.Noty.show('UTOPIA: сторінка отримана, але авторизація не знайдена');
+                    Lampa.Noty.show(
+                        'UTOPIA: сторінка отримана, але сесія не знайдена'
+                    );
                 }
             },
             function (error) {
                 console.log('[UTOPIA AUTH TEST] ERROR:', error);
-                Lampa.Noty.show('UTOPIA: помилка запиту');
+
+                Lampa.Noty.show(
+                    'UTOPIA: помилка запиту'
+                );
             },
             false,
             {
@@ -51,30 +60,49 @@
         );
     }
 
-    function addMenu() {
-        Lampa.Listener.follow('app', function (e) {
-            if (e.type !== 'ready') return;
+    function addSettings() {
+        Lampa.SettingsApi.addComponent({
+            component: COMPONENT,
+            name: 'UTOPIA — авторизація',
+            icon: '🔐'
+        });
 
-            Lampa.SettingsApi.addComponent({
-                component: 'utopia_auth_test',
-                name: 'UTOPIA — тест авторизації',
-                icon: '🔐',
-                onRender: function () {
-                    var item = $('<div class="settings-param selector">' +
-                        '<div class="settings-param__name">Перевірити авторизацію UTOPIA</div>' +
-                        '<div class="settings-param__descr">Тест сесії utp.to без зміни ключа</div>' +
-                        '</div>');
+        Lampa.SettingsApi.addParam({
+            component: COMPONENT,
+            param: {
+                name: 'utopia_auth_test',
+                type: 'trigger'
+            },
+            field: {
+                name: 'Перевірити авторизацію',
+                description: 'Перевірити сесію utp.to'
+            },
+            onChange: function () {
+                testAuth();
 
-                    item.on('hover:enter', function () {
-                        testAuth();
-                    });
-
-                    return item;
-                }
-            });
+                setTimeout(function () {
+                    Lampa.Settings.update();
+                }, 100);
+            }
         });
     }
 
-    addMenu();
+    function start() {
+        if (!window.Lampa) return;
+
+        if (Lampa.SettingsApi) {
+            addSettings();
+        }
+    }
+
+    if (window.appready) {
+        start();
+    } else {
+        Lampa.Listener.follow('app', function (event) {
+            if (event.type === 'ready') {
+                start();
+            }
+        });
+    }
 
 })();
