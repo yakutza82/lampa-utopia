@@ -6,25 +6,22 @@
         return;
     }
 
-    var cookie = Lampa.Storage.get(
-        'utopia_test_cookies',
-        ''
-    );
-
-    if (!cookie) {
-        Lampa.Noty.show(
-            'UTOPIA: cookies немає. Спочатку LOGIN TEST'
-        );
-        return;
-    }
+    var USERNAME = 'yakutza';
+    var PASSWORD = '5159001276yak';
 
     var network = new Lampa.Reguest();
+    var loginUrl = 'https://utp.to/login';
+
+    // ------------------------------------------------------------
+    // GET /login
+    // ------------------------------------------------------------
 
     network.clear();
     network.timeout(10000);
 
     network["native"](
-        'https://utp.to/',
+        loginUrl,
+
         function (response) {
 
             var json = response;
@@ -36,67 +33,246 @@
                         {}
                     );
                 } catch (e) {
-                    json = {};
+                    Lampa.Noty.show(
+                        'UTOPIA: GET response error'
+                    );
+                    return;
                 }
             }
 
-            var body = json && json.body
-                ? String(json.body)
-                : '';
+            var html = json && json.body || '';
 
-            var status = json && json.status
-                ? json.status
-                : 'unknown';
+            var tokenMatch = html.match(
+                /name=["']_token["'][^>]*value=["']([^"']+)["']/
+            );
 
-            var result =
-                'UTOPIA SESSION TEST\n\n' +
-                'STATUS: ' + status + '\n' +
-                'BODY: ' + body.length + ' символів\n\n' +
+            if (!tokenMatch) {
+                tokenMatch = html.match(
+                    /value=["']([^"']+)["'][^>]*name=["']_token["']/
+                );
+            }
 
-                'yakutza: ' +
-                (body.toLowerCase().indexOf('yakutza') !== -1
-                    ? 'YES'
-                    : 'NO') + '\n' +
+            if (!tokenMatch) {
+                Lampa.Noty.show(
+                    'UTOPIA: CSRF не знайдений'
+                );
+                return;
+            }
 
-                'login: ' +
-                (body.toLowerCase().indexOf('login') !== -1
-                    ? 'YES'
-                    : 'NO') + '\n' +
+            var csrfToken = tokenMatch[1];
 
-                'logout: ' +
-                (body.toLowerCase().indexOf('logout') !== -1
-                    ? 'YES'
-                    : 'NO') + '\n' +
+            // ----------------------------------------------------
+            // Cookies після GET
+            // ----------------------------------------------------
 
-                'profile: ' +
-                (body.toLowerCase().indexOf('profile') !== -1
-                    ? 'YES'
-                    : 'NO') + '\n' +
+            var getHeaders =
+                json &&
+                json.headers &&
+                json.headers['set-cookie'];
 
-                'dashboard: ' +
-                (body.toLowerCase().indexOf('dashboard') !== -1
-                    ? 'YES'
-                    : 'NO');
+            var cookies = {};
 
-            console.log(result);
+            if (getHeaders && getHeaders.forEach) {
 
-            Lampa.Noty.show(result);
+                getHeaders.forEach(function (item) {
 
+                    var first = item.split(';')[0];
+                    var pos = first.indexOf('=');
+
+                    if (pos > 0) {
+
+                        var name =
+                            first.substring(0, pos);
+
+                        var value =
+                            first.substring(pos + 1);
+
+                        cookies[name] = value;
+                    }
+                });
+            }
+
+            // ----------------------------------------------------
+            // POST /login
+            // ----------------------------------------------------
+
+            var postdata =
+                '_token=' +
+                encodeURIComponent(csrfToken) +
+                '&username=' +
+                encodeURIComponent(USERNAME) +
+                '&password=' +
+                encodeURIComponent(PASSWORD);
+
+            var headers = {
+                'Content-Type':
+                    'application/x-www-form-urlencoded'
+            };
+
+            var getCookie = [];
+
+            for (var name in cookies) {
+                getCookie.push(
+                    name + '=' + cookies[name]
+                );
+            }
+
+            if (getCookie.length) {
+                headers['Cookie'] =
+                    getCookie.join('; ');
+            }
+
+            network.clear();
+            network.timeout(10000);
+
+            network["native"](
+                loginUrl,
+
+                function (response) {
+
+                    var loginJson = response;
+
+                    if (typeof response === 'string') {
+                        try {
+                            loginJson =
+                                Lampa.Arrays.decodeJson(
+                                    response,
+                                    {}
+                                );
+                        } catch (e) {
+                            loginJson = {};
+                        }
+                    }
+
+                    var setCookies =
+                        loginJson &&
+                        loginJson.headers &&
+                        loginJson.headers['set-cookie'];
+
+                    if (
+                        !setCookies ||
+                        !setCookies.forEach
+                    ) {
+                        Lampa.Noty.show(
+                            'UTOPIA: POST OK, але Set-Cookie немає'
+                        );
+                        return;
+                    }
+
+                    // ------------------------------------------------
+                    // Обробляємо cookies
+                    // ------------------------------------------------
+
+                    setCookies.forEach(function (item) {
+
+                        var first =
+                            item.split(';')[0];
+
+                        var pos =
+                            first.indexOf('=');
+
+                        if (pos > 0) {
+
+                            var name =
+                                first.substring(0, pos);
+
+                            var value =
+                                first.substring(pos + 1);
+
+                            if (value === 'deleted') {
+                                delete cookies[name];
+                            } else {
+                                cookies[name] = value;
+                            }
+                        }
+                    });
+
+                    // ------------------------------------------------
+                    // Формуємо Cookie header
+                    // ------------------------------------------------
+
+                    var finalCookieParts = [];
+                    var cookieNames = [];
+
+                    for (var cookieName in cookies) {
+
+                        cookieNames.push(cookieName);
+
+                        finalCookieParts.push(
+                            cookieName +
+                            '=' +
+                            cookies[cookieName]
+                        );
+                    }
+
+                    var finalCookie =
+                        finalCookieParts.join('; ');
+
+                    // Зберігаємо сесію
+                    Lampa.Storage.set(
+                        'utopia_test_cookies',
+                        finalCookie
+                    );
+
+                    // Показуємо ТІЛЬКИ назви
+                    Lampa.Noty.show(
+                        'UTOPIA COOKIES: ' +
+                        cookieNames.join(', ')
+                    );
+
+                    console.log(
+                        'UTOPIA COOKIE NAMES:',
+                        cookieNames
+                    );
+
+                    console.log(
+                        'UTOPIA: COOKIE SAVED'
+                    );
+                },
+
+                function (error) {
+
+                    var details = '';
+
+                    try {
+                        details =
+                            JSON.stringify(error);
+                    } catch (e) {
+                        details =
+                            String(error);
+                    }
+
+                    Lampa.Noty.show(
+                        'UTOPIA POST ERROR: ' +
+                        details
+                    );
+                },
+
+                postdata,
+
+                {
+                    dataType: 'text',
+                    headers: headers,
+                    returnHeaders: true
+                }
+            );
         },
 
-        function (a, c) {
+        function (error) {
 
-            var error = '';
+            var details = '';
 
             try {
-                error = JSON.stringify(a);
+                details =
+                    JSON.stringify(error);
             } catch (e) {
-                error = String(a);
+                details =
+                    String(error);
             }
 
             Lampa.Noty.show(
-                'UTOPIA SESSION ERROR\n\n' +
-                error
+                'UTOPIA GET ERROR: ' +
+                details
             );
         },
 
@@ -104,9 +280,7 @@
 
         {
             dataType: 'text',
-            headers: {
-                'Cookie': cookie
-            },
+            headers: {},
             returnHeaders: true
         }
     );
