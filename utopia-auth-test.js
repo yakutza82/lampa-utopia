@@ -1,4 +1,3 @@
-```javascript
 (function () {
     'use strict';
 
@@ -74,4 +73,3 @@
         }
     );
 })();
-```
