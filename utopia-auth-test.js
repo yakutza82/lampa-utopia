@@ -130,19 +130,16 @@
             // ----------------------------------------------------
 
             var postdata =
-                '_token=' +
-                encodeURIComponent(csrfToken);
+    '_token=' +
+    encodeURIComponent(csrfToken);
 
-            postdata +=
-                '&username=' +
-                encodeURIComponent(USERNAME);
+postdata +=
+    '&username=' +
+    encodeURIComponent(USERNAME);
 
-            postdata +=
-                '&password=' +
-                encodeURIComponent(PASSWORD);
-
-            postdata +=
-                '&remember=1';
+postdata +=
+    '&password=' +
+    encodeURIComponent(PASSWORD);
 
             console.log('================================');
             console.log('UTOPIA: POST /login');
@@ -156,11 +153,9 @@
             // ----------------------------------------------------
 
             var headers = {
-                'Content-Type':
-                    'application/x-www-form-urlencoded',
-                'X-Requested-With':
-                    'XMLHttpRequest'
-            };
+    'Content-Type':
+        'application/x-www-form-urlencoded'
+};
 
             if (cookie) {
                 headers['Cookie'] = cookie;
