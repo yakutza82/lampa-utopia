@@ -1,75 +1,53 @@
 (function () {
     'use strict';
 
-    if (!window.Lampa || !Lampa.Reguest) {
-        console.error('UTOPIA TEST: Lampa.Reguest недоступний');
+    console.log('UTOPIA TEST START');
+
+    if (!window.Lampa) {
+        console.log('UTOPIA ERROR: Lampa not found');
         return;
     }
 
-    var network = new Lampa.Reguest();
-    var url = 'https://utp.to/login';
+    if (!Lampa.Reguest) {
+        console.log('UTOPIA ERROR: Lampa.Reguest not found');
+        return;
+    }
 
-    console.log('=================================');
-    console.log('UTOPIA AUTH TEST');
-    console.log('GET:', url);
-    console.log('=================================');
+    console.log('UTOPIA: Lampa OK');
 
-    Lampa.Noty.show('UTOPIA: перевірка доступу...');
+    var request = new Lampa.Reguest();
 
-    network.silent(
-        url,
+    request.silent(
+        'https://utp.to/login',
 
-        function (html, status, xhr) {
-
-            console.log('UTOPIA TEST: SUCCESS');
-            console.log('STATUS:', status);
+        function (html) {
+            console.log('UTOPIA GET SUCCESS');
             console.log('HTML LENGTH:', html ? html.length : 0);
 
-            if (html) {
-                var tokenMatch = html.match(
-                    /name=["']_token["']\s+value=["']([^"']+)["']/
-                );
-
-                console.log(
-                    'CSRF _token:',
-                    tokenMatch ? tokenMatch[1] : 'НЕ ЗНАЙДЕНО'
-                );
-
-                console.log(
-                    'HTML BEGIN:',
-                    html.substring(0, 500)
-                );
+            if (!html) {
+                console.log('UTOPIA ERROR: empty response');
+                return;
             }
 
-            if (xhr) {
-                console.log('XHR:', xhr);
+            console.log('HTML:', html.substring(0, 1000));
 
-                if (typeof xhr.getAllResponseHeaders === 'function') {
-                    console.log(
-                        'RESPONSE HEADERS:',
-                        xhr.getAllResponseHeaders()
-                    );
-                }
+            var tokenStart = html.indexOf('name="_token"');
+
+            if (tokenStart === -1) {
+                console.log('UTOPIA: _token not found');
+                return;
             }
 
-            Lampa.Noty.show(
-                tokenMatch
-                    ? 'UTOPIA: сторінка та CSRF отримані'
-                    : 'UTOPIA: сторінка отримана, але CSRF не знайдений'
-            );
+            console.log('UTOPIA: _token found');
+
+            Lampa.Noty.show('UTOPIA: GET працює, _token знайдено');
         },
 
         function (error) {
+            console.log('UTOPIA GET ERROR');
+            console.log(error);
 
-            console.error('=================================');
-            console.error('UTOPIA TEST: FAILED');
-            console.error('ERROR:', error);
-            console.error('ERROR TYPE:', typeof error);
-            console.error('=================================');
-
-            Lampa.Noty.show(
-                'UTOPIA: помилка GET /login — дивись консоль'
-            );
+            Lampa.Noty.show('UTOPIA: GET /login не працює');
         }
     );
 })();
