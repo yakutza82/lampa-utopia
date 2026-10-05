@@ -27,9 +27,9 @@
             cookies: cookies
           });
         } else {
-          onError('Не вдалося знайти CSRF _token на сторінці');
+          onError('Не вдалося знайти CSRF _token');
         }
-      }, function (a, c) {
+      }, function () {
         onError('Помилка завантаження сторінки авторизації utp.to');
       });
     },
@@ -86,7 +86,7 @@
       var cookies = Lampa.Storage.get('utopia_session_cookies', '');
       var authTime = Lampa.Storage.get('utopia_auth_time', 0);
 
-      var maxAge = 90 * 60 * 1000; // 1.5 години (сесія діє 2 години)
+      var maxAge = 90 * 60 * 1000; // 1.5 години
 
       if (!login || !password) {
         return onError('У налаштуваннях не вказано логін або пароль');
@@ -100,77 +100,68 @@
     }
   };
 
+  // Хелпер для безпечного створення полів вводу
+  function addInputField(paramName, title, description, defaultValue) {
+    Lampa.SettingsApi.addParam({
+      component: 'utopia_mod',
+      param: {
+        name: paramName,
+        type: 'input',
+        default: defaultValue || '',
+        values: {} // Запобігає помилці Cannot read properties of undefined (reading '')
+      },
+      field: {
+        name: title,
+        description: description
+      },
+      onChange: function (val) {
+        Lampa.Storage.set(paramName, val);
+      },
+      onRender: function (item) {
+        item.on('hover:enter', function () {
+          Lampa.Input.edit({
+            title: title,
+            value: Lampa.Storage.get(paramName, defaultValue || ''),
+            free: true
+          }, function (new_val) {
+            Lampa.Storage.set(paramName, new_val);
+            Lampa.Settings.update();
+          });
+        });
+      }
+    });
+  }
+
   // Реєстрація налаштувань плагіна
   function initSettings() {
     if (!window.Lampa || !Lampa.SettingsApi) return;
 
-    // Створення розділу
     Lampa.SettingsApi.addComponent({
       component: 'utopia_mod',
       name: 'Utopia',
       icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-2-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>'
     });
 
-    // Додавання полів
-    Lampa.SettingsApi.addParam({
-      component: 'utopia_mod',
-      param: {
-        name: 'utopia_login',
-        type: 'input',
-        default: ''
-      },
-      field: {
-        name: 'Логін',
-        description: 'Ваш логін на utp.to'
-      }
-    });
-
-    Lampa.SettingsApi.addParam({
-      component: 'utopia_mod',
-      param: {
-        name: 'utopia_password',
-        type: 'input',
-        default: ''
-      },
-      field: {
-        name: 'Пароль',
-        description: 'Ваш пароль на utp.to'
-      }
-    });
-
-    Lampa.SettingsApi.addParam({
-      component: 'utopia_mod',
-      param: {
-        name: 'utopia_proxy',
-        type: 'input',
-        default: ''
-      },
-      field: {
-        name: 'CORS Proxy URL',
-        description: 'Наприклад: https://cors.nb557.workers.dev/ (якщо потрібно)'
-      }
-    });
+    addInputField('utopia_login', 'Логін', 'Ваш логін на utp.to', '');
+    addInputField('utopia_password', 'Пароль', 'Ваш пароль на utp.to', '');
+    addInputField('utopia_proxy', 'CORS Proxy URL', 'Наприклад: https://cors.nb557.workers.dev/', '');
   }
 
-  // Головна функція запуску
   function startPlugin() {
     initSettings();
 
-    // Засвідчуємо плагін у реєстрі Lampa
     if (window.Lampa && Lampa.Plugins) {
       Lampa.Plugins.add('utopia_mod', {
         title: 'Utopia Tracker',
         description: 'Модуль авторизації та пошуку для utp.to',
-        version: '1.0.0',
+        version: '1.0.1',
         author: 'Custom'
       });
     }
 
-    // Експортуємо глобальний об'єкт для використання у пошуку
     window.UtopiaAuth = UtopiaAuth;
   }
 
-  // Перевірка готовності Lampa перед запуск
   if (window.appready) {
     startPlugin();
   } else {
