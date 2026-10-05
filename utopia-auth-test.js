@@ -84,7 +84,7 @@
     }
   };
 
-  // Хелпер для безпечного створення полів введення через type: 'title'
+  // Хелпер для створення активних полів із викликом клавіатури
   function addInputField(paramName, title, defaultDesc, isPassword) {
     Lampa.SettingsApi.addParam({
       component: 'utopia_mod',
@@ -101,7 +101,10 @@
         })()
       },
       onRender: function (item) {
+        // Додаємо клас 'selector', щоб елемент став активним для пульта/миші
+        item.addClass('selector');
         item.css({ 'cursor': 'pointer' });
+
         item.on('hover:enter', function () {
           Lampa.Input.edit({
             title: title,
@@ -109,14 +112,20 @@
             free: true
           }, function (new_val) {
             Lampa.Storage.set(paramName, new_val);
-            Lampa.Settings.update();
+            
+            // Динамічно оновлюємо текст опису під полем
+            var descText = defaultDesc;
+            if (new_val) {
+              descText = isPassword ? '••••••••' : new_val;
+            }
+            item.find('.settings-param__descr').text(descText);
           });
         });
       }
     });
   }
 
-  // Реєстрація розділу та полів налаштувань
+  // Реєстрація розділу та полів
   function initSettings() {
     if (!window.Lampa || !Lampa.SettingsApi) return;
 
@@ -139,10 +148,12 @@
       },
       field: {
         name: 'Перевірити авторизацію',
-        description: 'Натисніть Enter для тестового входу на utp.to'
+        description: 'Натисніть для тестового входу на utp.to'
       },
       onRender: function (item) {
+        item.addClass('selector');
         item.css({ 'cursor': 'pointer', 'color': '#28a745' });
+
         item.on('hover:enter', function () {
           var login = Lampa.Storage.get('utopia_login', '');
           var password = Lampa.Storage.get('utopia_password', '');
