@@ -84,67 +84,51 @@
     }
   };
 
+  // Хелпер для безпечного створення полів введення через type: 'title'
+  function addInputField(paramName, title, defaultDesc, isPassword) {
+    Lampa.SettingsApi.addParam({
+      component: 'utopia_mod',
+      param: {
+        name: paramName,
+        type: 'title'
+      },
+      field: {
+        name: title,
+        description: (function () {
+          var val = Lampa.Storage.get(paramName, '');
+          if (!val) return defaultDesc;
+          return isPassword ? '••••••••' : val;
+        })()
+      },
+      onRender: function (item) {
+        item.css({ 'cursor': 'pointer' });
+        item.on('hover:enter', function () {
+          Lampa.Input.edit({
+            title: title,
+            value: Lampa.Storage.get(paramName, ''),
+            free: true
+          }, function (new_val) {
+            Lampa.Storage.set(paramName, new_val);
+            Lampa.Settings.update();
+          });
+        });
+      }
+    });
+  }
+
   // Реєстрація розділу та полів налаштувань
   function initSettings() {
     if (!window.Lampa || !Lampa.SettingsApi) return;
 
-    // Сворення розділу Utopia
     Lampa.SettingsApi.addComponent({
       component: 'utopia_mod',
       name: 'Utopia',
       icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-2-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>'
     });
 
-    // Поле Логін
-    Lampa.SettingsApi.addParam({
-      component: 'utopia_mod',
-      param: {
-        name: 'utopia_login',
-        type: 'input',
-        default: ''
-      },
-      field: {
-        name: 'Логін',
-        description: 'Ваш логін на utp.to'
-      },
-      onChange: function (val) {
-        Lampa.Storage.set('utopia_login', val);
-      }
-    });
-
-    // Поле Пароль
-    Lampa.SettingsApi.addParam({
-      component: 'utopia_mod',
-      param: {
-        name: 'utopia_password',
-        type: 'input',
-        default: ''
-      },
-      field: {
-        name: 'Пароль',
-        description: 'Ваш пароль на utp.to'
-      },
-      onChange: function (val) {
-        Lampa.Storage.set('utopia_password', val);
-      }
-    });
-
-    // Поле CORS Proxy
-    Lampa.SettingsApi.addParam({
-      component: 'utopia_mod',
-      param: {
-        name: 'utopia_proxy',
-        type: 'input',
-        default: ''
-      },
-      field: {
-        name: 'CORS Proxy URL',
-        description: 'Приклад: https://cors.nb557.workers.dev/'
-      },
-      onChange: function (val) {
-        Lampa.Storage.set('utopia_proxy', val);
-      }
-    });
+    addInputField('utopia_login', 'Логін', 'Натисніть для введення логіна', false);
+    addInputField('utopia_password', 'Пароль', 'Натисніть для введення пароля', true);
+    addInputField('utopia_proxy', 'CORS Proxy URL', 'Приклад: https://cors.nb557.workers.dev/', false);
 
     // Кнопка перевірки авторизації
     Lampa.SettingsApi.addParam({
@@ -163,6 +147,10 @@
           var login = Lampa.Storage.get('utopia_login', '');
           var password = Lampa.Storage.get('utopia_password', '');
           var proxy = Lampa.Storage.get('utopia_proxy', '');
+
+          if (!login || !password) {
+            return Lampa.Noty.show('Спочатку вкажіть логін та пароль');
+          }
 
           Lampa.Noty.show('Виконується авторизація...');
 
