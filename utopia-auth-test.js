@@ -10,49 +10,47 @@
         return;
     }
 
-    // Тимчасово тільки для тесту.
-    // Після перевірки винесемо їх у налаштування Lampa.
+    // ТІЛЬКИ ДЛЯ ТЕСТУ
     var USERNAME = 'yakutza';
     var PASSWORD = '5159001276yakut';
 
     var network = new Lampa.Reguest();
+
     var loginUrl = 'https://utp.to/login';
+
+    // ------------------------------------------------------------
+    // GET /login
+    // ------------------------------------------------------------
+
+    console.log('UTOPIA: GET', loginUrl);
 
     network.clear();
     network.timeout(10000);
 
-    console.log('UTOPIA: GET', loginUrl);
-
-    // ------------------------------------------------------------
-    // 1. GET /login
-    // ------------------------------------------------------------
-
     network["native"](
         loginUrl,
+
         function (response) {
 
+            console.log('================================');
             console.log('UTOPIA: GET SUCCESS');
-            console.log('RAW GET RESPONSE:', response);
+            console.log('================================');
 
             var json = response;
 
             if (typeof response === 'string') {
-                try {
-                    json = Lampa.Arrays.decodeJson(response, {});
-                } catch (e) {
-                    console.error('UTOPIA: GET response не JSON');
-                    console.error(response);
-                    Lampa.Noty.show('UTOPIA: помилка GET response');
-                    return;
-                }
+                json = Lampa.Arrays.decodeJson(response, {});
             }
 
-            var html = json && json.body ? json.body : '';
+            var html = json && json.body || '';
 
-            console.log('UTOPIA: BODY LENGTH:', html.length);
+            console.log(
+                'UTOPIA: BODY LENGTH:',
+                html.length
+            );
 
             // ----------------------------------------------------
-            // CSRF
+            // CSRF TOKEN
             // ----------------------------------------------------
 
             var tokenMatch = html.match(
@@ -66,18 +64,26 @@
             }
 
             if (!tokenMatch) {
-                console.error('UTOPIA: CSRF TOKEN NOT FOUND');
-                Lampa.Noty.show('UTOPIA: CSRF не знайдений');
+                console.error(
+                    'UTOPIA: CSRF TOKEN NOT FOUND'
+                );
+
+                Lampa.Noty.show(
+                    'UTOPIA: CSRF не знайдений'
+                );
+
                 return;
             }
 
             var csrfToken = tokenMatch[1];
 
-            console.log('UTOPIA: CSRF FOUND');
-            console.log('TOKEN:', csrfToken);
+            console.log(
+                'UTOPIA: CSRF FOUND:',
+                csrfToken
+            );
 
             // ----------------------------------------------------
-            // Cookies після GET
+            // GET cookies
             // ----------------------------------------------------
 
             var getCookieHeaders =
@@ -85,41 +91,69 @@
                 json.headers &&
                 json.headers['set-cookie'];
 
-            var getCookies = [];
+            var cookies = [];
 
-            if (getCookieHeaders && getCookieHeaders.forEach) {
+            if (
+                getCookieHeaders &&
+                getCookieHeaders.forEach
+            ) {
 
-                getCookieHeaders.forEach(function (item) {
+                getCookieHeaders.forEach(function (param) {
 
                     console.log(
                         'UTOPIA GET SET-COOKIE:',
-                        item
+                        param
                     );
 
-                    var firstPart = item.split(';')[0];
+                    var parts =
+                        param.split(';')[0].split('=');
 
-                    if (firstPart) {
-                        getCookies.push(firstPart);
+                    if (parts[0]) {
+                        cookies.push(
+                            parts[0] +
+                            '=' +
+                            (parts[1] || '')
+                        );
                     }
                 });
             }
 
-            var cookieString = getCookies.join('; ');
+            var cookie = cookies.join('; ');
 
             console.log(
-                'UTOPIA GET COOKIES:',
-                cookieString || '(немає)'
+                'UTOPIA GET COOKIE:',
+                cookie || '(немає)'
             );
 
             // ----------------------------------------------------
-            // 2. POST /login
+            // POST DATA
             // ----------------------------------------------------
 
             var postdata =
-                '_token=' + encodeURIComponent(csrfToken) +
-                '&username=' + encodeURIComponent(USERNAME) +
-                '&password=' + encodeURIComponent(PASSWORD) +
+                '_token=' +
+                encodeURIComponent(csrfToken);
+
+            postdata +=
+                '&username=' +
+                encodeURIComponent(USERNAME);
+
+            postdata +=
+                '&password=' +
+                encodeURIComponent(PASSWORD);
+
+            postdata +=
                 '&remember=1';
+
+            console.log('================================');
+            console.log('UTOPIA: POST /login');
+            console.log('USERNAME:', USERNAME);
+            console.log('PASSWORD: [hidden]');
+            console.log('POST DATA:', postdata);
+            console.log('================================');
+
+            // ----------------------------------------------------
+            // HEADERS
+            // ----------------------------------------------------
 
             var headers = {
                 'Content-Type':
@@ -128,17 +162,13 @@
                     'XMLHttpRequest'
             };
 
-            if (cookieString) {
-                headers['Cookie'] = cookieString;
+            if (cookie) {
+                headers['Cookie'] = cookie;
             }
 
-            console.log('================================');
-            console.log('UTOPIA: POST /login');
-            console.log('USERNAME:', USERNAME);
-            console.log('PASSWORD: [hidden]');
-            console.log('POST DATA:', postdata);
-            console.log('COOKIE:', cookieString || '(немає)');
-            console.log('================================');
+            // ----------------------------------------------------
+            // POST /login
+            // ----------------------------------------------------
 
             network.clear();
             network.timeout(10000);
@@ -149,131 +179,184 @@
                 function (response) {
 
                     console.log('================================');
-                    console.log('UTOPIA: LOGIN SUCCESS CALLBACK');
-                    console.log('LOGIN RESPONSE:', response);
+                    console.log('UTOPIA: POST SUCCESS CALLBACK');
                     console.log('================================');
 
-                    var loginJson = response;
+                    console.log(
+                        'RAW RESPONSE:',
+                        response
+                    );
+
+                    var json = response;
 
                     if (typeof response === 'string') {
+
                         try {
-                            loginJson =
+                            json =
                                 Lampa.Arrays.decodeJson(
                                     response,
                                     {}
                                 );
                         } catch (e) {
-                            console.log(
-                                'UTOPIA: LOGIN response не JSON'
+
+                            console.error(
+                                'UTOPIA: response не JSON'
                             );
+
+                            console.error(response);
                         }
                     }
 
-                    // ------------------------------------------------
-                    // Статус
-                    // ------------------------------------------------
+                    console.log(
+                        'POST JSON:',
+                        json
+                    );
 
                     console.log(
-                        'UTOPIA LOGIN STATUS:',
-                        loginJson && loginJson.status
+                        'POST STATUS:',
+                        json && json.status
+                    );
+
+                    console.log(
+                        'POST BODY:',
+                        json && json.body
+                    );
+
+                    console.log(
+                        'POST HEADERS:',
+                        json && json.headers
                     );
 
                     // ------------------------------------------------
-                    // Response headers
-                    // ------------------------------------------------
-
-                    var loginHeaders =
-                        loginJson &&
-                        loginJson.headers
-                            ? loginJson.headers
-                            : {};
-
-                    console.log(
-                        'UTOPIA LOGIN HEADERS:',
-                        loginHeaders
-                    );
-
-                    // ------------------------------------------------
-                    // Set-Cookie
+                    // Cookies
                     // ------------------------------------------------
 
                     var cookieHeaders =
-                        loginHeaders['set-cookie'];
+                        json &&
+                        json.headers &&
+                        json.headers['set-cookie'];
 
                     console.log(
-                        'UTOPIA LOGIN SET-COOKIE:',
+                        'UTOPIA POST SET-COOKIE:',
                         cookieHeaders
                     );
 
-                    var authCookies = [];
+                    var values = {};
 
                     if (
                         cookieHeaders &&
                         cookieHeaders.forEach
                     ) {
 
-                        cookieHeaders.forEach(function (item) {
+                        cookieHeaders.forEach(
+                            function (param) {
 
-                            console.log(
-                                'UTOPIA LOGIN COOKIE:',
-                                item
-                            );
+                                console.log(
+                                    'UTOPIA COOKIE HEADER:',
+                                    param
+                                );
 
-                            var firstPart =
-                                item.split(';')[0];
+                                var parts =
+                                    param
+                                        .split(';')[0]
+                                        .split('=');
 
-                            if (firstPart) {
-                                authCookies.push(firstPart);
+                                if (parts[0]) {
+
+                                    if (
+                                        parts[1] ===
+                                        'deleted'
+                                    ) {
+                                        delete values[
+                                            parts[0]
+                                        ];
+                                    } else {
+                                        values[
+                                            parts[0]
+                                        ] =
+                                            parts[1] || '';
+                                    }
+                                }
                             }
-                        });
+                        );
                     }
 
-                    var finalCookies =
-                        authCookies.join('; ');
+                    var finalCookies = [];
+
+                    for (var name in values) {
+
+                        finalCookies.push(
+                            name +
+                            '=' +
+                            values[name]
+                        );
+                    }
+
+                    var authCookie =
+                        finalCookies.join('; ');
 
                     console.log('================================');
                     console.log(
-                        'UTOPIA FINAL COOKIES:',
-                        finalCookies || '(немає)'
+                        'UTOPIA AUTH COOKIE:',
+                        authCookie || '(немає)'
                     );
                     console.log('================================');
 
-                    if (finalCookies) {
+                    if (authCookie) {
 
                         Lampa.Storage.set(
                             'utopia_test_cookies',
-                            finalCookies
+                            authCookie
                         );
 
                         Lampa.Noty.show(
-                            'UTOPIA: LOGIN OK, cookies отримані'
+                            'UTOPIA: COOKIE ОТРИМАНО'
                         );
 
                     } else {
 
                         Lampa.Noty.show(
-                            'UTOPIA: LOGIN відповів, але cookies немає'
+                            'UTOPIA: POST відповів, але Cookie немає'
                         );
                     }
                 },
 
-                function (error, code) {
+                function (a, c) {
 
-    console.error('================================');
-    console.error('UTOPIA LOGIN ERROR');
-    console.error('ERROR TYPE:', typeof error);
-    console.error('ERROR:', error);
-    console.error('ERROR JSON:', JSON.stringify(error));
-    console.error('CODE TYPE:', typeof code);
-    console.error('CODE:', code);
-    console.error('NETWORK ERROR:', network.errorDecode(error, code));
-    console.error('================================');
+                    console.error('================================');
+                    console.error(
+                        'UTOPIA: POST NATIVE ERROR'
+                    );
+                    console.error(
+                        'ARGUMENT A:',
+                        a
+                    );
+                    console.error(
+                        'ARGUMENT C:',
+                        c
+                    );
+                    console.error(
+                        'A TYPE:',
+                        typeof a
+                    );
+                    console.error(
+                        'C TYPE:',
+                        typeof c
+                    );
+                    console.error('================================');
 
-    Lampa.Noty.show(
-        'UTOPIA POST ERROR: ' +
-        network.errorDecode(error, code)
-    );
-},
+                    /*
+                     * Тут спеціально НЕ використовуємо
+                     * network.errorDecode().
+                     *
+                     * Нам потрібні сирі аргументи native(),
+                     * щоб побачити справжню відповідь.
+                     */
+
+                    Lampa.Noty.show(
+                        'UTOPIA: POST native error'
+                    );
+                },
 
                 postdata,
 
@@ -285,37 +368,20 @@
             );
         },
 
-        function (error, code) {
+        function (a, c) {
 
-    console.error('================================');
-    console.error('UTOPIA POST ERROR');
-    console.error('ERROR:', error);
-    console.error('ERROR TYPE:', typeof error);
-    console.error('CODE:', code);
-    console.error('CODE TYPE:', typeof code);
+            console.error('================================');
+            console.error(
+                'UTOPIA: GET NATIVE ERROR'
+            );
+            console.error('A:', a);
+            console.error('C:', c);
+            console.error('================================');
 
-    try {
-        console.error(
-            'ERROR JSON:',
-            JSON.stringify(error)
-        );
-    } catch (e) {
-        console.error(
-            'ERROR JSON: stringify failed'
-        );
-    }
-
-    console.error(
-        'NETWORK OBJECT:',
-        network
-    );
-
-    console.error('================================');
-
-    Lampa.Noty.show(
-        'UTOPIA POST ERROR: ' + String(error)
-    );
-},
+            Lampa.Noty.show(
+                'UTOPIA: GET native error'
+            );
+        },
 
         false,
 
@@ -325,4 +391,5 @@
             returnHeaders: true
         }
     );
+
 })();
