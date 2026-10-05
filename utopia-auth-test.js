@@ -259,16 +259,21 @@
 
                 function (error, code) {
 
-                    console.error('================================');
-                    console.error('UTOPIA LOGIN ERROR');
-                    console.error('ERROR:', error);
-                    console.error('CODE:', code);
-                    console.error('================================');
+    console.error('================================');
+    console.error('UTOPIA LOGIN ERROR');
+    console.error('ERROR TYPE:', typeof error);
+    console.error('ERROR:', error);
+    console.error('ERROR JSON:', JSON.stringify(error));
+    console.error('CODE TYPE:', typeof code);
+    console.error('CODE:', code);
+    console.error('NETWORK ERROR:', network.errorDecode(error, code));
+    console.error('================================');
 
-                    Lampa.Noty.show(
-                        'UTOPIA: помилка POST /login'
-                    );
-                },
+    Lampa.Noty.show(
+        'UTOPIA POST ERROR: ' +
+        network.errorDecode(error, code)
+    );
+},
 
                 postdata,
 
