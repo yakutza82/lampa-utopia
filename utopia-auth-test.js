@@ -287,16 +287,35 @@
 
         function (error, code) {
 
-            console.error('================================');
-            console.error('UTOPIA GET ERROR');
-            console.error('ERROR:', error);
-            console.error('CODE:', code);
-            console.error('================================');
+    console.error('================================');
+    console.error('UTOPIA POST ERROR');
+    console.error('ERROR:', error);
+    console.error('ERROR TYPE:', typeof error);
+    console.error('CODE:', code);
+    console.error('CODE TYPE:', typeof code);
 
-            Lampa.Noty.show(
-                'UTOPIA: помилка GET /login'
-            );
-        },
+    try {
+        console.error(
+            'ERROR JSON:',
+            JSON.stringify(error)
+        );
+    } catch (e) {
+        console.error(
+            'ERROR JSON: stringify failed'
+        );
+    }
+
+    console.error(
+        'NETWORK OBJECT:',
+        network
+    );
+
+    console.error('================================');
+
+    Lampa.Noty.show(
+        'UTOPIA POST ERROR: ' + String(error)
+    );
+},
 
         false,
 
