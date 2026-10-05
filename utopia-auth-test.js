@@ -323,15 +323,20 @@
 
                 function (a, c) {
 
-    var msg =
-        'A=' + String(a) +
-        ' | C=' + String(c);
+    var details = '';
 
-    console.log('UTOPIA POST NATIVE ERROR');
-    console.log('A:', a);
-    console.log('C:', c);
+    try {
+        details = JSON.stringify(a);
+    } catch (e) {
+        details = String(a);
+    }
 
-    Lampa.Noty.show(msg);
+    console.log('UTOPIA POST NATIVE ERROR OBJECT:', a);
+    console.log('UTOPIA POST NATIVE ERROR JSON:', details);
+
+    Lampa.Noty.show(
+        'UTOPIA ERROR: ' + details
+    );
 
 },
 
