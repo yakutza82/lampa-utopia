@@ -1,12 +1,8 @@
 (function () {
     'use strict';
 
-    console.log('================================');
-    console.log('UTOPIA SESSION TEST START');
-    console.log('================================');
-
     if (!window.Lampa || !Lampa.Reguest) {
-        console.error('UTOPIA: Lampa.Reguest не знайдений');
+        Lampa.Noty.show('UTOPIA: Reguest не знайдений');
         return;
     }
 
@@ -15,43 +11,21 @@
         ''
     );
 
-    console.log(
-        'UTOPIA STORED COOKIE:',
-        cookie || '(немає)'
-    );
-
     if (!cookie) {
         Lampa.Noty.show(
-            'UTOPIA: cookies не знайдені. Спочатку виконай LOGIN TEST'
+            'UTOPIA: cookies немає. Спочатку LOGIN TEST'
         );
         return;
     }
 
     var network = new Lampa.Reguest();
-    var url = 'https://utp.to/';
-
-    var headers = {
-        'Cookie': cookie
-    };
-
-    console.log('UTOPIA: AUTH GET', url);
 
     network.clear();
     network.timeout(10000);
 
     network["native"](
-        url,
-
+        'https://utp.to/',
         function (response) {
-
-            console.log('================================');
-            console.log('UTOPIA: AUTH GET SUCCESS');
-            console.log('================================');
-
-            console.log(
-                'RAW RESPONSE:',
-                response
-            );
 
             var json = response;
 
@@ -62,99 +36,67 @@
                         {}
                     );
                 } catch (e) {
-                    console.log(
-                        'UTOPIA: response не JSON'
-                    );
+                    json = {};
                 }
             }
 
-            var body =
-                json &&
-                json.body
-                    ? json.body
-                    : '';
+            var body = json && json.body
+                ? String(json.body)
+                : '';
 
-            console.log(
-                'UTOPIA AUTH BODY LENGTH:',
-                body.length
-            );
+            var status = json && json.status
+                ? json.status
+                : 'unknown';
 
-            var preview = body.substring(0, 1500);
+            var result =
+                'UTOPIA SESSION TEST\n\n' +
+                'STATUS: ' + status + '\n' +
+                'BODY: ' + body.length + ' символів\n\n' +
 
-console.log(
-    'UTOPIA AUTH BODY BEGIN:',
-    preview
-);
+                'yakutza: ' +
+                (body.toLowerCase().indexOf('yakutza') !== -1
+                    ? 'YES'
+                    : 'NO') + '\n' +
 
-Lampa.Noty.show(
-    'UTOPIA RESPONSE:\n' + preview
-);
+                'login: ' +
+                (body.toLowerCase().indexOf('login') !== -1
+                    ? 'YES'
+                    : 'NO') + '\n' +
 
-            console.log(
-                'UTOPIA AUTH HEADERS:',
-                json && json.headers
-            );
+                'logout: ' +
+                (body.toLowerCase().indexOf('logout') !== -1
+                    ? 'YES'
+                    : 'NO') + '\n' +
 
-            /*
-             * Простий пошук ознак авторизованого акаунта.
-             */
+                'profile: ' +
+                (body.toLowerCase().indexOf('profile') !== -1
+                    ? 'YES'
+                    : 'NO') + '\n' +
 
-            var authenticated =
-                body.indexOf('Logout') !== -1 ||
-                body.indexOf('Выйти') !== -1 ||
-                body.indexOf('Вийти') !== -1 ||
-                body.indexOf('logout') !== -1;
+                'dashboard: ' +
+                (body.toLowerCase().indexOf('dashboard') !== -1
+                    ? 'YES'
+                    : 'NO');
 
-            console.log(
-                'UTOPIA AUTHENTICATED:',
-                authenticated
-            );
+            console.log(result);
 
-            if (authenticated) {
-
-                Lampa.Noty.show(
-                    'UTOPIA: СЕСІЯ АВТОРИЗОВАНА'
-                );
-
-            } else {
-
-                Lampa.Noty.show(
-                    'UTOPIA: відповідь отримана, але ознаку авторизації не знайдено'
-                );
-            }
+            Lampa.Noty.show(result);
 
         },
 
         function (a, c) {
 
-            var details = '';
+            var error = '';
 
             try {
-                details = JSON.stringify(a);
+                error = JSON.stringify(a);
             } catch (e) {
-                details = String(a);
+                error = String(a);
             }
 
-            console.error(
-                '================================'
-            );
-
-            console.error(
-                'UTOPIA AUTH GET ERROR:',
-                details
-            );
-
-            console.error(
-                'CODE:',
-                c
-            );
-
-            console.error(
-                '================================'
-            );
-
             Lampa.Noty.show(
-                'UTOPIA AUTH ERROR: ' + details
+                'UTOPIA SESSION ERROR\n\n' +
+                error
             );
         },
 
@@ -162,7 +104,9 @@ Lampa.Noty.show(
 
         {
             dataType: 'text',
-            headers: headers,
+            headers: {
+                'Cookie': cookie
+            },
             returnHeaders: true
         }
     );
