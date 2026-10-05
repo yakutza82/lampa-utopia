@@ -323,40 +323,17 @@
 
                 function (a, c) {
 
-                    console.error('================================');
-                    console.error(
-                        'UTOPIA: POST NATIVE ERROR'
-                    );
-                    console.error(
-                        'ARGUMENT A:',
-                        a
-                    );
-                    console.error(
-                        'ARGUMENT C:',
-                        c
-                    );
-                    console.error(
-                        'A TYPE:',
-                        typeof a
-                    );
-                    console.error(
-                        'C TYPE:',
-                        typeof c
-                    );
-                    console.error('================================');
+    var msg =
+        'A=' + String(a) +
+        ' | C=' + String(c);
 
-                    /*
-                     * Тут спеціально НЕ використовуємо
-                     * network.errorDecode().
-                     *
-                     * Нам потрібні сирі аргументи native(),
-                     * щоб побачити справжню відповідь.
-                     */
+    console.log('UTOPIA POST NATIVE ERROR');
+    console.log('A:', a);
+    console.log('C:', c);
 
-                    Lampa.Noty.show(
-                        'UTOPIA: POST native error'
-                    );
-                },
+    Lampa.Noty.show(msg);
+
+},
 
                 postdata,
 
