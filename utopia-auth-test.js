@@ -105,22 +105,29 @@
                 encodeURIComponent(PASSWORD);
 
             var headers = {
-                'Content-Type':
-                    'application/x-www-form-urlencoded'
-            };
+    'Content-Type':
+        'application/x-www-form-urlencoded',
+    'Accept':
+        'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'
+};
 
-            var getCookie = [];
+var getCookie = [];
 
-            for (var name in cookies) {
-                getCookie.push(
-                    name + '=' + cookies[name]
-                );
-            }
+for (var name in cookies) {
+    getCookie.push(
+        name + '=' + cookies[name]
+    );
+}
 
-            if (getCookie.length) {
-                headers['Cookie'] =
-                    getCookie.join('; ');
-            }
+if (getCookie.length) {
+    headers['Cookie'] =
+        getCookie.join('; ');
+}
+
+if (cookies['XSRF-TOKEN']) {
+    headers['X-XSRF-TOKEN'] =
+        decodeURIComponent(cookies['XSRF-TOKEN']);
+}
 
             network.clear();
             network.timeout(10000);
