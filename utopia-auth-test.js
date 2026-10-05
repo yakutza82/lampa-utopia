@@ -3,7 +3,8 @@
 
     var network = new Lampa.Reguest();
 
-    var url = 'https://utp.to/login';
+    var proxy = 'https://cors.nb557.workers.dev/';
+    var url = proxy + encodeURIComponent('https://utp.to/login');
 
     Lampa.Noty.show('GET https://utp.to/login...');
 
