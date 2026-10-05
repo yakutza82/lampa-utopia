@@ -84,50 +84,14 @@
     }
   };
 
-  // Хелпер для створення активних полів із викликом клавіатури
-  function addInputField(paramName, title, defaultDesc, isPassword) {
-    Lampa.SettingsApi.addParam({
-      component: 'utopia_mod',
-      param: {
-        name: paramName,
-        type: 'title'
-      },
-      field: {
-        name: title,
-        description: (function () {
-          var val = Lampa.Storage.get(paramName, '');
-          if (!val) return defaultDesc;
-          return isPassword ? '••••••••' : val;
-        })()
-      },
-      onRender: function (item) {
-        // Додаємо клас 'selector', щоб елемент став активним для пульта/миші
-        item.addClass('selector');
-        item.css({ 'cursor': 'pointer' });
-
-        item.on('hover:enter', function () {
-          Lampa.Input.edit({
-            title: title,
-            value: Lampa.Storage.get(paramName, ''),
-            free: true
-          }, function (new_val) {
-            Lampa.Storage.set(paramName, new_val);
-            
-            // Динамічно оновлюємо текст опису під полем
-            var descText = defaultDesc;
-            if (new_val) {
-              descText = isPassword ? '••••••••' : new_val;
-            }
-            item.find('.settings-param__descr').text(descText);
-          });
-        });
-      }
-    });
-  }
-
-  // Реєстрація розділу та полів
+  // Реєстрація розділу та полів налаштувань
   function initSettings() {
     if (!window.Lampa || !Lampa.SettingsApi) return;
+
+    // Запобігаємо появі undefined у Lampa.Storage
+    if (Lampa.Storage.get('utopia_login') === undefined) Lampa.Storage.set('utopia_login', '');
+    if (Lampa.Storage.get('utopia_password') === undefined) Lampa.Storage.set('utopia_password', '');
+    if (Lampa.Storage.get('utopia_proxy') === undefined) Lampa.Storage.set('utopia_proxy', '');
 
     Lampa.SettingsApi.addComponent({
       component: 'utopia_mod',
@@ -135,20 +99,105 @@
       icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-2-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>'
     });
 
-    addInputField('utopia_login', 'Логін', 'Натисніть для введення логіна', false);
-    addInputField('utopia_password', 'Пароль', 'Натисніть для введення пароля', true);
-    addInputField('utopia_proxy', 'CORS Proxy URL', 'Приклад: https://cors.nb557.workers.dev/', false);
+    // Логін
+    Lampa.SettingsApi.addParam({
+      component: 'utopia_mod',
+      param: {
+        name: 'utopia_login',
+        type: 'title',
+        values: {},
+        default: ''
+      },
+      field: {
+        name: 'Логін',
+        description: Lampa.Storage.get('utopia_login', '') || 'Натисніть для введення логіна'
+      },
+      onRender: function (item) {
+        item.addClass('selector');
+        item.css({ 'cursor': 'pointer' });
+        item.on('hover:enter', function () {
+          Lampa.Input.edit({
+            title: 'Логін',
+            value: Lampa.Storage.get('utopia_login', ''),
+            free: true
+          }, function (new_val) {
+            Lampa.Storage.set('utopia_login', new_val);
+            item.find('.settings-param__descr').text(new_val || 'Натисніть для введення логіна');
+          });
+        });
+      }
+    });
+
+    // Пароль
+    Lampa.SettingsApi.addParam({
+      component: 'utopia_mod',
+      param: {
+        name: 'utopia_password',
+        type: 'title',
+        values: {},
+        default: ''
+      },
+      field: {
+        name: 'Пароль',
+        description: Lampa.Storage.get('utopia_password', '') ? '••••••••' : 'Натисніть для введення пароля'
+      },
+      onRender: function (item) {
+        item.addClass('selector');
+        item.css({ 'cursor': 'pointer' });
+        item.on('hover:enter', function () {
+          Lampa.Input.edit({
+            title: 'Пароль',
+            value: Lampa.Storage.get('utopia_password', ''),
+            free: true
+          }, function (new_val) {
+            Lampa.Storage.set('utopia_password', new_val);
+            item.find('.settings-param__descr').text(new_val ? '••••••••' : 'Натисніть для введення пароля');
+          });
+        });
+      }
+    });
+
+    // CORS Proxy URL
+    Lampa.SettingsApi.addParam({
+      component: 'utopia_mod',
+      param: {
+        name: 'utopia_proxy',
+        type: 'title',
+        values: {},
+        default: ''
+      },
+      field: {
+        name: 'CORS Proxy URL',
+        description: Lampa.Storage.get('utopia_proxy', '') || 'Приклад: https://cors.nb557.workers.dev/'
+      },
+      onRender: function (item) {
+        item.addClass('selector');
+        item.css({ 'cursor': 'pointer' });
+        item.on('hover:enter', function () {
+          Lampa.Input.edit({
+            title: 'CORS Proxy URL',
+            value: Lampa.Storage.get('utopia_proxy', ''),
+            free: true
+          }, function (new_val) {
+            Lampa.Storage.set('utopia_proxy', new_val);
+            item.find('.settings-param__descr').text(new_val || 'Приклад: https://cors.nb557.workers.dev/');
+          });
+        });
+      }
+    });
 
     // Кнопка перевірки авторизації
     Lampa.SettingsApi.addParam({
       component: 'utopia_mod',
       param: {
         name: 'utopia_test_connection',
-        type: 'title'
+        type: 'title',
+        values: {},
+        default: ''
       },
       field: {
         name: 'Перевірити авторизацію',
-        description: 'Натисніть для тестового входу на utp.to'
+        description: 'Натисніть Enter для тестового входу на utp.to'
       },
       onRender: function (item) {
         item.addClass('selector');
