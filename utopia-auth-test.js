@@ -79,10 +79,16 @@
                 body.length
             );
 
-            console.log(
-                'UTOPIA AUTH BODY BEGIN:',
-                body.substring(0, 2000)
-            );
+            var preview = body.substring(0, 1500);
+
+console.log(
+    'UTOPIA AUTH BODY BEGIN:',
+    preview
+);
+
+Lampa.Noty.show(
+    'UTOPIA RESPONSE:\n' + preview
+);
 
             console.log(
                 'UTOPIA AUTH HEADERS:',
