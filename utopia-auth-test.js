@@ -1211,6 +1211,8 @@ finish({ ok: false, candidates: [], report: report.join('\n') });
 return;
 
 // siteNative(keysUrl, null, headers({ 'Referer': SITE_ORIGIN + '/' }), function (err3, res3) {
+  
+                siteNative(keysUrl, null, headers({ 'Referer': SITE_ORIGIN + '/' }), function (err3, res3) {
                     if (err3) {
                         fail('3) GET apikeys: ' + siteDescribeError(err3));
                         return;
