@@ -480,10 +480,3 @@
         });
     }
 })();
-
-    if (window.Lampa) {
-        Lampa.Listener.follow('app', function (e) {
-            if (e.type === 'ready') startPlugin();
-        });
-    }
-})();
