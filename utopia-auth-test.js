@@ -137,6 +137,56 @@ if (cookies['XSRF-TOKEN']) {
 
                 function (response) {
 
+                  console.log('UTOPIA POST RAW RESPONSE:', response);
+
+var debugJson = response;
+
+if (typeof response === 'string') {
+    try {
+        debugJson = Lampa.Arrays.decodeJson(response, {});
+    } catch (e) {
+        debugJson = {};
+    }
+}
+
+var debugStatus =
+    debugJson && debugJson.status
+        ? debugJson.status
+        : 'unknown';
+
+var debugHeaders =
+    debugJson && debugJson.headers
+        ? debugJson.headers
+        : {};
+
+var safeHeaders = {};
+
+for (var h in debugHeaders) {
+    if (
+        h.toLowerCase() !== 'set-cookie' &&
+        h.toLowerCase() !== 'cookie'
+    ) {
+        safeHeaders[h] = debugHeaders[h];
+    }
+}
+
+console.log(
+    'UTOPIA POST STATUS:',
+    debugStatus
+);
+
+console.log(
+    'UTOPIA POST SAFE HEADERS:',
+    safeHeaders
+);
+
+Lampa.Noty.show(
+    'UTOPIA POST STATUS: ' +
+    debugStatus +
+    '\nHeaders: ' +
+    JSON.stringify(safeHeaders)
+);
+
                     var loginJson = response;
 
                     if (typeof response === 'string') {
@@ -239,21 +289,19 @@ if (cookies['XSRF-TOKEN']) {
 
                 function (error) {
 
-                    var details = '';
+    var details = '';
 
-                    try {
-                        details =
-                            JSON.stringify(error);
-                    } catch (e) {
-                        details =
-                            String(error);
-                    }
+    try {
+        details = JSON.stringify(error);
+    } catch (e) {
+        details = String(error);
+    }
 
-                    Lampa.Noty.show(
-                        'UTOPIA POST ERROR: ' +
-                        details
-                    );
-                },
+    Lampa.Noty.show(
+        'UTOPIA POST ERROR:\n' + details
+    );
+
+}
 
                 postdata,
 
