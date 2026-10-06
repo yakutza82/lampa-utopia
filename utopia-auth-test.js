@@ -1142,6 +1142,16 @@
             }
 
             form.hidden.forEach(function (h) { if (h.value) exclude[h.value] = true; });
+            var formMatch = html.match(/<form[\s\S]*?<\/form>/i);
+
+if (formMatch) {
+    note(
+        'LOGIN FORM:\n' +
+        formMatch[0].slice(0, 3000)
+    );
+} else {
+    note('LOGIN FORM: НЕ ЗНАЙДЕНО');
+}
             note('   поля форми: ' + form.hidden.map(function (h) { return h.name; }).join(', ') + ', ' + form.user + ', ' + form.pass);
 
             // 2. Вхід
@@ -1211,7 +1221,7 @@ finish({ ok: false, candidates: [], report: report.join('\n') });
 return;
 
 // siteNative(keysUrl, null, headers({ 'Referer': SITE_ORIGIN + '/' }), function (err3, res3) {
-  
+
                 siteNative(keysUrl, null, headers({ 'Referer': SITE_ORIGIN + '/' }), function (err3, res3) {
                     if (err3) {
                         fail('3) GET apikeys: ' + siteDescribeError(err3));
