@@ -450,19 +450,28 @@
     }
 
     // ----- РЕЄСТРАЦІЯ В МЕНЮ НАЛАШТУВАНЬ LAMPA -----
-    // ----- РЕЄСТРАЦІЯ В МЕНЮ НАЛАШТУВАНЬ LAMPA -----
     function startPlugin() {
-        // 1. Створюємо пункт у боковому меню
         Lampa.SettingsApi.addComponent({
             component: 'utopia_login',
             name: 'Utopia Auto-Login',
             icon: '<svg height="36" viewBox="0 0 24 24" width="36"><path fill="currentColor" d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm-1-13h2v6h-2zm0 8h2v2h-2z"/></svg>'
         });
 
-        // 2. Відстежуємо клік по цьому пункту меню і одразу викликаємо вхід
-        Lampa.Settings.listener.follow('open', function (e) {
-            if (e.name === 'utopia_login') {
-                onSiteLogin();
+        Lampa.SettingsApi.addParam({
+            component: 'utopia_login',
+            param: {
+                name: 'utopia_login_action',
+                type: 'click',
+                default: '' // <--- ОБОВ'ЯЗКОВО: без цього Lampa ігнорує параметр
+            },
+            field: {
+                name: 'Авторизація utp.to',
+                description: 'Натисніть для запуску авторизації та отримання API-ключа'
+            },
+            onRender: function (item) {
+                item.on('hover:enter click', function () {
+                    onSiteLogin();
+                });
             }
         });
     }
