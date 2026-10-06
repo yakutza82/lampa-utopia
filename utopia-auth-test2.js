@@ -1,7 +1,47 @@
-// ----- Отримання ключа з сайту: вхід логіном і паролем (ЕКСПЕРИМЕНТ) -----
-    // Працює лише в застосунку Lampa для Android: тільки він віддає заголовки відповіді
-    // (Set-Cookie) і дозволяє передавати Cookie. Запити йдуть прямо на utp.to, БЕЗ сторонніх
-    // проксі. Пароль нікуди не зберігається і не потрапляє у звіт.
+(function () {
+    'use strict';
+
+    // Захист від повторної ініціалізації
+    if (window.plugin_utopia_login_ready) return;
+    window.plugin_utopia_login_ready = true;
+
+    // ----- ДОПОМІЖНІ ФУНКЦІЇ, ЯКИХ НЕ ВИСТАЧАЛО -----
+    function escapeText(text) {
+        return String(text || '')
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;');
+    }
+
+    function backToSettings() {
+        if (Lampa.Settings && Lampa.Settings.open) {
+            Lampa.Settings.open();
+        } else {
+            Lampa.Controller.toggle('settings');
+        }
+    }
+
+    function askApply(key) {
+        Lampa.Select.show({
+            title: 'Зберегти API ключ?',
+            items: [
+                { title: 'Так, зберегти', value: 'yes' },
+                { title: 'Скасувати', value: 'no' }
+            ],
+            onSelect: function (item) {
+                if (item.value === 'yes') {
+                    // Зберігаємо ключ у Storage Lampa
+                    Lampa.Storage.set('utopia_token', key);
+                    Lampa.Noty.show('UTOPIA: Ключ успішно збережено');
+                }
+                backToSettings();
+            },
+            onBack: backToSettings
+        });
+    }
+
+    // ----- ВАШ КІД UTILITY / SITE FETCH (без змін) -----
     var SITE_ORIGIN = 'https://utp.to';
     var SITE_UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/154.0.0.0 Safari/537.36';
 
@@ -23,51 +63,39 @@
         });
     }
 
-    // Відповідь застосунку: або { headers, body }, або (без підтримки заголовків) просто текст
     function siteParse(res) {
         var obj = res;
-
         if (typeof obj === 'string') {
             try {
                 var parsed = JSON.parse(obj);
                 if (parsed && typeof parsed === 'object' && (parsed.body !== undefined || parsed.headers !== undefined)) obj = parsed;
             } catch (e) {}
         }
-
         if (obj && typeof obj === 'object' && (obj.body !== undefined || obj.headers !== undefined)) {
             var body = obj.body;
-
             if (body && typeof body === 'object') {
                 try { body = JSON.stringify(body); } catch (e) { body = ''; }
             }
-
             return { headers: obj.headers || {}, body: String(body || ''), hasHeaders: !!obj.headers };
         }
-
         return { headers: {}, body: typeof res === 'string' ? res : '', hasHeaders: false };
     }
 
     function siteCollectCookies(jar, headers) {
         var list = headers && (headers['set-cookie'] || headers['Set-Cookie']);
         var added = [];
-
         if (!list) return added;
         if (typeof list === 'string') list = list.split('\n');
-
         list.forEach(function (line) {
             var part = String(line).split(';')[0];
             var eq = part.indexOf('=');
             if (eq <= 0) return;
-
             var name = part.slice(0, eq).trim();
             var value = part.slice(eq + 1).trim();
-
             if (!value || value === 'deleted') delete jar[name];
             else jar[name] = value;
-
             if (added.indexOf(name) === -1) added.push(name);
         });
-
         return added;
     }
 
@@ -90,17 +118,14 @@
         return /<input[^>]*type\s*=\s*["']password["']/i.test(html) && /name\s*=\s*["']_token["']/i.test(html);
     }
 
-    // Поля форми входу: ім'я поля логіна й пароля та всі приховані поля (_token та інші)
     function siteLoginFields(html) {
         var fields = { user: '', pass: '', hidden: [] };
         var tags = html.match(/<input\b[^>]*>/gi) || [];
         var firstText = '';
-
         tags.forEach(function (tag) {
             var type = (siteAttr(tag, 'type') || 'text').toLowerCase();
             var name = siteAttr(tag, 'name');
             if (!name) return;
-
             if (type === 'password') {
                 if (!fields.pass) fields.pass = name;
             } else if (type === 'hidden') {
@@ -110,15 +135,12 @@
                 if (!fields.user && /user|login|email/i.test(name)) fields.user = name;
             }
         });
-
         if (!fields.user) fields.user = firstText;
-
         if (!fields.hidden.some(function (h) { return h.name === '_token'; })) {
             var meta = html.match(/<meta[^>]*name\s*=\s*["']csrf-token["'][^>]*>/i);
             var token = meta ? siteAttr(meta[0], 'content') : '';
             if (token) fields.hidden.push({ name: '_token', value: token });
         }
-
         return fields;
     }
 
@@ -126,8 +148,6 @@
         return token.slice(0, 4) + '…' + token.slice(-4) + ' (' + token.length + ' симв.)';
     }
 
-    // Шукає схожі на ключ рядки на сторінці. primary - поля вводу й елементи з кодом,
-    // broad - будь-який довгий рядок у тексті (запасний варіант).
     function siteCandidates(html, exclude) {
         var cleaned = html.replace(/<script[\s\S]*?<\/script>/gi, ' ').replace(/<style[\s\S]*?<\/style>/gi, ' ');
         var primary = [];
@@ -162,15 +182,11 @@
         var parts = [];
         if (err.status !== undefined && err.status !== null) parts.push('код ' + err.status);
         if (err.statusText) parts.push(String(err.statusText));
-
         var text = String(err.responseText || '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 80);
         if (text) parts.push(text);
-
         return parts.join(', ') || 'невідома помилка';
     }
 
-    // Вхід на сайт і пошук ключа. finish({ ok, candidates, report }).
-    // У звіт потрапляють лише назви кукі та замасковані ключі - ні пароля, ні значень кукі.
     function siteFetchKey(username, password, finish) {
         var report = [];
         var jar = { laravel_cookie_consent: '1' };
@@ -190,7 +206,6 @@
                 'Accept-Language': 'uk,ru;q=0.9,en;q=0.8',
                 'Cookie': siteCookieHeader(jar)
             };
-
             for (var k in extra) h[k] = extra[k];
             return h;
         }
@@ -198,13 +213,11 @@
         var loginUrl = SITE_ORIGIN + '/login';
         var keysUrl = SITE_ORIGIN + '/users/' + encodeURIComponent(username) + '/apikeys';
 
-        // 1. Сторінка входу: токен форми і початкові кукі
         siteNative(loginUrl, null, headers({ 'Referer': SITE_ORIGIN + '/' }), function (err, res) {
             if (err) {
                 fail('1) GET /login: ' + siteDescribeError(err));
                 return;
             }
-
             var r = siteParse(res);
             siteCollectCookies(jar, r.headers);
             note('1) GET /login: заголовки ' + (r.hasHeaders ? 'є' : 'НЕМАЄ') + ', кукі: ' + Object.keys(jar).join(', '));
@@ -215,12 +228,10 @@
             }
 
             var form = siteLoginFields(r.body);
-
             if (!form.pass || !form.user) {
                 fail('На сторінці входу не знайдено поля логіна/пароля (поля: ' + (form.user || '-') + ' / ' + (form.pass || '-') + ')');
                 return;
             }
-
             if (!form.hidden.some(function (h) { return h.name === '_token'; })) {
                 fail('На сторінці входу не знайдено захисний токен _token');
                 return;
@@ -229,7 +240,6 @@
             form.hidden.forEach(function (h) { if (h.value) exclude[h.value] = true; });
             note('   поля форми: ' + form.hidden.map(function (h) { return h.name; }).join(', ') + ', ' + form.user + ', ' + form.pass);
 
-            // 2. Вхід
             var pairs = form.hidden.map(function (h) {
                 return encodeURIComponent(h.name) + '=' + encodeURIComponent(h.value);
             });
@@ -258,13 +268,11 @@
                     return;
                 }
 
-                // 3. Сторінка ключів
                 siteNative(keysUrl, null, headers({ 'Referer': SITE_ORIGIN + '/' }), function (err3, res3) {
                     if (err3) {
                         fail('3) GET apikeys: ' + siteDescribeError(err3));
                         return;
                     }
-
                     var r3 = siteParse(res3);
                     siteCollectCookies(jar, r3.headers);
 
@@ -305,7 +313,6 @@
                 '</div>' +
             '</div>'
         );
-
         modal.find('textarea').val(text);
 
         function close() {
@@ -342,12 +349,10 @@
             var name = String(value || '').trim().replace(/^@/, '');
             var found = name.match(/\/users\/([^\/?#\s]+)/i);
             if (found) name = found[1];
-
             if (!name) {
                 backToSettings();
                 return;
             }
-
             Lampa.Storage.set('utopia_username', name);
             done();
         }
@@ -362,7 +367,6 @@
 
     function siteRun(username, password) {
         Lampa.Noty.show('UTOPIA: входжу на utp.to...');
-
         try { Lampa.Loading.start('utopia_site_login', 'UTOPIA: вхід...'); } catch (e) {}
 
         siteFetchKey(username, password, function (result) {
@@ -382,7 +386,6 @@
             var items = result.candidates.slice(0, 8).map(function (c) {
                 return { title: siteMask(c.value), subtitle: c.where, value: c.value, action: 'pick' };
             });
-
             items.push({ title: '📄 Показати звіт', action: 'report' });
 
             Lampa.Select.show({
@@ -392,9 +395,7 @@
                     if (item.action === 'pick') askApply(item.value);
                     else setTimeout(function () { showSiteReport(result.report); }, 200);
                 },
-                onBack: function () {
-                    backToSettings();
-                }
+                onBack: backToSettings
             });
         });
     }
@@ -402,15 +403,10 @@
     function siteAskPassword(name) {
         function got(value) {
             var password = String(value === null || value === undefined ? '' : value);
-
-            // Кнопка "Скасувати" в клавіатурі віддає порожній рядок
             if (!password) {
                 backToSettings();
                 return;
             }
-
-            // "Назад" повертає те, що набрано, тому перед входом питаємо підтвердження:
-            // кожна невдала спроба рахується в ліміті сайту (5 спроб).
             setTimeout(function () {
                 Lampa.Select.show({
                     title: 'Вхід на utp.to',
@@ -422,9 +418,7 @@
                         if (item.action === 'go') siteRun(name, password);
                         else backToSettings();
                     },
-                    onBack: function () {
-                        backToSettings();
-                    }
+                    onBack: backToSettings
                 });
             }, 200);
         }
@@ -439,13 +433,12 @@
 
     function onSiteLogin() {
         if (typeof AndroidJS === 'undefined') {
-            Lampa.Noty.show('UTOPIA: вхід із плагіна працює лише в застосунку Lampa для Android');
+            Lampa.Noty.show('UTOPIA: вхід працює лише в Android-застосунку Lampa');
             backToSettings();
             return;
         }
 
         var name = siteUserName();
-
         if (!name) {
             siteAskUserName(function () {
                 setTimeout(onSiteLogin, 200);
@@ -455,3 +448,35 @@
 
         siteAskPassword(name);
     }
+
+    // ----- РЕЄСТРАЦІЯ В МЕНЮ НАЛАШТУВАНЬ LAMPA -----
+    function startPlugin() {
+        // Додаємо нову секцію або компонент в налаштування
+        Lampa.SettingsApi.addComponent({
+            component: 'utopia_login',
+            name: 'Utopia Auto-Login',
+            icon: '<svg height="36" viewBox="0 0 24 24" width="36"><path fill="currentColor" d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm-1-13h2v6h-2zm0 8h2v2h-2z"/></svg>'
+        });
+
+        Lampa.SettingsApi.addParam({
+            component: 'utopia_login',
+            param: {
+                name: 'utopia_login_button',
+                type: 'title'
+            },
+            field: {
+                name: 'Авторизація utp.to',
+                description: 'Натисніть для запуску авторизації та отримання API-ключа'
+            },
+            onChange: function () {
+                onSiteLogin();
+            }
+        });
+    }
+
+    if (window.Lampa) {
+        Lampa.Listener.follow('app', function (e) {
+            if (e.type === 'ready') startPlugin();
+        });
+    }
+})();
