@@ -451,7 +451,6 @@
 
     // ----- РЕЄСТРАЦІЯ В МЕНЮ НАЛАШТУВАНЬ LAMPA -----
     function startPlugin() {
-        // Додаємо нову секцію або компонент в налаштування
         Lampa.SettingsApi.addComponent({
             component: 'utopia_login',
             name: 'Utopia Auto-Login',
@@ -462,7 +461,7 @@
             component: 'utopia_login',
             param: {
                 name: 'utopia_login_button',
-                type: 'title'
+                type: 'click' // <--- Обов'язково 'click', щоб пункт став активною кнопкою
             },
             field: {
                 name: 'Авторизація utp.to',
