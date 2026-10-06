@@ -1166,10 +1166,51 @@
                 var r2 = siteParse(res2);
                 var added = siteCollectCookies(jar, r2.headers);
                 var location = r2.headers && (r2.headers.location || r2.headers.Location) || '';
-                note('2) POST /login: заголовки ' + (r2.hasHeaders ? 'є' : 'НЕМАЄ') + ', нові кукі: ' + (added.join(', ') || 'немає') + (location ? ', Location: ' + location : ''));
+                var postStatus = res2 && res2.status !== undefined
+    ? res2.status
+    : 'unknown';
+
+var postSetCookie =
+    r2.headers &&
+    (r2.headers['set-cookie'] || r2.headers['Set-Cookie']);
+
+var postSetCookieNames = [];
+
+if (postSetCookie) {
+    var cookieList = typeof postSetCookie === 'string'
+        ? postSetCookie.split('\n')
+        : postSetCookie;
+
+    if (cookieList && cookieList.forEach) {
+        cookieList.forEach(function (line) {
+            var part = String(line).split(';')[0];
+            var eq = part.indexOf('=');
+
+            if (eq > 0) {
+                var name = part.slice(0, eq).trim();
+
+                if (postSetCookieNames.indexOf(name) === -1) {
+                    postSetCookieNames.push(name);
+                }
+            }
+        });
+    }
+}
+
+note(
+    '2) POST /login: status=' + postStatus +
+    ', заголовки=' + (r2.hasHeaders ? 'є' : 'НЕМАЄ') +
+    ', нові кукі=' + (added.join(', ') || 'немає') +
+    ', Set-Cookie=' + (postSetCookieNames.join(', ') || 'немає') +
+    (location ? ', Location=' + location : ', Location=немає')
+);
 
                 // 3. Сторінка ключів
-                siteNative(keysUrl, null, headers({ 'Referer': SITE_ORIGIN + '/' }), function (err3, res3) {
+                note('COOKIE JAR ПІСЛЯ POST: ' + Object.keys(jar).join(', '));
+finish({ ok: false, candidates: [], report: report.join('\n') });
+return;
+
+// siteNative(keysUrl, null, headers({ 'Referer': SITE_ORIGIN + '/' }), function (err3, res3) {
                     if (err3) {
                         fail('3) GET apikeys: ' + siteDescribeError(err3));
                         return;
@@ -2556,7 +2597,7 @@ items.push({
             }
             Lampa.Activity.push({
                 url: '',
-                title: 'utopia-auth-test: ' + title,
+                title: 'UTOPIA' + title,
                 component: 'utopia_torrents',
                 movie: movie,
                 search: title,
