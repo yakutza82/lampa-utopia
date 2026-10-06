@@ -460,9 +460,8 @@
         Lampa.SettingsApi.addParam({
             component: 'utopia_login',
             param: {
-                name: 'utopia_login_action',
-                type: 'click',
-                default: '' // <--- ОБОВ'ЯЗКОВО: без цього Lampa ігнорує параметр
+                name: 'utopia_login_button',
+                type: 'click'
             },
             field: {
                 name: 'Авторизація utp.to',
