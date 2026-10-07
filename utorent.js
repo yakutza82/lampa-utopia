@@ -1168,10 +1168,10 @@
                 var location = r2.headers && (r2.headers.location || r2.headers.Location) || '';
                 note('2) POST /login: заголовки ' + (r2.hasHeaders ? 'є' : 'НЕМАЄ') + ', нові кукі: ' + (added.join(', ') || 'немає') + (location ? ', Location: ' + location : ''));
 
-                if (siteHasLoginForm(r2.body)) {
-                    fail('Вхід не вдався: сайт знову показав форму входу (перевір логін і пароль)');
-                    return;
-                }
+                if (siteHasLoginForm(r2.body) && !added.length) {
+    fail('Вхід не вдався: сайт знову показав форму входу (перевір логін і пароль)');
+    return;
+}
 
                 // 3. Сторінка ключів
                 siteNative(keysUrl, null, headers({ 'Referer': SITE_ORIGIN + '/' }), function (err3, res3) {
