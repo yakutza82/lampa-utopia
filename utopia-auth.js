@@ -510,7 +510,176 @@ Lampa.SettingsApi.addParam({
 });
 
 function getUtopiaCookie() {
-    Lampa.Noty.show('UTOPIA: кнопка працює');
+
+    var USERNAME = Lampa.Storage.get('utopia_auth_username', '');
+    var PASSWORD = Lampa.Storage.get('utopia_auth_password', '');
+
+    if (!USERNAME || !PASSWORD) {
+        Lampa.Noty.show('UTOPIA: введіть логін і пароль');
+        return;
+    }
+
+    Lampa.Noty.show('UTOPIA: отримую CSRF...');
+
+    var network = new Lampa.Reguest();
+
+    network.clear();
+    network.timeout(10000);
+
+    network.native(
+        'https://utp.to/login',
+        function (response) {
+
+            var html = response && response.body
+                ? String(response.body)
+                : String(response || '');
+
+            var match = html.match(
+                /<input[^>]+name=["']_token["'][^>]+value=["']([^"']+)["']/i
+            );
+
+            if (!match) {
+                match = html.match(
+                    /name=["']_token["'][^>]*value=["']([^"']+)["']/i
+                );
+            }
+
+            if (!match) {
+                Lampa.Noty.show('UTOPIA: CSRF токен не знайдено');
+                return;
+            }
+
+            var csrfToken = match[1];
+
+            Lampa.Noty.show('UTOPIA: виконую вхід...');
+
+            var postdata =
+                '_token=' + encodeURIComponent(csrfToken) +
+                '&username=' + encodeURIComponent(USERNAME) +
+                '&password=' + encodeURIComponent(PASSWORD);
+
+            var headers = {
+                'Content-Type': 'application/x-www-form-urlencoded',
+                'Accept': 'text/html,application/xhtml+xml'
+            };
+
+            network.clear();
+            network.timeout(10000);
+
+            network.native(
+                'https://utp.to/login',
+                function (loginResponse) {
+
+                    var responseHeaders =
+                        loginResponse &&
+                        loginResponse.headers
+                            ? loginResponse.headers
+                            : {};
+
+                    var setCookie =
+                        responseHeaders['set-cookie'] ||
+                        responseHeaders['Set-Cookie'] ||
+                        [];
+
+                    if (!Array.isArray(setCookie)) {
+                        setCookie = [setCookie];
+                    }
+
+                    var cookies = {};
+
+                    setCookie.forEach(function (item) {
+
+                        if (!item) return;
+
+                        var first = String(item).split(';')[0];
+                        var pos = first.indexOf('=');
+
+                        if (pos < 1) return;
+
+                        var name = first.substring(0, pos);
+                        var value = first.substring(pos + 1);
+
+                        if (value === 'deleted') {
+                            delete cookies[name];
+                        } else {
+                            cookies[name] = value;
+                        }
+                    });
+
+                    var cookieList = [];
+
+                    for (var name in cookies) {
+                        cookieList.push(
+                            name + '=' + cookies[name]
+                        );
+                    }
+
+                    var cookie = cookieList.join('; ');
+
+                    if (!cookie) {
+                        Lampa.Noty.show(
+                            'UTOPIA: cookie не отримані'
+                        );
+                        return;
+                    }
+
+                    Lampa.Storage.set(
+                        'utopia_auth_cookie',
+                        cookie
+                    );
+
+                    Lampa.Storage.set(
+                        'utopia_auth_xsrf',
+                        cookies['XSRF-TOKEN'] || ''
+                    );
+
+                    Lampa.Noty.show(
+                        'UTOPIA: cookie отримані і збережені'
+                    );
+
+                    console.log(
+                        'UTOPIA AUTH COOKIE:',
+                        cookie
+                    );
+
+                },
+                function (a, c) {
+
+                    Lampa.Noty.show(
+                        'UTOPIA: помилка входу'
+                    );
+
+                    console.log(
+                        'UTOPIA LOGIN ERROR:',
+                        a,
+                        c
+                    );
+                },
+                postdata,
+                {
+                    headers: headers,
+                    returnHeaders: true
+                }
+            );
+        },
+        function (a, c) {
+
+            Lampa.Noty.show(
+                'UTOPIA: помилка GET /login'
+            );
+
+            console.log(
+                'UTOPIA CSRF ERROR:',
+                a,
+                c
+            );
+        },
+        false,
+        {
+            dataType: 'text',
+            returnHeaders: true
+        }
+    );
 }
 
 })();
