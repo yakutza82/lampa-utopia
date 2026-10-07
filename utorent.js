@@ -1181,6 +1181,15 @@
 }
 
                 // 3. Сторінка ключів
+                note(
+    '   Cookie для GET apikeys: ' +
+    siteCookieHeader(jar).split('; ').map(function (part) {
+        var eq = part.indexOf('=');
+        if (eq < 0) return part;
+        return part.slice(0, eq) + '=' + String(part.slice(eq + 1)).length + ' симв.';
+    }).join(', ')
+);
+
                 siteNative(keysUrl, null, headers({ 'Referer': SITE_ORIGIN + '/' }), function (err3, res3) {
                     if (err3) {
                         fail('3) GET apikeys: ' + siteDescribeError(err3));
