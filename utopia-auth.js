@@ -534,22 +534,19 @@ function getUtopiaCookie() {
                 ? String(response.body)
                 : String(response || '');
 
-            var match = html.match(
-                /<input[^>]+name=["']_token["'][^>]+value=["']([^"']+)["']/i
-            );
+            var csrfToken = '';
 
-            if (!match) {
-                match = html.match(
-                    /name=["']_token["'][^>]*value=["']([^"']+)["']/i
-                );
-            }
+try {
+    var tokenBox = $('<div>').html(html);
+    csrfToken = tokenBox.find('input[name="_token"]').attr('value') || '';
+} catch (e) {
+    console.log('UTOPIA CSRF PARSE ERROR:', e);
+}
 
-            if (!match) {
-                Lampa.Noty.show('UTOPIA: CSRF токен не знайдено');
-                return;
-            }
-
-            var csrfToken = match[1];
+if (!csrfToken) {
+    Lampa.Noty.show('UTOPIA: CSRF токен не знайдено');
+    return;
+}
 
             Lampa.Noty.show('UTOPIA: виконую вхід...');
 
