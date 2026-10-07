@@ -927,7 +927,6 @@
     function siteNative(url, postdata, headers, callback) {
         var net = new Lampa.Reguest();
         net.timeout(20000);
-        
         note(
     '   native Cookie: ' +
     (headers && headers.Cookie
@@ -939,9 +938,6 @@
         }).join(', ')
         : 'НЕМАЄ')
 );
-
-net.native(url, function (res) {
-    
         net.native(url, function (res) {
             callback(null, res);
         }, function (xhr) {
