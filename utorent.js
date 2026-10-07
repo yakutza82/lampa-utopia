@@ -1169,6 +1169,13 @@
 
                 var r2 = siteParse(res2);
                 var added = siteCollectCookies(jar, r2.headers);
+
+note(
+    '   set-cookie type після POST: ' +
+    (Array.isArray(r2.headers && r2.headers['set-cookie'])
+        ? 'ARRAY[' + r2.headers['set-cookie'].length + ']'
+        : typeof (r2.headers && r2.headers['set-cookie']))
+);
                 var location = r2.headers && (r2.headers.location || r2.headers.Location) || '';
                 note('2) POST /login: заголовки ' + (r2.hasHeaders ? 'є' : 'НЕМАЄ') + ', нові кукі: ' + (added.join(', ') || 'немає') + (location ? ', Location: ' + location : ''));
 
