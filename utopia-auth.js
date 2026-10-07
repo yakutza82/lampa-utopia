@@ -505,8 +505,8 @@ Lampa.SettingsApi.addParam({
         description: 'Увійти на utp.to та отримати сесійні cookie'
     },
     onChange: function () {
-        getUtopiaCookie();
-    }
+    authorize();
+}
 });
 
 function getUtopiaCookie() {
