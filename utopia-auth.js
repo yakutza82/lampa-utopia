@@ -446,13 +446,35 @@
         }
 
         Lampa.SettingsApi.addComponent({
-            component: 'utopia_auth',
-            name: 'UTOPIA — авторизація',
-            icon: 'account_circle',
-            onClick: showMenu
-        });
+    component: 'utopia_auth',
+    name: 'Утопія - авторизація',
+    icon:
+    '<svg width="1.5em" height="1.5em" viewBox="0 0 64 64" ' +
+    'xmlns="http://www.w3.org/2000/svg" ' +
+    'style="display:block;flex-shrink:0;">' +
+        '<image href="https://raw.githubusercontent.com/yakutza82/lampa-utopia/refs/heads/main/pngegg2wh.png" ' +
+        'x="0" y="0" width="64" height="64" />' +
+    '</svg>'
+});
     }
 
     register();
+
+    Lampa.SettingsApi.addParam({
+    component: 'utopia_auth',
+    param: {
+        name: 'utopia_auth_username',
+        type: 'input',
+        values: '',
+        default: ''
+    },
+    field: {
+        name: 'Логін UTOPIA',
+        description: 'Введіть логін'
+    },
+    onChange: function (value) {
+        Lampa.Storage.set('utopia_auth_username', value || '');
+    }
+});
 
 })();
