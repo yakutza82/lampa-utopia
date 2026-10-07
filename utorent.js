@@ -964,10 +964,7 @@
 
     function siteCollectCookies(jar, headers) {
         var list = headers && (headers['set-cookie'] || headers['Set-Cookie']);
-        note(
-    '   set-cookie type: ' +
-    (Array.isArray(list) ? 'ARRAY[' + list.length + ']' : typeof list)
-);
+        
         var added = [];
 
         if (!list) return added;
