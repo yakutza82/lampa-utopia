@@ -477,4 +477,21 @@
     }
 });
 
+Lampa.SettingsApi.addParam({
+    component: 'utopia_auth',
+    param: {
+        name: 'utopia_auth_password',
+        type: 'input',
+        values: '',
+        default: ''
+    },
+    field: {
+        name: 'Пароль UTOPIA',
+        description: 'Введіть пароль'
+    },
+    onChange: function (value) {
+        Lampa.Storage.set('utopia_auth_password', value || '');
+    }
+});
+
 })();
