@@ -934,7 +934,8 @@
         }, postdata || false, {
             dataType: 'text',
             headers: headers,
-            returnHeaders: true
+            returnHeaders: true,
+            withCredentials: true
         });
     }
 
