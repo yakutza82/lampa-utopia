@@ -494,4 +494,23 @@ Lampa.SettingsApi.addParam({
     }
 });
 
+Lampa.SettingsApi.addParam({
+    component: 'utopia_auth',
+    param: {
+        name: 'utopia_auth_cookie_btn',
+        type: 'button'
+    },
+    field: {
+        name: 'Отримати cookie',
+        description: 'Увійти на utp.to та отримати сесійні cookie'
+    },
+    onChange: function () {
+        getUtopiaCookie();
+    }
+});
+
+function getUtopiaCookie() {
+    Lampa.Noty.show('UTOPIA: кнопка працює');
+}
+
 })();
