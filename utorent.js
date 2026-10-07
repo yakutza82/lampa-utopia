@@ -927,17 +927,7 @@
     function siteNative(url, postdata, headers, callback) {
         var net = new Lampa.Reguest();
         net.timeout(20000);
-        note(
-    '   native Cookie: ' +
-    (headers && headers.Cookie
-        ? headers.Cookie.split('; ').map(function (part) {
-            var eq = part.indexOf('=');
-            return eq >= 0
-                ? part.slice(0, eq) + '=' + String(part.slice(eq + 1)).length + ' симв.'
-                : part;
-        }).join(', ')
-        : 'НЕМАЄ')
-);
+        
         net.native(url, function (res) {
             callback(null, res);
         }, function (xhr) {
