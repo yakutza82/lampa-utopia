@@ -267,42 +267,6 @@
                         var finalCookie =
                             saveCookies(cookies);
 
-                        console.log('UTOPIA AUTH TEST COOKIE:', finalCookie);
-
-Lampa.Reguest.native(
-    'https://utp.to/',
-    function (response) {
-        console.log('UTOPIA AUTH TEST RESPONSE:', response);
-
-        var body = '';
-
-        try {
-            if (response && response.body) {
-                body = String(response.body);
-            } else {
-                body = String(response || '');
-            }
-        } catch (e) {
-            console.log('UTOPIA AUTH TEST BODY ERROR:', e);
-        }
-
-        console.log(
-            'UTOPIA AUTH TEST RESULT:',
-            body.indexOf('/login') !== -1
-                ? 'LOGIN'
-                : 'NOT LOGIN'
-        );
-    },
-    function (error) {
-        console.log('UTOPIA AUTH TEST ERROR:', error);
-    },
-    {
-        headers: {
-            'Cookie': finalCookie
-        }
-    }
-);
-
                         if (!finalCookie) {
                             Lampa.Noty.show(
                                 'UTOPIA: cookie не отримано'
