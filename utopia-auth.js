@@ -1,458 +1,87 @@
-(function () {
-    'use strict';
+function initSettings() {
 
-    if (!window.Lampa || !Lampa.Reguest) {
-        Lampa.Noty.show('UTOPIA AUTH: Reguest не знайдений');
-        return;
-    }
+    Lampa.SettingsApi.addComponent({
+        component: 'utopia_auth',
+        name: 'Утопія - авторизація',
+        icon:
+        '<svg width="1.5em" height="1.5em" viewBox="0 0 64 64" ' +
+        'xmlns="http://www.w3.org/2000/svg" ' +
+        'style="display:block;flex-shrink:0;">' +
+            '<image href="https://raw.githubusercontent.com/yakutza82/lampa-utopia/refs/heads/main/pngegg2wh.png" ' +
+            'x="0" y="0" width="64" height="64" />' +
+        '</svg>'
+    });
 
-    if (window.UTOPIA_AUTH) return;
-    window.UTOPIA_AUTH = true;
-
-    var SITE_ORIGIN = 'https://utp.to';
-    var LOGIN_URL = SITE_ORIGIN + '/login';
-
-    var COOKIE_KEY = 'utopia_auth_cookie';
-    var USER_KEY = 'utopia_auth_username';
-    var PASS_KEY = 'utopia_auth_password';
-
-    var network = new Lampa.Reguest();
-
-    // ------------------------------------------------------------
-    // Отримати збережений cookie
-    // ------------------------------------------------------------
-
-    function getCookie() {
-        return Lampa.Storage.get(COOKIE_KEY, '');
-    }
-
-    // ------------------------------------------------------------
-    // Зберегти cookies
-    // ------------------------------------------------------------
-
-    function saveCookies(cookies) {
-        var parts = [];
-
-        for (var name in cookies) {
-            parts.push(
-                name + '=' + cookies[name]
+    Lampa.SettingsApi.addParam({
+        component: 'utopia_auth',
+        param: {
+            name: 'utopia_auth_username',
+            type: 'button'
+        },
+        field: {
+            name: 'Логін',
+            description: Lampa.Storage.get('utopia_auth_username', '') || 'Не вказано'
+        },
+        onChange: function () {
+            Lampa.Input.edit(
+                Lampa.Storage.get('utopia_auth_username', ''),
+                function (value) {
+                    Lampa.Storage.set('utopia_auth_username', value);
+                    Lampa.Noty.show('UTOPIA: логін збережено');
+                }
             );
         }
+    });
 
-        var cookie = parts.join('; ');
-
-        if (cookie) {
-            Lampa.Storage.set(
-                COOKIE_KEY,
-                cookie
+    Lampa.SettingsApi.addParam({
+        component: 'utopia_auth',
+        param: {
+            name: 'utopia_auth_password',
+            type: 'button'
+        },
+        field: {
+            name: 'Пароль',
+            description: 'Не зберігається'
+        },
+        onChange: function () {
+            Lampa.Input.edit(
+                '',
+                function (value) {
+                    Lampa.Storage.set('utopia_auth_password', value);
+                    Lampa.Noty.show('UTOPIA: пароль введено');
+                },
+                true
             );
         }
+    });
 
-        return cookie;
-    }
-
-    // ------------------------------------------------------------
-    // Розбір Set-Cookie
-    // ------------------------------------------------------------
-
-    function collectCookies(target, headers) {
-
-        if (!headers) return;
-
-        var setCookies =
-            headers['set-cookie'] ||
-            headers['Set-Cookie'];
-
-        if (!setCookies) return;
-
-        if (!Array.isArray(setCookies)) {
-            setCookies = [setCookies];
+    Lampa.SettingsApi.addParam({
+        component: 'utopia_auth',
+        param: {
+            name: 'utopia_auth_cookie_btn',
+            type: 'button'
+        },
+        field: {
+            name: 'Отримати cookie',
+            description: 'Увійти на utp.to та отримати сесійні cookie'
+        },
+        onChange: function () {
+            getUtopiaCookie();
         }
+    });
 
-        setCookies.forEach(function (item) {
-
-            var first =
-                String(item).split(';')[0];
-
-            var pos =
-                first.indexOf('=');
-
-            if (pos <= 0) return;
-
-            var name =
-                first.substring(0, pos);
-
-            var value =
-                first.substring(pos + 1);
-
-            if (value === 'deleted') {
-                delete target[name];
-            } else {
-                target[name] = value;
-            }
-        });
-    }
-
-    // ------------------------------------------------------------
-    // Cookie -> header
-    // ------------------------------------------------------------
-
-    function cookieHeader(cookies) {
-
-        var parts = [];
-
-        for (var name in cookies) {
-            parts.push(
-                name + '=' + cookies[name]
-            );
+    Lampa.SettingsApi.addParam({
+        component: 'utopia_auth',
+        param: {
+            name: 'utopia_auth_test_btn',
+            type: 'button'
+        },
+        field: {
+            name: 'Перевірити авторизацію',
+            description: 'Перевірити поточну сесію UTOPIA'
+        },
+        onChange: function () {
+            testUtopiaSession();
         }
-
-        return parts.join('; ');
-    }
-
-    // ------------------------------------------------------------
-    // Отримання CSRF token
-    // ------------------------------------------------------------
-
-    function getToken(html) {
-
-        var match = html.match(
-            /name=["']_token["'][^>]*value=["']([^"']+)["']/
-        );
-
-        if (!match) {
-            match = html.match(
-                /value=["']([^"']+)["'][^>]*name=["']_token["']/
-            );
-        }
-
-        return match ? match[1] : '';
-    }
-
-    // ------------------------------------------------------------
-    // Авторизація
-    // ------------------------------------------------------------
-
-    function authorize() {
-
-        var username =
-            Lampa.Storage.get(USER_KEY, '');
-
-        var password =
-            Lampa.Storage.get(PASS_KEY, '');
-
-        if (!username) {
-            Lampa.Noty.show(
-                'UTOPIA: введи логін'
-            );
-            return;
-        }
-
-        if (!password) {
-            Lampa.Noty.show(
-                'UTOPIA: введи пароль'
-            );
-            return;
-        }
-
-        Lampa.Noty.show(
-            'UTOPIA: отримую cookie...'
-        );
-
-        var cookies = {};
-
-        // --------------------------------------------------------
-        // GET /login
-        // --------------------------------------------------------
-
-        network.clear();
-        network.timeout(10000);
-
-        network["native"](
-            LOGIN_URL,
-
-            function (response) {
-
-                var json = response;
-
-                if (typeof response === 'string') {
-                    try {
-                        json =
-                            Lampa.Arrays.decodeJson(
-                                response,
-                                {}
-                            );
-                    } catch (e) {
-                        Lampa.Noty.show(
-                            'UTOPIA: помилка відповіді GET /login'
-                        );
-                        return;
-                    }
-                }
-
-                var html =
-                    json &&
-                    json.body ||
-                    '';
-
-                collectCookies(
-                    cookies,
-                    json && json.headers
-                );
-
-                var csrfToken =
-                    getToken(html);
-
-                if (!csrfToken) {
-                    Lampa.Noty.show(
-                        'UTOPIA: CSRF token не знайдений'
-                    );
-                    return;
-                }
-
-                // ------------------------------------------------
-                // POST /login
-                // ------------------------------------------------
-
-                var postdata =
-                    '_token=' +
-                    encodeURIComponent(csrfToken) +
-                    '&username=' +
-                    encodeURIComponent(username) +
-                    '&password=' +
-                    encodeURIComponent(password);
-
-                var headers = {
-                    'Content-Type':
-                        'application/x-www-form-urlencoded',
-                    'Accept':
-                        'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'
-                };
-
-                var existingCookie =
-                    cookieHeader(cookies);
-
-                if (existingCookie) {
-                    headers['Cookie'] =
-                        existingCookie;
-                }
-
-                network.clear();
-                network.timeout(10000);
-
-                network["native"](
-                    LOGIN_URL,
-
-                    function (response2) {
-
-                        var json2 = response2;
-
-                        if (typeof response2 === 'string') {
-                            try {
-                                json2 =
-                                    Lampa.Arrays.decodeJson(
-                                        response2,
-                                        {}
-                                    );
-                            } catch (e) {
-                                json2 = {};
-                            }
-                        }
-
-                        collectCookies(
-                            cookies,
-                            json2 && json2.headers
-                        );
-
-                        var finalCookie =
-                            saveCookies(cookies);
-
-                        if (!finalCookie) {
-                            Lampa.Noty.show(
-                                'UTOPIA: cookie не отримано'
-                            );
-                            return;
-                        }
-
-                        var names = [];
-
-                        for (var name in cookies) {
-                            names.push(name);
-                        }
-
-                        Lampa.Noty.show(
-                            'UTOPIA: cookie отримано\n' +
-                            names.join(', ')
-                        );
-
-                        console.log(
-                            'UTOPIA AUTH COOKIE NAMES:',
-                            names
-                        );
-                    },
-
-                    function (error) {
-
-                        var details = '';
-
-                        try {
-                            details =
-                                JSON.stringify(error);
-                        } catch (e) {
-                            details =
-                                String(error);
-                        }
-
-                        Lampa.Noty.show(
-                            'UTOPIA POST ERROR: ' +
-                            details
-                        );
-                    },
-
-                    postdata,
-
-                    {
-                        dataType: 'text',
-                        headers: headers,
-                        returnHeaders: true
-                    }
-                );
-            },
-
-            function (error) {
-
-                var details = '';
-
-                try {
-                    details =
-                        JSON.stringify(error);
-                } catch (e) {
-                    details =
-                        String(error);
-                }
-
-                Lampa.Noty.show(
-                    'UTOPIA GET ERROR: ' +
-                    details
-                );
-            },
-
-            false,
-
-            {
-                dataType: 'text',
-                headers: {},
-                returnHeaders: true
-            }
-        );
-    }
-
-    // ------------------------------------------------------------
-    // Меню
-    // ------------------------------------------------------------
-
-    function showMenu() {
-
-        var username =
-            Lampa.Storage.get(USER_KEY, '');
-
-        var password =
-            Lampa.Storage.get(PASS_KEY, '');
-
-        var cookie =
-            getCookie();
-
-        var items = [
-            {
-                title: 'Логін',
-                subtitle: username || 'Не задано',
-                action: 'username'
-            },
-            {
-                title: 'Пароль',
-                subtitle: password ? '••••••••' : 'Не задано',
-                action: 'password'
-            },
-            {
-                title: 'Отримати cookie',
-                subtitle: cookie
-                    ? 'Cookie збережено'
-                    : 'Cookie немає',
-                action: 'cookie'
-            }
-        ];
-
-        Lampa.Select.show({
-            title: 'UTOPIA — авторизація',
-            items: items,
-
-            onSelect: function (item) {
-
-                if (item.action === 'username') {
-
-                    Lampa.Input.edit({
-                        title: 'UTOPIA — логін',
-                        value: username,
-
-                        onBack: function (value) {
-                            Lampa.Storage.set(
-                                USER_KEY,
-                                value || ''
-                            );
-                        }
-                    });
-
-                    return;
-                }
-
-                if (item.action === 'password') {
-
-                    Lampa.Input.edit({
-                        title: 'UTOPIA — пароль',
-                        value: password,
-
-                        onBack: function (value) {
-                            Lampa.Storage.set(
-                                PASS_KEY,
-                                value || ''
-                            );
-                        }
-                    });
-
-                    return;
-                }
-
-                if (item.action === 'cookie') {
-                    authorize();
-                }
-            }
-        });
-    }
-
-    // ------------------------------------------------------------
-    // Реєстрація в налаштуваннях Lampa
-    // ------------------------------------------------------------
-
-    function register() {
-
-        if (
-            !Lampa.SettingsApi ||
-            !Lampa.SettingsApi.addComponent
-        ) {
-            Lampa.Noty.show(
-                'UTOPIA AUTH: SettingsApi не знайдений'
-            );
-            return;
-        }
-
-        Lampa.SettingsApi.addComponent({
-            component: 'utopia_auth',
-            name: 'UTOPIA — авторизація',
-            icon: 'account_circle',
-            onClick: showMenu
-        });
-    }
-
-    register();
-
-})();
+    });
+}
