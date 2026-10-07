@@ -286,9 +286,14 @@
                         );
 
                         console.log(
-                            'UTOPIA AUTH COOKIE NAMES:',
-                            names
-                        );
+    'UTOPIA AUTH COOKIE NAMES:',
+    names
+);
+
+console.log(
+    'UTOPIA AUTH COOKIE SAVED:',
+    Lampa.Storage.get(COOKIE_KEY, '')
+);
                     },
 
                     function (error) {
