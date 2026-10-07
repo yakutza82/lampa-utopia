@@ -1168,6 +1168,13 @@
                 var location = r2.headers && (r2.headers.location || r2.headers.Location) || '';
                 note('2) POST /login: заголовки ' + (r2.hasHeaders ? 'є' : 'НЕМАЄ') + ', нові кукі: ' + (added.join(', ') || 'немає') + (location ? ', Location: ' + location : ''));
 
+                note(
+    '   cookie jar після POST: ' +
+    Object.keys(jar).map(function (name) {
+        return name + '=' + String(jar[name] || '').length + ' симв.';
+    }).join(', ')
+);
+
                 if (siteHasLoginForm(r2.body) && !added.length) {
     fail('Вхід не вдався: сайт знову показав форму входу (перевір логін і пароль)');
     return;
