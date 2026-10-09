@@ -1200,7 +1200,7 @@
                     }
                     else if (err2.status === 419) fail('2) POST /login: сторінка входу застаріла (419)');
                     else if (err2.status === 422) fail('2) POST /login: сайт відхилив вхід' + (why ? ': ' + why : '') + ' (код 422). Перевір логін і пароль');
-                    else fail('2) POST /login: ' + siteDescribeError(err2) + ' [поля відповіді: ' + Object.keys(err2).join(', ') + ']');
+                    else fail('2) POST /login: ' + siteDescribeError(err2) + ' [відповідь сервера: ' + JSON.stringify(err2) + ']');
                     return;
                 }
 
