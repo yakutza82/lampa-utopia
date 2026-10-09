@@ -918,6 +918,8 @@
     // (Set-Cookie) і дозволяє передавати Cookie. Запити йдуть прямо на utp.to, БЕЗ сторонніх
     // проксі. Пароль нікуди не зберігається і не потрапляє у звіт.
     var SITE_ORIGIN = 'https://utp.to';
+    var siteLastRun = 0;        // коли востаннє запускали вхід
+    var siteCooldownUntil = 0;  // до якого часу чекаємо після помилки 429
     var SITE_UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/154.0.0.0 Safari/537.36';
 
     function siteUserName() {
@@ -927,7 +929,6 @@
     function siteNative(url, postdata, headers, callback) {
         var net = new Lampa.Reguest();
         net.timeout(20000);
-        
         net.native(url, function (res) {
             callback(null, res);
         }, function (xhr) {
@@ -965,7 +966,6 @@
 
     function siteCollectCookies(jar, headers) {
         var list = headers && (headers['set-cookie'] || headers['Set-Cookie']);
-        
         var added = [];
 
         if (!list) return added;
@@ -986,6 +986,13 @@
         });
 
         return added;
+    }
+
+    // Назви кукі та їхня довжина (значення не показуємо)
+    function siteCookieSizes(jar) {
+        return Object.keys(jar).map(function (name) {
+            return name + ' (' + String(jar[name]).length + ' симв.)';
+        }).join(', ');
     }
 
     function siteCookieHeader(jar) {
@@ -1086,6 +1093,23 @@
         return parts.join(', ') || 'невідома помилка';
     }
 
+    // Текст помилки з JSON-відповіді сайту (Laravel віддає { message, errors })
+    function siteErrorMessage(err) {
+        try {
+            var data = JSON.parse(String(err.responseText || ''));
+
+            if (data && data.errors) {
+                var first = Object.keys(data.errors)[0];
+                var list = data.errors[first];
+                if (list && list[0]) return String(list[0]);
+            }
+
+            if (data && data.message) return String(data.message);
+        } catch (e) {}
+
+        return '';
+    }
+
     // Вхід на сайт і пошук ключа. finish({ ok, candidates, report }).
     // У звіт потрапляють лише назви кукі та замасковані ключі - ні пароля, ні значень кукі.
     function siteFetchKey(username, password, finish) {
@@ -1118,7 +1142,12 @@
         // 1. Сторінка входу: токен форми і початкові кукі
         siteNative(loginUrl, null, headers({ 'Referer': SITE_ORIGIN + '/' }), function (err, res) {
             if (err) {
-                fail('1) GET /login: ' + siteDescribeError(err));
+                if (err.status === 429) {
+                    siteCooldownUntil = Date.now() + 5 * 60 * 1000;
+                    fail('1) GET /login: сайт тимчасово обмежив запити (429). Зачекай кілька хвилин і повтори');
+                } else {
+                    fail('1) GET /login: ' + siteDescribeError(err));
+                }
                 return;
             }
 
@@ -1153,55 +1182,53 @@
             pairs.push(encodeURIComponent(form.user) + '=' + encodeURIComponent(username));
             pairs.push(encodeURIComponent(form.pass) + '=' + encodeURIComponent(password));
 
+            // Просимо JSON-відповідь: тоді сайт не робить перенаправлення після входу
+            // (застосунок губить кукі при перенаправленні), а при помилці віддає 422 з поясненням.
             siteNative(loginUrl, pairs.join('&'), headers({
                 'Origin': SITE_ORIGIN,
                 'Referer': loginUrl,
+                'Accept': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest',
                 'Content-Type': 'application/x-www-form-urlencoded'
             }), function (err2, res2) {
                 if (err2) {
-                    if (err2.status === 429) fail('2) POST /login: забагато спроб входу. Зачекай хвилину і спробуй ще раз');
+                    var why = siteErrorMessage(err2);
+
+                    if (err2.status === 429) {
+                        siteCooldownUntil = Date.now() + 5 * 60 * 1000;
+                        fail('2) POST /login: забагато спроб входу (429). Зачекай кілька хвилин');
+                    }
                     else if (err2.status === 419) fail('2) POST /login: сторінка входу застаріла (419)');
+                    else if (err2.status === 422) fail('2) POST /login: сайт відхилив вхід' + (why ? ': ' + why : '') + ' (код 422). Перевір логін і пароль');
                     else fail('2) POST /login: ' + siteDescribeError(err2) + ' [поля відповіді: ' + Object.keys(err2).join(', ') + ']');
                     return;
                 }
 
                 var r2 = siteParse(res2);
                 var added = siteCollectCookies(jar, r2.headers);
-
-note(
-    '   set-cookie type після POST: ' +
-    (Array.isArray(r2.headers && r2.headers['set-cookie'])
-        ? 'ARRAY[' + r2.headers['set-cookie'].length + ']'
-        : typeof (r2.headers && r2.headers['set-cookie']))
-);
                 var location = r2.headers && (r2.headers.location || r2.headers.Location) || '';
-                note('2) POST /login: заголовки ' + (r2.hasHeaders ? 'є' : 'НЕМАЄ') + ', нові кукі: ' + (added.join(', ') || 'немає') + (location ? ', Location: ' + location : ''));
+                note('2) POST /login: заголовки ' + (r2.hasHeaders ? 'є' : 'НЕМАЄ') + ', нові кукі: ' + (added.join(', ') || 'немає') + (location ? ', Location: ' + location : '') + ', відповідь: ' + (r2.body.length ? r2.body.length + ' симв.' : 'порожня'));
 
-                note(
-    '   cookie jar після POST: ' +
-    Object.keys(jar).map(function (name) {
-        return name + '=' + String(jar[name] || '').length + ' симв.';
-    }).join(', ')
-);
+                note('   кукі після входу: ' + siteCookieSizes(jar));
 
-                if (siteHasLoginForm(r2.body) && !added.length) {
-    fail('Вхід не вдався: сайт знову показав форму входу (перевір логін і пароль)');
-    return;
-}
+                if (/"two_factor"\s*:\s*true/.test(r2.body)) {
+                    fail('На акаунті ввімкнена двофакторна автентифікація - цей спосіб не підходить');
+                    return;
+                }
+
+                if (siteHasLoginForm(r2.body)) {
+                    note('   відповідь містить форму входу: сайт або відхилив дані, або перенаправив без кукі');
+                }
 
                 // 3. Сторінка ключів
-                note(
-    '   Cookie для GET apikeys: ' +
-    siteCookieHeader(jar).split('; ').map(function (part) {
-        var eq = part.indexOf('=');
-        if (eq < 0) return part;
-        return part.slice(0, eq) + '=' + String(part.slice(eq + 1)).length + ' симв.';
-    }).join(', ')
-);
-
                 siteNative(keysUrl, null, headers({ 'Referer': SITE_ORIGIN + '/' }), function (err3, res3) {
                     if (err3) {
-                        fail('3) GET apikeys: ' + siteDescribeError(err3));
+                        if (err3.status === 429) {
+                            siteCooldownUntil = Date.now() + 5 * 60 * 1000;
+                            fail('3) GET apikeys: сайт тимчасово обмежив запити (429). Зачекай кілька хвилин і повтори один раз');
+                        } else {
+                            fail('3) GET apikeys: ' + siteDescribeError(err3));
+                        }
                         return;
                     }
 
@@ -1209,7 +1236,7 @@ note(
                     siteCollectCookies(jar, r3.headers);
 
                     if (siteHasLoginForm(r3.body)) {
-                        fail('3) GET apikeys: не авторизовано (сайт показав форму входу). Найімовірніше, сесійні кукі після входу не збереглися');
+                        fail('3) GET apikeys: не авторизовано (сайт показав форму входу). Причина: невірний логін/пароль або застосунок втратив кукі при перенаправленні');
                         return;
                     }
 
@@ -1301,6 +1328,7 @@ note(
     }
 
     function siteRun(username, password) {
+        siteLastRun = Date.now();
         Lampa.Noty.show('UTOPIA: входжу на utp.to...');
 
         try { Lampa.Loading.start('utopia_site_login', 'UTOPIA: вхід...'); } catch (e) {}
@@ -1380,6 +1408,15 @@ note(
     function onSiteLogin() {
         if (typeof AndroidJS === 'undefined') {
             Lampa.Noty.show('UTOPIA: вхід із плагіна працює лише в застосунку Lampa для Android');
+            backToSettings();
+            return;
+        }
+
+        // Сайт обмежує спроби входу (5 за хвилину), тож між запусками тримаємо паузу
+        var wait = Math.max(siteCooldownUntil, siteLastRun + 2 * 60 * 1000) - Date.now();
+
+        if (wait > 0) {
+            Lampa.Noty.show('UTOPIA: зачекай ще ' + Math.ceil(wait / 1000) + ' с, щоб сайт не заблокував за забагато спроб');
             backToSettings();
             return;
         }
