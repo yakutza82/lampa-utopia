@@ -1083,32 +1083,53 @@
     }
 
     function siteDescribeError(err) {
-        var parts = [];
-        if (err.status !== undefined && err.status !== null) parts.push('код ' + err.status);
-        if (err.statusText) parts.push(String(err.statusText));
+    if (!err) return 'невідома помилка';
+    var parts = [];
 
-        var text = String(err.responseText || '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 80);
-        if (text) parts.push(text);
+    var status = err.status !== undefined ? err.status : err.code;
+    if (status !== undefined && status !== null) parts.push('код ' + status);
 
-        return parts.join(', ') || 'невідома помилка';
+    var msg = siteErrorMessage(err);
+    if (msg) {
+        parts.push(msg);
+    } else if (err.statusText) {
+        parts.push(String(err.statusText));
     }
+
+    return parts.join(', ') || 'невідома помилка';
+}
 
     // Текст помилки з JSON-відповіді сайту (Laravel віддає { message, errors })
     function siteErrorMessage(err) {
-        try {
-            var data = JSON.parse(String(err.responseText || ''));
-
-            if (data && data.errors) {
-                var first = Object.keys(data.errors)[0];
-                var list = data.errors[first];
-                if (list && list[0]) return String(list[0]);
-            }
-
-            if (data && data.message) return String(data.message);
-        } catch (e) {}
-
-        return '';
+    if (!err) return '';
+    
+    // Якщо Lampa повернула готову помилку обгортки
+    if (typeof err.message === 'string' && err.message) {
+        if (/Invalid response from server:\s*401/i.test(err.message)) {
+            return 'Невірний логін або пароль (помилка 401)';
+        }
+        if (/Invalid response from server:\s*419/i.test(err.message)) {
+            return 'Сесія застаріла (CSRF token mismatch 419)';
+        }
+        return err.message;
     }
+
+    // Спроба розібрати JSON із responseText
+    try {
+        var raw = err.responseText || err.response || '';
+        var data = typeof raw === 'object' ? raw : JSON.parse(String(raw));
+
+        if (data && data.errors) {
+            var first = Object.keys(data.errors)[0];
+            var list = data.errors[first];
+            if (list && list[0]) return String(list[0]);
+        }
+
+        if (data && data.message) return String(data.message);
+    } catch (e) {}
+
+    return '';
+}
 
     // Вхід на сайт і пошук ключа. finish({ ok, candidates, report }).
     // У звіт потрапляють лише назви кукі та замасковані ключі - ні пароля, ні значень кукі.
@@ -1174,6 +1195,19 @@
 
             form.hidden.forEach(function (h) { if (h.value) exclude[h.value] = true; });
             note('   поля форми: ' + form.hidden.map(function (h) { return h.name; }).join(', ') + ', ' + form.user + ', ' + form.pass);
+            var extraHeaders = {
+    'Origin': SITE_ORIGIN,
+    'Referer': loginUrl,
+    'Accept': 'application/json',
+    'X-Requested-With': 'XMLHttpRequest',
+    'Content-Type': 'application/x-www-form-urlencoded'
+};
+
+if (jar['XSRF-TOKEN']) {
+    extraHeaders['X-XSRF-TOKEN'] = decodeURIComponent(jar['XSRF-TOKEN']);
+}
+
+siteNative(loginUrl, pairs.join('&'), headers(extraHeaders), function (err2, res2) { ... });
 
             // 2. Вхід
             var pairs = form.hidden.map(function (h) {
