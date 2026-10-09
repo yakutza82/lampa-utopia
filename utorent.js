@@ -1,7 +1,7 @@
 (function () {
     'use strict';
 
-    // ============================================================
+        // ============================================================
     // Універсальний реєстр торент-приймачів
     // ============================================================
     if (!window.LampaTorrentReceivers) {
@@ -72,6 +72,16 @@
 
     // =========================================================
     // -1. Побудова робочого magnet з .torrent-файлу
+    //
+    // UTOPIA не завжди дає готовий magnet - часто натомість дає
+    // посилання на завантаження самого .torrent-файлу. Щоб все одно
+    // відкрити його одним кліком (без ручного скачування), тут:
+    // 1) вручну розбираємо bencode-структуру .torrent файлу,
+    //    щоб знайти РІВНО ті байти, де лежить секція "info";
+    // 2) рахуємо SHA-1 від цих байтів - це і є справжній BTIH-хеш;
+    // 3) збираємо з нього робочий magnet-рядок.
+    // SHA-1 порахований власноруч (не через Web Crypto), бо
+    // crypto.subtle іноді недоступний у не-https/file:// оточенні.
     // =========================================================
     function findInfoDictRange(buffer) {
         var buf = new Uint8Array(buffer);
@@ -173,6 +183,11 @@
         return toHex(h0) + toHex(h1) + toHex(h2) + toHex(h3) + toHex(h4);
     }
 
+    // Качаємо .torrent-файл ЧЕРЕЗ ТОЙ САМИЙ механізм, що вже успішно
+    // обходить CORS для звичайних JSON-запитів (Lampa.Reguest().native()) -
+    // звичайний XMLHttpRequest, як з'ясувалось, CORS не обходить.
+    // native() віддає відповідь як звичайний РЯДОК (як і для JSON), тому
+    // переводимо кожен символ назад у байт (код символу як є, без UTF-8).
     function fetchTorrentFileBytes(url, headers, onSuccess, onError) {
         var network = new Lampa.Reguest();
         network.timeout(20000);
@@ -204,441 +219,453 @@
     // 0. Стилі
     // =========================================================
     function injectStyles() {
-        if (document.getElementById('utopia-styles')) return;
+    if (document.getElementById('utopia-styles')) return;
 
-        var css = '' +
-            '.utopia-wrap{' +
-                'display:flex;' +
-                'flex-direction:column;' +
-                'gap:1em;' +
-                'padding:1em 1.2em 0;' +
-                'box-sizing:border-box;' +
-            '}' +
+    var css = '' +
 
-            '.utopia-header{' +
-                'display:flex;' +
-                'align-items:flex-start;' +
-                'justify-content:center;' +
-                'gap:1em;' +
-                'flex-wrap:wrap;' +
-                'padding-bottom:1em;' +
-            '}' +
+        '.utopia-wrap{' +
+            'display:flex;' +
+            'flex-direction:column;' +
+            'gap:1em;' +
+            'padding:1em 1.2em 0;' +
+            'box-sizing:border-box;' +
+        '}' +
 
-            '.utopia-header__info{' +
+        '.utopia-header{' +
+            'display:flex;' +
+            'align-items:flex-start;' +
+            'justify-content:center;' +
+            'gap:1em;' +
+            'flex-wrap:wrap;' +
+            'padding-bottom:1em;' +
+        '}' +
+
+        '.utopia-header__info{' +
+            'display:none;' +
+        '}' +
+
+        '.utopia-header__title{' +
+            'font-size:1.2em;' +
+            'font-weight:600;' +
+            'line-height:1.3;' +
+            'overflow:hidden;' +
+            'text-overflow:ellipsis;' +
+            'white-space:nowrap;' +
+        '}' +
+
+        '.utopia-header__original{' +
+            'font-size:.85em;' +
+            'opacity:.55;' +
+            'margin-top:.25em;' +
+            'overflow:hidden;' +
+            'text-overflow:ellipsis;' +
+            'white-space:nowrap;' +
+        '}' +
+
+        '.utopia-header__meta{' +
+            'font-size:.82em;' +
+            'opacity:.55;' +
+            'margin-top:.35em;' +
+        '}' +
+
+        '.utopia-header__actions{' +
+            'display:flex;' +
+            'align-items:center;' +
+            'gap:.55em;' +
+            'flex-wrap:wrap;' +
+            'flex-shrink:0;' +
+        '}' +
+
+        '.utopia-action{' +
+            'display:flex;' +
+            'align-items:center;' +
+            'justify-content:center;' +
+            'padding:.55em .9em;' +
+            'border-radius:.6em;' +
+            'background:rgba(255,255,255,.08);' +
+            'border:1px solid rgba(255,255,255,.12);' +
+            'font-size:1.6em;' +
+            'white-space:nowrap;' +
+            'box-sizing:border-box;' +
+        '}' +
+
+        '.utopia-sort-btn,' +
+'.utopia-portrait-back{' +
+    'background:#3a3a3a;' +
+    'border-color:#5a5a5a;' +
+'}' +
+
+'.utopia-sort-btn.focus,' +
+'.utopia-portrait-back.focus{' +
+    'background:#565656;' +
+    'border-color:rgba(255,255,255,.75);' +
+'}' +
+
+        /* Картка фільму */
+
+'.utopia-movie{' +
+    'display:flex;' +
+    'flex-direction:column;' +
+    'box-sizing:border-box;' +
+    'min-width:0;' +
+    'height:100%;' +
+    'overflow-y:auto;' +
+    'overflow-x:hidden;' +
+    'padding:.3em .8em .8em 0;' +
+    'touch-action: pan-y;' +
+    'overscroll-behavior: contain;' +
+'}' +
+
+'.utopia-movie__top{' +
+    'display:flex;' +
+    'align-items:flex-start;' +
+    'gap:.8em;' +
+    'width:100%;' +
+    'box-sizing:border-box;' +
+'}' +
+
+'.utopia-movie__poster{' +
+    'flex:0 0 8em;' +
+    'width:8em;' +
+    'height:12em;' +
+    'overflow:hidden;' +
+    'border-radius:.25em;' +
+    'background:rgba(255,255,255,.05);' +
+'}' +
+
+'.utopia-movie__poster.focus{' +
+    'outline:.2em solid rgba(255,255,255,.85);' +
+    'outline-offset:-.2em;' +
+'}' +
+
+'.utopia-movie__poster-img{' +
+    'display:block;' +
+    'width:100%;' +
+    'height:100%;' +
+    'object-fit:cover;' +
+'}' +
+
+'.utopia-movie__details{' +
+    'flex:1;' +
+    'min-width:0;' +
+    'padding-top:.1em;' +
+'}' +
+
+'.utopia-movie__year,' +
+'.utopia-movie__country,' +
+'.utopia-movie__rating,' +
+'.utopia-movie__imdb,' +
+'.utopia-movie__pg{' +
+    'font-size:1.22em;' +
+    'color:#FFFFFF;' +
+    'line-height:1.45;' +
+    'opacity:1;' +
+'}' +
+
+'.utopia-movie__rating,' +
+'.utopia-movie__imdb{' +
+    'margin-top:.35em;' +
+'}' +
+
+'.utopia-movie__pg{' +
+    'margin-top:.35em;' +
+'}' +
+
+'.utopia-movie__title{' +
+    'font-size:2.25em;' +
+    'color:#FFFFFF;' +
+    'font-weight:700;' +
+    'line-height:1.25;' +
+    'margin-top:1em;' +
+'}' +
+
+'.utopia-movie__genres{' +
+    'font-size:1.22em;' +
+    'color:#FFFFFF;' +
+    'line-height:1.4;' +
+    'opacity:.65;' +
+    'margin-top:.45em;' +
+'}' +
+
+'.utopia-movie__overview{' +
+    'font-size:1.22em;' +
+    'color:#FFFFFF;' +
+    'line-height:1.45;' +
+    'opacity:1;' +
+    'margin-top:1.2em;' +
+    'padding-bottom:1em;' +
+'}' +
+
+        /* торенти */
+        '.utopia-list{' +
+            'display:flex;' +
+            'flex-direction:column;' +
+            'gap:.7em;' +
+        '}' +
+
+        '.utopia-item{' +
+            'position:relative;' +
+            'display:flex;' +
+            'align-items:center;' +
+            'justify-content:space-between;' +
+            'gap:1em;' +
+            'padding:1em 1.15em;' +
+            'border-radius:.7em;' +
+            'background:rgba(255,255,255,.015);' +
+            'border:1px solid rgba(255,255,255,.07);' +
+            'box-sizing:border-box;' +
+            'user-select:none;' +
+            'width:98%;' +
+            'align-self:center;' +
+        '}' +
+
+            '@keyframes utopia-bounce{' +
+            '0%{transform:translateY(0) scale(1);}' +
+            '30%{transform:translateY(-.45em) scale(1.02);}' +
+            '55%{transform:translateY(.12em) scale(.995);}' +
+            '80%{transform:translateY(-.08em) scale(1.005);}' +
+            '100%{transform:translateY(0) scale(1);}' +
+        '}' +
+
+                '.utopia-item.focus{' +
+            'background:rgba(255,255,255,.065);' +
+            'border-color:rgba(255,255,255,.75);' +
+            'animation:utopia-bounce .35s ease-out;' +
+        '}' +
+
+        '.utopia-item__left{' +
+            'flex:1;' +
+            'min-width:0;' +
+        '}' +
+
+        '.utopia-item__movie{' +
+            'font-weight:600;' +
+            'font-size:1.85em;' +
+            'line-height:1.3;' +
+            'margin-bottom:.2em;' +
+            'overflow:hidden;' +
+            'text-overflow:ellipsis;' +
+            'white-space:nowrap;' +
+        '}' +
+
+        '.utopia-item__title{' +
+            'font-size:1.27em;' +
+            'opacity:.58;' +
+            'line-height:1.3;' +
+            'margin-bottom:.3em;' +
+            'overflow:hidden;' +
+            'text-overflow:ellipsis;' +
+            'white-space:nowrap;' +
+        '}' +
+
+        '.utopia-item__meta{' +
+            'font-size:1.16em;' +
+            'opacity:.45;' +
+        '}' +
+
+        '.utopia-item__badges{' +
+            'display:flex;' +
+            'align-items:center;' +
+            'gap:.7em;' +
+            'white-space:nowrap;' +
+            'flex-shrink:0;' +
+            'font-size:1.2em;' +
+            'font-weight:600;' +
+        '}' +
+
+        '.utopia-badge{' +
+            'display:inline-flex;' +
+            'align-items:center;' +
+            'gap:.2em;' +
+        '}' +
+
+        '.utopia-badge--good{color:#7fcf8a;}' +
+        '.utopia-badge--mid{color:#d6b85c;}' +
+        '.utopia-badge--bad{color:#c96b6b;}' +
+
+        '.utopia-more{' +
+            'display:flex;' +
+            'align-items:center;' +
+            'justify-content:center;' +
+            'padding:1em;' +
+            'margin:.3em 0 1em;' +
+            'border-radius:.7em;' +
+            'background:rgba(255,255,255,.05);' +
+            'border:1px solid rgba(255,255,255,.07);' +
+            'font-size:.9em;' +
+            'font-weight:600;' +
+        '}' +
+
+        '.utopia-more.focus{' +
+            'background:rgba(255,255,255,.08);' +
+            'border-color:rgba(255,255,255,.75);' +
+        '}' +
+
+        '.utopia-state{' +
+            'display:flex;' +
+            'flex-direction:column;' +
+            'align-items:center;' +
+            'justify-content:center;' +
+            'text-align:center;' +
+            'padding:4em 1.5em;' +
+            'opacity:.9;' +
+        '}' +
+
+        '.utopia-state__icon{' +
+            'font-size:2.2em;' +
+            'line-height:1;' +
+            'margin-bottom:.55em;' +
+            'opacity:.8;' +
+        '}' +
+
+        '.utopia-state__title{' +
+            'font-size:1.1em;' +
+            'font-weight:600;' +
+            'margin-bottom:.35em;' +
+        '}' +
+
+        '.utopia-state__text{' +
+            'max-width:42em;' +
+            'font-size:.88em;' +
+            'line-height:1.45;' +
+            'opacity:.55;' +
+            'margin-bottom:1.1em;' +
+        '}' +
+
+        /* Portrait */
+        '@media screen and (orientation:portrait){' +
+
+            '.utopia-movie{' +
                 'display:none;' +
             '}' +
 
-            '.utopia-header__title{' +
-                'font-size:1.2em;' +
-                'font-weight:600;' +
-                'line-height:1.3;' +
-                'overflow:hidden;' +
-                'text-overflow:ellipsis;' +
-                'white-space:nowrap;' +
+            '.utopia-portrait-back,' +
+            '.utopia-sort-btn{' +
+            'font-size:1.5em;' +
             '}' +
 
-            '.utopia-header__original{' +
-                'font-size:.85em;' +
-                'opacity:.55;' +
-                'margin-top:.25em;' +
-                'overflow:hidden;' +
-                'text-overflow:ellipsis;' +
-                'white-space:nowrap;' +
-            '}' +
-
-            '.utopia-header__meta{' +
-                'font-size:.82em;' +
-                'opacity:.55;' +
-                'margin-top:.35em;' +
-            '}' +
-
-            '.utopia-header__actions{' +
-                'display:flex;' +
-                'align-items:center;' +
-                'gap:.55em;' +
-                'flex-wrap:wrap;' +
-                'flex-shrink:0;' +
-            '}' +
-
-            '.utopia-action{' +
-                'display:flex;' +
-                'align-items:center;' +
-                'justify-content:center;' +
-                'padding:.55em .9em;' +
-                'border-radius:.6em;' +
-                'background:rgba(255,255,255,.08);' +
-                'border:1px solid rgba(255,255,255,.12);' +
-                'font-size:1.6em;' +
-                'white-space:nowrap;' +
-                'box-sizing:border-box;' +
-            '}' +
-
-            '.utopia-sort-btn,' +
-            '.utopia-portrait-back{' +
-                'background:#3a3a3a;' +
-                'border-color:#5a5a5a;' +
-            '}' +
-
-            '.utopia-sort-btn.focus,' +
-            '.utopia-portrait-back.focus{' +
-                'background:#565656;' +
-                'border-color:rgba(255,255,255,.75);' +
-            '}' +
-
-            '.utopia-movie{' +
-                'display:flex;' +
-                'flex-direction:column;' +
-                'box-sizing:border-box;' +
-                'min-width:0;' +
+            '.utopia-wrap{' +
                 'height:100%;' +
+                'min-height:0;' +
                 'overflow-y:auto;' +
                 'overflow-x:hidden;' +
-                'padding:.3em .8em .8em 0;' +
-                'touch-action: pan-y;' +
-                'overscroll-behavior: contain;' +
+                'touch-action:pan-y;' +
+                'overscroll-behavior:contain;' +
+                '-webkit-mask-image:linear-gradient(to bottom,rgba(0,0,0,0) 0,rgba(0,0,0,.5) .4em,#000 .8em);' +
+                'mask-image:linear-gradient(to bottom,rgba(0,0,0,0) 0,rgba(0,0,0,.5) .4em,#000 .8em);' +
             '}' +
 
-            '.utopia-movie__top{' +
-                'display:flex;' +
-                'align-items:flex-start;' +
-                'gap:.8em;' +
-                'width:100%;' +
-                'box-sizing:border-box;' +
-            '}' +
-
-            '.utopia-movie__poster{' +
-                'flex:0 0 8em;' +
-                'width:8em;' +
-                'height:12em;' +
-                'overflow:hidden;' +
-                'border-radius:.25em;' +
-                'background:rgba(255,255,255,.05);' +
-            '}' +
-
-            '.utopia-movie__poster.focus{' +
-                'outline:.2em solid rgba(255,255,255,.85);' +
-                'outline-offset:-.2em;' +
-            '}' +
-
-            '.utopia-movie__poster-img{' +
-                'display:block;' +
-                'width:100%;' +
-                'height:100%;' +
-                'object-fit:cover;' +
-            '}' +
-
-            '.utopia-movie__details{' +
-                'flex:1;' +
-                'min-width:0;' +
-                'padding-top:.1em;' +
-            '}' +
-
-            '.utopia-movie__year,' +
-            '.utopia-movie__country,' +
-            '.utopia-movie__rating,' +
-            '.utopia-movie__imdb,' +
-            '.utopia-movie__pg{' +
-                'font-size:1.22em;' +
-                'color:#FFFFFF;' +
-                'line-height:1.45;' +
-                'opacity:1;' +
-            '}' +
-
-            '.utopia-movie__rating,' +
-            '.utopia-movie__imdb{' +
-                'margin-top:.35em;' +
-            '}' +
-
-            '.utopia-movie__pg{' +
-                'margin-top:.35em;' +
-            '}' +
-
-            '.utopia-movie__title{' +
-                'font-size:2.25em;' +
-                'color:#FFFFFF;' +
-                'font-weight:700;' +
-                'line-height:1.25;' +
-                'margin-top:1em;' +
-            '}' +
-
-            '.utopia-movie__genres{' +
-                'font-size:1.22em;' +
-                'color:#FFFFFF;' +
-                'line-height:1.4;' +
-                'opacity:.65;' +
-                'margin-top:.45em;' +
-            '}' +
-
-            '.utopia-movie__overview{' +
-                'font-size:1.22em;' +
-                'color:#FFFFFF;' +
-                'line-height:1.45;' +
-                'opacity:1;' +
-                'margin-top:1.2em;' +
+            '.utopia-header{' +
+                'flex-shrink:0;' +
+                'margin-top:0;' +
+                'justify-content:flex-start;' +
+                'padding-left:1%;' +
                 'padding-bottom:1em;' +
             '}' +
 
             '.utopia-list{' +
-                'display:flex;' +
-                'flex-direction:column;' +
-                'gap:.7em;' +
+                'flex-shrink:0;' +
+            '}' +
+
+        '}' +
+
+        /* Landscape */
+        '@media screen and (orientation:landscape){' +
+
+    '.utopia-wrap{' +
+        'display:grid;' +
+        'grid-template-columns:minmax(0,30%) minmax(0,1fr);' +
+        'grid-template-rows:auto minmax(0,1fr);' +
+        'column-gap:1.2em;' +
+        'height:100%;' +
+        'min-height:0;' +
+        'box-sizing:border-box;' +
+        'align-items:stretch;' +
+    '}' +
+
+        '.utopia-header{' +
+            'grid-column:2;' +
+            'grid-row:1;' +
+            'min-width:0;' +
+            'justify-content:flex-start;' +
+            'padding-left:1%;' +
+            'padding-top:0;' +
+            'padding-bottom:1em;' +
+            'position:relative;' +
+            'z-index:2;' +
+            'top:-.5em;' +
+        '}' +
+
+    '.utopia-header__info{' +
+        'display:none;' +
+    '}' +
+
+    '.utopia-movie{' +
+        'grid-column:1;' +
+        'grid-row:1 / span 2;' +
+        'display:flex;' +
+        'height:100%;' +
+        'min-height:0;' +
+        'overflow-y:auto;' +
+        'overflow-x:hidden;' +
+    '}' +
+
+    '.utopia-movie__top{' +
+        'width:100%;' +
+    '}' +
+
+    '.utopia-movie__poster{' +
+        'flex:0 0 7.5em;' +
+        'width:7.5em;' +
+        'height:11.25em;' +
+    '}' +
+
+    '.utopia-list{' +
+        'grid-column:2;' +
+        'grid-row:2;' +
+        'min-width:0;' +
+        'min-height:0;' +
+        'height:auto;' +
+        'overflow-y:auto;' +
+        'overflow-x:hidden;' +
+        'touch-action: pan-y;' +
+        'overscroll-behavior: contain;' +
+        'margin-top:-3em;' +
+        'padding-top:3em;' +
+        'padding-bottom:1.8em;' +
+        '-webkit-mask-image:linear-gradient(to bottom,rgba(0,0,0,0) 0,rgba(0,0,0,.25) 1em,rgba(0,0,0,.55) 2em,#000 3em,#000 calc(100% - 1.8em),rgba(0,0,0,.55) calc(100% - 1.2em),rgba(0,0,0,.35) calc(100% - .6em),rgba(0,0,0,0) 100%);' +
+        'mask-image:linear-gradient(to bottom,rgba(0,0,0,0) 0,rgba(0,0,0,.25) 1em,rgba(0,0,0,.55) 2em,#000 3em,#000 calc(100% - 1.8em),rgba(0,0,0,.55) calc(100% - 1.2em),rgba(0,0,0,.35) calc(100% - .6em),rgba(0,0,0,0) 100%);' +
+    '}' +
+
+    '.utopia-portrait-back{' +
+        'display:none !important;' +
+    '}' +
+
+'}' +
+            
+        '@media screen and (max-width:600px){' +
+
+            '.utopia-wrap{' +
+                'padding:.8em .8em 0;' +
             '}' +
 
             '.utopia-item{' +
-                'position:relative;' +
-                'display:flex;' +
-                'align-items:center;' +
-                'justify-content:space-between;' +
-                'gap:1em;' +
-                'padding:1em 1.15em;' +
-                'border-radius:.7em;' +
-                'background:rgba(255,255,255,.015);' +
-                'border:1px solid rgba(255,255,255,.07);' +
-                'box-sizing:border-box;' +
-                'user-select:none;' +
-                'width:98%;' +
-                'align-self:center;' +
-            '}' +
-
-            '@keyframes utopia-bounce{' +
-                '0%{transform:translateY(0) scale(1);}' +
-                '30%{transform:translateY(-.45em) scale(1.02);}' +
-                '55%{transform:translateY(.12em) scale(.995);}' +
-                '80%{transform:translateY(-.08em) scale(1.005);}' +
-                '100%{transform:translateY(0) scale(1);}' +
-            '}' +
-
-            '.utopia-item.focus{' +
-                'background:rgba(255,255,255,.065);' +
-                'border-color:rgba(255,255,255,.75);' +
-                'animation:utopia-bounce .35s ease-out;' +
-            '}' +
-
-            '.utopia-item__left{' +
-                'flex:1;' +
-                'min-width:0;' +
-            '}' +
-
-            '.utopia-item__movie{' +
-                'font-weight:600;' +
-                'font-size:1.85em;' +
-                'line-height:1.3;' +
-                'margin-bottom:.2em;' +
-                'overflow:hidden;' +
-                'text-overflow:ellipsis;' +
-                'white-space:nowrap;' +
-            '}' +
-
-            '.utopia-item__title{' +
-                'font-size:1.27em;' +
-                'opacity:.58;' +
-                'line-height:1.3;' +
-                'margin-bottom:.3em;' +
-                'overflow:hidden;' +
-                'text-overflow:ellipsis;' +
-                'white-space:nowrap;' +
-            '}' +
-
-            '.utopia-item__meta{' +
-                'font-size:1.16em;' +
-                'opacity:.45;' +
+                'padding:.9em 1em;' +
             '}' +
 
             '.utopia-item__badges{' +
-                'display:flex;' +
-                'align-items:center;' +
-                'gap:.7em;' +
-                'white-space:nowrap;' +
-                'flex-shrink:0;' +
-                'font-size:1.2em;' +
-                'font-weight:600;' +
-            '}' +
-
-            '.utopia-badge{' +
-                'display:inline-flex;' +
-                'align-items:center;' +
-                'gap:.2em;' +
-            '}' +
-
-            '.utopia-badge--good{color:#7fcf8a;}' +
-            '.utopia-badge--mid{color:#d6b85c;}' +
-            '.utopia-badge--bad{color:#c96b6b;}' +
-
-            '.utopia-more{' +
-                'display:flex;' +
-                'align-items:center;' +
-                'justify-content:center;' +
-                'padding:1em;' +
-                'margin:.3em 0 1em;' +
-                'border-radius:.7em;' +
-                'background:rgba(255,255,255,.05);' +
-                'border:1px solid rgba(255,255,255,.07);' +
-                'font-size:.9em;' +
-                'font-weight:600;' +
-            '}' +
-
-            '.utopia-more.focus{' +
-                'background:rgba(255,255,255,.08);' +
-                'border-color:rgba(255,255,255,.75);' +
-            '}' +
-
-            '.utopia-state{' +
-                'display:flex;' +
-                'flex-direction:column;' +
-                'align-items:center;' +
-                'justify-content:center;' +
-                'text-align:center;' +
-                'padding:4em 1.5em;' +
-                'opacity:.9;' +
-            '}' +
-
-            '.utopia-state__icon{' +
-                'font-size:2.2em;' +
-                'line-height:1;' +
-                'margin-bottom:.55em;' +
-                'opacity:.8;' +
-            '}' +
-
-            '.utopia-state__title{' +
                 'font-size:1.1em;' +
-                'font-weight:600;' +
-                'margin-bottom:.35em;' +
+                'gap:.45em;' +
             '}' +
 
-            '.utopia-state__text{' +
-                'max-width:42em;' +
-                'font-size:.88em;' +
-                'line-height:1.45;' +
-                'opacity:.55;' +
-                'margin-bottom:1.1em;' +
-            '}' +
+        '}';
 
-            '@media screen and (orientation:portrait){' +
-                '.utopia-movie{' +
-                    'display:none;' +
-                '}' +
-
-                '.utopia-portrait-back,' +
-                '.utopia-sort-btn{' +
-                    'font-size:1.5em;' +
-                '}' +
-
-                '.utopia-wrap{' +
-                    'height:100%;' +
-                    'min-height:0;' +
-                    'overflow-y:auto;' +
-                    'overflow-x:hidden;' +
-                    'touch-action:pan-y;' +
-                    'overscroll-behavior:contain;' +
-                    '-webkit-mask-image:linear-gradient(to bottom,rgba(0,0,0,0) 0,rgba(0,0,0,.5) .4em,#000 .8em);' +
-                    'mask-image:linear-gradient(to bottom,rgba(0,0,0,0) 0,rgba(0,0,0,.5) .4em,#000 .8em);' +
-                '}' +
-
-                '.utopia-header{' +
-                    'flex-shrink:0;' +
-                    'margin-top:0;' +
-                    'justify-content:flex-start;' +
-                    'padding-left:1%;' +
-                    'padding-bottom:1em;' +
-                '}' +
-
-                '.utopia-list{' +
-                    'flex-shrink:0;' +
-                '}' +
-            '}' +
-
-            '@media screen and (orientation:landscape){' +
-                '.utopia-wrap{' +
-                    'display:grid;' +
-                    'grid-template-columns:minmax(0,30%) minmax(0,1fr);' +
-                    'grid-template-rows:auto minmax(0,1fr);' +
-                    'column-gap:1.2em;' +
-                    'height:100%;' +
-                    'min-height:0;' +
-                    'box-sizing:border-box;' +
-                    'align-items:stretch;' +
-                '}' +
-
-                '.utopia-header{' +
-                    'grid-column:2;' +
-                    'grid-row:1;' +
-                    'min-width:0;' +
-                    'justify-content:flex-start;' +
-                    'padding-left:1%;' +
-                    'padding-top:0;' +
-                    'padding-bottom:1em;' +
-                    'position:relative;' +
-                    'z-index:2;' +
-                    'top:-.5em;' +
-                '}' +
-
-                '.utopia-header__info{' +
-                    'display:none;' +
-                '}' +
-
-                '.utopia-movie{' +
-                    'grid-column:1;' +
-                    'grid-row:1 / span 2;' +
-                    'display:flex;' +
-                    'height:100%;' +
-                    'min-height:0;' +
-                    'overflow-y:auto;' +
-                    'overflow-x:hidden;' +
-                '}' +
-
-                '.utopia-movie__top{' +
-                    'width:100%;' +
-                '}' +
-
-                '.utopia-movie__poster{' +
-                    'flex:0 0 7.5em;' +
-                    'width:7.5em;' +
-                    'height:11.25em;' +
-                '}' +
-
-                '.utopia-list{' +
-                    'grid-column:2;' +
-                    'grid-row:2;' +
-                    'min-width:0;' +
-                    'min-height:0;' +
-                    'height:auto;' +
-                    'overflow-y:auto;' +
-                    'overflow-x:hidden;' +
-                    'touch-action: pan-y;' +
-                    'overscroll-behavior: contain;' +
-                    'margin-top:-3em;' +
-                    'padding-top:3em;' +
-                    'padding-bottom:1.8em;' +
-                    '-webkit-mask-image:linear-gradient(to bottom,rgba(0,0,0,0) 0,rgba(0,0,0,.25) 1em,rgba(0,0,0,.55) 2em,#000 3em,#000 calc(100% - 1.8em),rgba(0,0,0,.55) calc(100% - 1.2em),rgba(0,0,0,.35) calc(100% - .6em),rgba(0,0,0,0) 100%);' +
-                    'mask-image:linear-gradient(to bottom,rgba(0,0,0,0) 0,rgba(0,0,0,.25) 1em,rgba(0,0,0,.55) 2em,#000 3em,#000 calc(100% - 1.8em),rgba(0,0,0,.55) calc(100% - 1.2em),rgba(0,0,0,.35) calc(100% - .6em),rgba(0,0,0,0) 100%);' +
-                '}' +
-
-                '.utopia-portrait-back{' +
-                    'display:none !important;' +
-                '}' +
-            '}' +
-            
-            '@media screen and (max-width:600px){' +
-                '.utopia-wrap{' +
-                    'padding:.8em .8em 0;' +
-                '}' +
-
-                '.utopia-item{' +
-                    'padding:.9em 1em;' +
-                '}' +
-
-                '.utopia-item__badges{' +
-                    'font-size:1.1em;' +
-                    'gap:.45em;' +
-                '}' +
-            '}';
-
-        var style = document.createElement('style');
-        style.id = 'utopia-styles';
-        style.type = 'text/css';
-        style.appendChild(document.createTextNode(css));
-        document.head.appendChild(style);
-    }
+    var style = document.createElement('style');
+    style.id = 'utopia-styles';
+    style.type = 'text/css';
+    style.appendChild(document.createTextNode(css));
+    document.head.appendChild(style);
+}
 
     // =========================================================
     // 1. Сховище
@@ -650,6 +677,8 @@
         return !!getKey();
     }
 
+    // Поле "API ключ" працює як кнопка: ключ редагується у власному вікні,
+    // а "Назад" у клавіатурі нічого не зберігає (див. editApiKey).
     var keyField = {
         name: 'API ключ UTOPIA',
         description: ''
@@ -677,10 +706,10 @@
         keyField.description = keyDescription();
 
         try {
-            var $el =$('[data-name="utopia_api_key_btn"], [data-param="utopia_api_key_btn"]');
+            var $el = $('[data-name="utopia_api_key_btn"], [data-param="utopia_api_key_btn"]');
             if ($el.length) {
-                var $descr =$el.find('.settings-param__descr, .settings-param__descr-text');
-                if ($descr.length)$descr.html(keyField.description);
+                var $descr = $el.find('.settings-param__descr, .settings-param__descr-text');
+                if ($descr.length) $descr.html(keyField.description);
             }
         } catch (e) {}
     }
@@ -696,6 +725,10 @@
         backToSettings();
     }
 
+    // Клавіатура Lampa повертає тільки текст і не каже, чим її закрили ("ОК" чи "Назад"),
+    // тому якщо ключ змінився, показуємо підтвердження: Застосувати / Скасувати.
+    // "Назад" у підтвердженні = скасувати.
+        // Вікно підтвердження: Застосувати / Скасувати ("Назад" = скасувати).
     function askApply(key) {
         setTimeout(function () {
             Lampa.Select.show({
@@ -708,4 +741,1931 @@
                     if (item.action === 'apply') applyApiKey(key);
                     else backToSettings();
                 },
-                onBack: function ()
+                onBack: function () {
+                    backToSettings();
+                }
+            });
+        }, 200);
+    }
+
+    // Клавіатура Lampa повертає тільки текст і не каже, чим її закрили. Кнопка "Скасувати"
+    // віддає порожній рядок, а "Назад" - текст, що є зараз. Тому:
+    //  - порожній результат або той самий ключ = нічого не змінюємо;
+    //  - змінений ключ = показуємо підтвердження "Застосувати / Скасувати".
+    // Видалити ключ можна лише окремим пунктом меню (див. editApiKey).
+        // Живий перегляд введеного тексту на ТБ.
+    // Рядок введення Lampa показує довгий ключ в один рядок і ховає кінець, тому не видно,
+    // що саме набрано. Ми дублюємо текст угорі екрана з переносом рядків і лічильником символів.
+    var typingPreview = { timer: null, guard: null, box: null, textEl: null, countEl: null, last: null };
+
+    function isMobileScreen() {
+        try {
+            return !!(Lampa.Platform && typeof Lampa.Platform.screen === 'function' && Lampa.Platform.screen('mobile'));
+        } catch (e) {
+            return false;
+        }
+    }
+
+    // Поле, в яке клавіатура Lampa пише введений текст
+    function findKeyboardField() {
+        var field = document.getElementById('orsay-keyboard');
+
+        if (!field) field = document.querySelector('.simple-keyboard-input input, .simple-keyboard-input textarea');
+
+        if (!field) {
+            var list = document.querySelectorAll('input[type="text"], input:not([type]), textarea');
+            for (var i = 0; i < list.length; i++) {
+                if (list[i].offsetParent !== null) {
+                    field = list[i];
+                    break;
+                }
+            }
+        }
+
+        return field;
+    }
+
+    function ensurePreviewBox() {
+        if (typingPreview.box) return;
+
+        var box = document.createElement('div');
+        box.style.cssText = 'position:fixed;left:4%;right:4%;top:1em;z-index:100000;padding:.6em .9em;' +
+            'border-radius:.5em;background:rgba(0,0,0,.88);color:#fff;font-size:1.4em;line-height:1.35;' +
+            'word-break:break-all;overflow-wrap:anywhere;pointer-events:none;';
+
+        var countEl = document.createElement('div');
+        countEl.style.cssText = 'font-size:.6em;opacity:.65;margin-bottom:.2em;';
+
+        var textEl = document.createElement('div');
+
+        box.appendChild(countEl);
+        box.appendChild(textEl);
+        document.body.appendChild(box);
+
+        typingPreview.box = box;
+        typingPreview.countEl = countEl;
+        typingPreview.textEl = textEl;
+    }
+
+    function stopTypingPreview() {
+        clearInterval(typingPreview.timer);
+        clearTimeout(typingPreview.guard);
+
+        if (typingPreview.box && typingPreview.box.parentNode) {
+            typingPreview.box.parentNode.removeChild(typingPreview.box);
+        }
+
+        typingPreview.timer = null;
+        typingPreview.guard = null;
+        typingPreview.box = null;
+        typingPreview.textEl = null;
+        typingPreview.countEl = null;
+        typingPreview.last = null;
+    }
+
+    function startTypingPreview() {
+        stopTypingPreview();
+
+        // На телефоні клавіатура зручна й так
+        if (isMobileScreen()) return;
+
+        typingPreview.timer = setInterval(function () {
+            var field = findKeyboardField();
+            if (!field) return;
+
+            var text = String(field.value !== undefined ? field.value : (field.textContent || ''));
+            if (text === typingPreview.last) return;
+
+            typingPreview.last = text;
+            ensurePreviewBox();
+            typingPreview.countEl.textContent = 'Введено символів: ' + text.length;
+            typingPreview.textEl.textContent = text || '(порожньо)';
+        }, 150);
+
+        // Страховка: якщо вікно клавіатури закрилось без відповіді
+        typingPreview.guard = setTimeout(stopTypingPreview, 10 * 60 * 1000);
+    }
+
+        function openKeyboard(startValue) {
+        var current = getKey();
+
+        function done(newValue) {
+            stopTypingPreview();
+
+            var key = String(newValue === null || newValue === undefined ? '' : newValue).trim();
+
+            if (!key || key === current) {
+                backToSettings();
+                return;
+            }
+
+            askApply(key);
+        }
+
+        if (Lampa.Input && typeof Lampa.Input.edit === 'function') {
+            Lampa.Input.edit({
+                title: 'API ключ UTOPIA',
+                value: startValue,
+                free: true,
+                nosave: true
+            }, done);
+
+            startTypingPreview();
+        } else {
+            var result = prompt('API ключ UTOPIA', startValue);
+            if (result !== null) done(result);
+            else backToSettings();
+        }
+    }
+
+    function editApiKey() {
+        var current = getKey();
+
+        // Ключа ще немає - одразу чиста клавіатура
+        if (!current) {
+            openKeyboard('');
+            return;
+        }
+
+        // Збережений ключ у рядку введення виходить за межі екрана (особливо на ТБ),
+        // а курсор стоїть на початку - здається, що введення не працює. Тому спершу
+        // вибір: чиста клавіатура, редагування поточного ключа або видалення.
+        Lampa.Select.show({
+            title: 'API ключ UTOPIA',
+            items: [
+                { title: '✏️ Ввести новий ключ', subtitle: 'клавіатура буде порожня', action: 'new' },
+                { title: '📝 Редагувати поточний', subtitle: maskKey(current), action: 'edit' },
+                { title: '🗑 Видалити ключ', action: 'delete' },
+                { title: '✖ Скасувати', action: 'cancel' }
+            ],
+            onSelect: function (item) {
+                if (item.action === 'new') setTimeout(function () { openKeyboard(''); }, 200);
+                else if (item.action === 'edit') setTimeout(function () { openKeyboard(current); }, 200);
+                else if (item.action === 'delete') askApply('');
+                else backToSettings();
+            },
+            onBack: function () {
+                backToSettings();
+            }
+        });
+    }
+
+    // =========================================================
+    // 2. Налаштування
+    // =========================================================
+    // ----- Отримання ключа з сайту: вхід логіном і паролем (ЕКСПЕРИМЕНТ) -----
+    // Працює лише в застосунку Lampa для Android: тільки він віддає заголовки відповіді
+    // (Set-Cookie) і дозволяє передавати Cookie. Запити йдуть прямо на utp.to, БЕЗ сторонніх
+    // проксі. Пароль нікуди не зберігається і не потрапляє у звіт.
+    var SITE_ORIGIN = 'https://utp.to';
+    var siteLastRun = 0;        // коли востаннє запускали вхід
+    var siteCooldownUntil = 0;  // до якого часу чекаємо після помилки 429
+    var SITE_UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/154.0.0.0 Safari/537.36';
+
+    function siteUserName() {
+        return String(Lampa.Storage.get('utopia_username', '') || '');
+    }
+
+    function siteNative(url, postdata, headers, callback) {
+        var net = new Lampa.Reguest();
+        net.timeout(20000);
+        net.native(url, function (res) {
+            callback(null, res);
+        }, function (xhr) {
+            callback(xhr || {}, null);
+        }, postdata || false, {
+            dataType: 'text',
+            headers: headers,
+            returnHeaders: true
+        });
+    }
+
+    // Відповідь застосунку: або { headers, body }, або (без підтримки заголовків) просто текст
+    function siteParse(res) {
+        var obj = res;
+
+        if (typeof obj === 'string') {
+            try {
+                var parsed = JSON.parse(obj);
+                if (parsed && typeof parsed === 'object' && (parsed.body !== undefined || parsed.headers !== undefined)) obj = parsed;
+            } catch (e) {}
+        }
+
+        if (obj && typeof obj === 'object' && (obj.body !== undefined || obj.headers !== undefined)) {
+            var body = obj.body;
+
+            if (body && typeof body === 'object') {
+                try { body = JSON.stringify(body); } catch (e) { body = ''; }
+            }
+
+            return { headers: obj.headers || {}, body: String(body || ''), hasHeaders: !!obj.headers };
+        }
+
+        return { headers: {}, body: typeof res === 'string' ? res : '', hasHeaders: false };
+    }
+
+    function siteCollectCookies(jar, headers) {
+        var list = headers && (headers['set-cookie'] || headers['Set-Cookie']);
+        var added = [];
+
+        if (!list) return added;
+        if (typeof list === 'string') list = list.split('\n');
+
+        list.forEach(function (line) {
+            var part = String(line).split(';')[0];
+            var eq = part.indexOf('=');
+            if (eq <= 0) return;
+
+            var name = part.slice(0, eq).trim();
+            var value = part.slice(eq + 1).trim();
+
+            if (!value || value === 'deleted') delete jar[name];
+            else jar[name] = value;
+
+            if (added.indexOf(name) === -1) added.push(name);
+        });
+
+        return added;
+    }
+
+    // Назви кукі та їхня довжина (значення не показуємо)
+    function siteCookieSizes(jar) {
+        return Object.keys(jar).map(function (name) {
+            return name + ' (' + String(jar[name]).length + ' симв.)';
+        }).join(', ');
+    }
+
+    function siteCookieHeader(jar) {
+        return Object.keys(jar).map(function (name) {
+            return name + '=' + jar[name];
+        }).join('; ');
+    }
+
+    function siteAttr(tag, name) {
+        var m = tag.match(new RegExp('\\b' + name + '\\s*=\\s*("([^"]*)"|\'([^\']*)\')', 'i'));
+        return m ? (m[2] !== undefined ? m[2] : m[3]) : '';
+    }
+
+    function siteDecode(text) {
+        return String(text).replace(/&quot;/g, '"').replace(/&#039;/g, "'").replace(/&amp;/g, '&');
+    }
+
+    function siteHasLoginForm(html) {
+        return /<input[^>]*type\s*=\s*["']password["']/i.test(html) && /name\s*=\s*["']_token["']/i.test(html);
+    }
+
+    // Поля форми входу: ім'я поля логіна й пароля та всі приховані поля (_token та інші)
+    function siteLoginFields(html) {
+        var fields = { user: '', pass: '', hidden: [] };
+        var tags = html.match(/<input\b[^>]*>/gi) || [];
+        var firstText = '';
+
+        tags.forEach(function (tag) {
+            var type = (siteAttr(tag, 'type') || 'text').toLowerCase();
+            var name = siteAttr(tag, 'name');
+            if (!name) return;
+
+            if (type === 'password') {
+                if (!fields.pass) fields.pass = name;
+            } else if (type === 'hidden') {
+                fields.hidden.push({ name: name, value: siteDecode(siteAttr(tag, 'value')) });
+            } else if (type === 'text' || type === 'email') {
+                if (!firstText) firstText = name;
+                if (!fields.user && /user|login|email/i.test(name)) fields.user = name;
+            }
+        });
+
+        if (!fields.user) fields.user = firstText;
+
+        if (!fields.hidden.some(function (h) { return h.name === '_token'; })) {
+            var meta = html.match(/<meta[^>]*name\s*=\s*["']csrf-token["'][^>]*>/i);
+            var token = meta ? siteAttr(meta[0], 'content') : '';
+            if (token) fields.hidden.push({ name: '_token', value: token });
+        }
+
+        return fields;
+    }
+
+    function siteMask(token) {
+        return token.slice(0, 4) + '…' + token.slice(-4) + ' (' + token.length + ' симв.)';
+    }
+
+    // Шукає схожі на ключ рядки на сторінці. primary - поля вводу й елементи з кодом,
+    // broad - будь-який довгий рядок у тексті (запасний варіант).
+    function siteCandidates(html, exclude) {
+        var cleaned = html.replace(/<script[\s\S]*?<\/script>/gi, ' ').replace(/<style[\s\S]*?<\/style>/gi, ' ');
+        var primary = [];
+        var broad = [];
+
+        function add(list, value, where) {
+            if (!value || exclude[value]) return;
+            if (!/[A-Za-z]/.test(value) || !/\d/.test(value)) return;
+            for (var i = 0; i < list.length; i++) if (list[i].value === value) return;
+            list.push({ value: value, where: where });
+        }
+
+        (cleaned.match(/<(input|textarea)\b[^>]*>/gi) || []).forEach(function (tag) {
+            if (siteAttr(tag, 'name') === '_token') return;
+            var value = siteDecode(siteAttr(tag, 'value'));
+            if (/^[A-Za-z0-9_\-|]{32,200}$/.test(value)) add(primary, value, 'поле вводу');
+        });
+
+        var re = /<(code|pre|kbd|samp|td|th|span|p|div|li|dd|b|strong)\b[^>]*>\s*([A-Za-z0-9_\-|]{32,200})\s*<\//gi;
+        var m;
+        while ((m = re.exec(cleaned)) !== null) add(primary, m[2], 'елемент <' + m[1].toLowerCase() + '>');
+
+        var text = cleaned.replace(/<[^>]*>/g, ' ');
+        (text.match(/[A-Za-z0-9_\-|]{32,200}/g) || []).forEach(function (value) {
+            add(broad, value, 'текст сторінки');
+        });
+
+        return primary.length ? primary : broad;
+    }
+
+    function siteDescribeError(err) {
+        var parts = [];
+        if (err.status !== undefined && err.status !== null) parts.push('код ' + err.status);
+        if (err.statusText) parts.push(String(err.statusText));
+
+        var text = String(err.responseText || '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 80);
+        if (text) parts.push(text);
+
+        return parts.join(', ') || 'невідома помилка';
+    }
+
+    // Текст помилки з JSON-відповіді сайту (Laravel віддає { message, errors })
+    function siteErrorMessage(err) {
+        try {
+            var data = JSON.parse(String(err.responseText || ''));
+
+            if (data && data.errors) {
+                var first = Object.keys(data.errors)[0];
+                var list = data.errors[first];
+                if (list && list[0]) return String(list[0]);
+            }
+
+            if (data && data.message) return String(data.message);
+        } catch (e) {}
+
+        return '';
+    }
+
+    // Вхід на сайт і пошук ключа. finish({ ok, candidates, report }).
+    // У звіт потрапляють лише назви кукі та замасковані ключі - ні пароля, ні значень кукі.
+    function siteFetchKey(username, password, finish) {
+        var report = [];
+        var jar = { laravel_cookie_consent: '1' };
+        var exclude = {};
+
+        function note(line) { report.push(line); }
+
+        function fail(message) {
+            note('✖ ' + message);
+            finish({ ok: false, candidates: [], report: report.join('\n') });
+        }
+
+        function headers(extra) {
+            var h = {
+                'User-Agent': SITE_UA,
+                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+                'Accept-Language': 'uk,ru;q=0.9,en;q=0.8',
+                'Cookie': siteCookieHeader(jar)
+            };
+
+            for (var k in extra) h[k] = extra[k];
+            return h;
+        }
+
+        var loginUrl = SITE_ORIGIN + '/login';
+        var keysUrl = SITE_ORIGIN + '/users/' + encodeURIComponent(username) + '/apikeys';
+
+        // 1. Сторінка входу: токен форми і початкові кукі
+        siteNative(loginUrl, null, headers({ 'Referer': SITE_ORIGIN + '/' }), function (err, res) {
+            if (err) {
+                if (err.status === 429) {
+                    siteCooldownUntil = Date.now() + 5 * 60 * 1000;
+                    fail('1) GET /login: сайт тимчасово обмежив запити (429). Зачекай кілька хвилин і повтори');
+                } else {
+                    fail('1) GET /login: ' + siteDescribeError(err));
+                }
+                return;
+            }
+
+            var r = siteParse(res);
+            siteCollectCookies(jar, r.headers);
+            note('1) GET /login: заголовки ' + (r.hasHeaders ? 'є' : 'НЕМАЄ') + ', кукі: ' + Object.keys(jar).join(', '));
+
+            if (!r.hasHeaders) {
+                fail('Застосунок не віддає заголовки відповіді. Потрібна свіжа версія Lampa для Android.');
+                return;
+            }
+
+            var form = siteLoginFields(r.body);
+
+            if (!form.pass || !form.user) {
+                fail('На сторінці входу не знайдено поля логіна/пароля (поля: ' + (form.user || '-') + ' / ' + (form.pass || '-') + ')');
+                return;
+            }
+
+            if (!form.hidden.some(function (h) { return h.name === '_token'; })) {
+                fail('На сторінці входу не знайдено захисний токен _token');
+                return;
+            }
+
+            form.hidden.forEach(function (h) { if (h.value) exclude[h.value] = true; });
+            note('   поля форми: ' + form.hidden.map(function (h) { return h.name; }).join(', ') + ', ' + form.user + ', ' + form.pass);
+
+            // 2. Вхід
+            var pairs = form.hidden.map(function (h) {
+                return encodeURIComponent(h.name) + '=' + encodeURIComponent(h.value);
+            });
+            pairs.push(encodeURIComponent(form.user) + '=' + encodeURIComponent(username));
+            pairs.push(encodeURIComponent(form.pass) + '=' + encodeURIComponent(password));
+
+            // Просимо JSON-відповідь: тоді сайт не робить перенаправлення після входу
+            // (застосунок губить кукі при перенаправленні), а при помилці віддає 422 з поясненням.
+            siteNative(loginUrl, pairs.join('&'), headers({
+                'Origin': SITE_ORIGIN,
+                'Referer': loginUrl,
+                'Accept': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest',
+                'Content-Type': 'application/x-www-form-urlencoded'
+            }), function (err2, res2) {
+                if (err2) {
+                    var why = siteErrorMessage(err2);
+
+                    if (err2.status === 429) {
+                        siteCooldownUntil = Date.now() + 5 * 60 * 1000;
+                        fail('2) POST /login: забагато спроб входу (429). Зачекай кілька хвилин');
+                    }
+                    else if (err2.status === 419) fail('2) POST /login: сторінка входу застаріла (419)');
+                    else if (err2.status === 422) fail('2) POST /login: сайт відхилив вхід' + (why ? ': ' + why : '') + ' (код 422). Перевір логін і пароль');
+                    else fail('2) POST /login: ' + siteDescribeError(err2) + ' [відповідь сервера: ' + JSON.stringify(err2) + ']');
+                    return;
+                }
+
+                var r2 = siteParse(res2);
+                var added = siteCollectCookies(jar, r2.headers);
+                var location = r2.headers && (r2.headers.location || r2.headers.Location) || '';
+                note('2) POST /login: заголовки ' + (r2.hasHeaders ? 'є' : 'НЕМАЄ') + ', нові кукі: ' + (added.join(', ') || 'немає') + (location ? ', Location: ' + location : '') + ', відповідь: ' + (r2.body.length ? r2.body.length + ' симв.' : 'порожня'));
+
+                note('   кукі після входу: ' + siteCookieSizes(jar));
+
+                if (/"two_factor"\s*:\s*true/.test(r2.body)) {
+                    fail('На акаунті ввімкнена двофакторна автентифікація - цей спосіб не підходить');
+                    return;
+                }
+
+                if (siteHasLoginForm(r2.body)) {
+                    note('   відповідь містить форму входу: сайт або відхилив дані, або перенаправив без кукі');
+                }
+
+                // 3. Сторінка ключів
+                siteNative(keysUrl, null, headers({ 'Referer': SITE_ORIGIN + '/' }), function (err3, res3) {
+                    if (err3) {
+                        if (err3.status === 429) {
+                            siteCooldownUntil = Date.now() + 5 * 60 * 1000;
+                            fail('3) GET apikeys: сайт тимчасово обмежив запити (429). Зачекай кілька хвилин і повтори один раз');
+                        } else {
+                            fail('3) GET apikeys: ' + siteDescribeError(err3));
+                        }
+                        return;
+                    }
+
+                    var r3 = siteParse(res3);
+                    siteCollectCookies(jar, r3.headers);
+
+                    if (siteHasLoginForm(r3.body)) {
+                        fail('3) GET apikeys: не авторизовано (сайт показав форму входу). Причина: невірний логін/пароль або застосунок втратив кукі при перенаправленні');
+                        return;
+                    }
+
+                    var csrf = r3.body.match(/<meta[^>]*name\s*=\s*["']csrf-token["'][^>]*>/i);
+                    if (csrf) exclude[siteAttr(csrf[0], 'content')] = true;
+
+                    var found = siteCandidates(r3.body, exclude);
+                    note('3) GET apikeys: сторінку отримано (' + r3.body.length + ' симв.), схожих на ключ рядків: ' + found.length);
+
+                    found.forEach(function (c, i) {
+                        note('   ' + (i + 1) + ') ' + siteMask(c.value) + ' - ' + c.where);
+                    });
+
+                    if (!found.length) {
+                        fail('Ключ на сторінці не знайдено (він може бути прихований або показуватись лише після натискання кнопки)');
+                        return;
+                    }
+
+                    note('✔ Готово');
+                    finish({ ok: true, candidates: found, report: report.join('\n') });
+                });
+            });
+        });
+    }
+
+    function showSiteReport(text) {
+        var modal = $(
+            '<div>' +
+                '<textarea readonly style="width:100%;height:16em;box-sizing:border-box;"></textarea>' +
+                '<div style="display:flex;gap:.6em;margin-top:.8em;">' +
+                    '<div class="utopia-action selector utopia-rep-copy">📋 Скопіювати</div>' +
+                    '<div class="utopia-action selector utopia-rep-close">Закрити</div>' +
+                '</div>' +
+            '</div>'
+        );
+
+        modal.find('textarea').val(text);
+
+        function close() {
+            Lampa.Modal.close();
+            backToSettings();
+        }
+
+        modal.find('.utopia-rep-copy').on('click hover:enter', function () {
+            try {
+                Lampa.Utils.copyTextToClipboard(text, function () {
+                    Lampa.Noty.show('UTOPIA: звіт скопійовано');
+                }, function () {
+                    Lampa.Noty.show('UTOPIA: не вдалося скопіювати');
+                });
+            } catch (e) {
+                Lampa.Noty.show('UTOPIA: не вдалося скопіювати');
+            }
+        });
+
+        modal.find('.utopia-rep-close').on('click hover:enter', close);
+
+        Lampa.Modal.open({
+            title: 'UTOPIA: звіт входу',
+            html: modal,
+            size: 'medium',
+            scroll_to_center: true,
+            select: modal.find('.utopia-rep-copy'),
+            onBack: close
+        });
+    }
+
+    function siteAskUserName(done) {
+        function finish(value) {
+            var name = String(value || '').trim().replace(/^@/, '');
+            var found = name.match(/\/users\/([^\/?#\s]+)/i);
+            if (found) name = found[1];
+
+            if (!name) {
+                backToSettings();
+                return;
+            }
+
+            Lampa.Storage.set('utopia_username', name);
+            done();
+        }
+
+        Lampa.Input.edit({
+            title: "Ім'я користувача на utp.to",
+            value: siteUserName(),
+            free: true,
+            nosave: true
+        }, finish);
+    }
+
+    function siteRun(username, password) {
+        siteLastRun = Date.now();
+        Lampa.Noty.show('UTOPIA: входжу на utp.to...');
+
+        try { Lampa.Loading.start('utopia_site_login', 'UTOPIA: вхід...'); } catch (e) {}
+
+        siteFetchKey(username, password, function (result) {
+            try { Lampa.Loading.stop('utopia_site_login'); } catch (e) {}
+
+            if (!result.ok) {
+                showSiteReport(result.report);
+                return;
+            }
+
+            if (result.candidates.length === 1) {
+                Lampa.Noty.show('UTOPIA: ключ знайдено');
+                askApply(result.candidates[0].value);
+                return;
+            }
+
+            var items = result.candidates.slice(0, 8).map(function (c) {
+                return { title: siteMask(c.value), subtitle: c.where, value: c.value, action: 'pick' };
+            });
+
+            items.push({ title: '📄 Показати звіт', action: 'report' });
+
+            Lampa.Select.show({
+                title: 'Знайдено кілька рядків. Який із них ключ?',
+                items: items,
+                onSelect: function (item) {
+                    if (item.action === 'pick') askApply(item.value);
+                    else setTimeout(function () { showSiteReport(result.report); }, 200);
+                },
+                onBack: function () {
+                    backToSettings();
+                }
+            });
+        });
+    }
+
+    function siteAskPassword(name) {
+        function got(value) {
+            var password = String(value === null || value === undefined ? '' : value);
+
+            // Кнопка "Скасувати" в клавіатурі віддає порожній рядок
+            if (!password) {
+                backToSettings();
+                return;
+            }
+
+            // "Назад" повертає те, що набрано, тому перед входом питаємо підтвердження:
+            // кожна невдала спроба рахується в ліміті сайту (5 спроб).
+            setTimeout(function () {
+                Lampa.Select.show({
+                    title: 'Вхід на utp.to',
+                    items: [
+                        { title: '🔐 Увійти як ' + escapeText(name), subtitle: 'довжина пароля: ' + password.length, action: 'go' },
+                        { title: '✖ Скасувати', action: 'cancel' }
+                    ],
+                    onSelect: function (item) {
+                        if (item.action === 'go') siteRun(name, password);
+                        else backToSettings();
+                    },
+                    onBack: function () {
+                        backToSettings();
+                    }
+                });
+            }, 200);
+        }
+
+        Lampa.Input.edit({
+            title: 'Пароль utp.to для ' + name,
+            value: '',
+            free: true,
+            nosave: true
+        }, got);
+    }
+
+    function onSiteLogin() {
+        if (typeof AndroidJS === 'undefined') {
+            Lampa.Noty.show('UTOPIA: вхід із плагіна працює лише в застосунку Lampa для Android');
+            backToSettings();
+            return;
+        }
+
+        // Сайт обмежує спроби входу (5 за хвилину), тож між запусками тримаємо паузу
+        var wait = Math.max(siteCooldownUntil, siteLastRun + 2 * 60 * 1000) - Date.now();
+
+        if (wait > 0) {
+            Lampa.Noty.show('UTOPIA: зачекай ще ' + Math.ceil(wait / 1000) + ' с, щоб сайт не заблокував за забагато спроб');
+            backToSettings();
+            return;
+        }
+
+        var name = siteUserName();
+
+        if (!name) {
+            siteAskUserName(function () {
+                setTimeout(onSiteLogin, 200);
+            });
+            return;
+        }
+
+        siteAskPassword(name);
+    }
+    
+    function initSettings() {
+        Lampa.SettingsApi.addComponent({
+            component: 'utopia',
+            name: 'UTOPIA',
+            icon:
+        '<svg width="1.5em" height="1.5em" viewBox="0 0 64 64" ' +
+        'xmlns="http://www.w3.org/2000/svg" ' +
+        'style="display:block;flex-shrink:0;">' +
+            '<image href="https://raw.githubusercontent.com/yakutza82/lampa-utopia/refs/heads/main/pngegg2wh.png" ' +
+            'x="0" y="0" width="64" height="64" />' +
+        '</svg>'
+        });
+
+        keyField.description = keyDescription();
+
+        Lampa.SettingsApi.addParam({
+            component: 'utopia',
+            param: { name: 'utopia_api_key_btn', type: 'button' },
+            field: keyField,
+            onChange: editApiKey
+        });
+
+                Lampa.SettingsApi.addParam({
+            component: 'utopia',
+            param: { name: 'utopia_site_login_btn', type: 'button' },
+            field: {
+                name: 'Отримати ключ із сайту (експеримент)',
+                description: 'Вхід на utp.to логіном і паролем. Пароль не зберігається'
+            },
+            onChange: onSiteLogin
+        });
+
+        // прибираємо кукі, які залишив старий тестовий скрипт
+        try { Lampa.Storage.set('utopia_test_cookies', ''); } catch (e) {}
+
+        Lampa.Listener.follow('settings', function (e) {
+            if (e.type === 'open' || e.name === 'utopia') setTimeout(updateKeyDisplay, 100);
+        });
+    }
+
+    function verifyKey(key) {
+        Lampa.Noty.show('UTOPIA: перевіряю ключ...');
+        request('test', 1, function () {
+            Lampa.Noty.show(String.fromCharCode(0x2705) + ' UTOPIA: ключ робочий, звязок є');
+        }, function (code) {
+            Lampa.Noty.show(String.fromCharCode(0x26A0) + ' UTOPIA: ' + errorMessage(code));
+        });
+    }
+
+    // =========================================================
+    // 3. Кеш
+    // =========================================================
+    var CACHE = {};
+    var CACHE_TTL = 10 * 60 * 1000;
+
+    function cacheKey(query, page) {
+        return String(query).toLowerCase() + '::' + page;
+    }
+
+    function getFromCache(query, page) {
+        var entry = CACHE[cacheKey(query, page)];
+        if (!entry) return null;
+        if (Date.now() - entry.time > CACHE_TTL) return null;
+        return entry.data;
+    }
+
+    function saveToCache(query, page, data) {
+        CACHE[cacheKey(query, page)] = { data: data, time: Date.now() };
+    }
+
+    // =========================================================
+    // 4. Глибокий пошук та збірка Magnet
+    // =========================================================
+    function parseArrayFromData(data) {
+        if (!data) return [];
+        if (Array.isArray(data)) return data;
+        if (Array.isArray(data.data)) return data.data;
+        if (Array.isArray(data.results)) return data.results;
+        if (Array.isArray(data.torrents)) return data.torrents;
+        if (Array.isArray(data.items)) return data.items;
+        if (data.data && Array.isArray(data.data.data)) return data.data.data;
+        return [];
+    }
+
+    function deepFind(obj, keys) {
+        if (!obj || typeof obj !== 'object') return null;
+        for (var i = 0; i < keys.length; i++) {
+            var k = keys[i];
+            if (obj[k] !== undefined && obj[k] !== null && obj[k] !== '') {
+                return obj[k];
+            }
+        }
+        for (var p in obj) {
+            if (obj.hasOwnProperty(p) && typeof obj[p] === 'object' && obj[p] !== null) {
+                var res = deepFind(obj[p], keys);
+                if (res !== null) return res;
+            }
+        }
+        return null;
+    }
+
+    function normalizeItem(raw) {
+        if (!raw || typeof raw !== 'object') return {};
+
+        // Реальна структура відповіді UTOPIA: { type: "torrent", id: "...", attributes: {...} }
+        var attrs = (raw.attributes && typeof raw.attributes === 'object') ? raw.attributes : raw;
+
+        var name = attrs.name || deepFind(raw, ['name', 'title', 'filename']) || 'Без назви';
+        var size = attrs.size != null ? attrs.size : (deepFind(raw, ['size']) || 0);
+        var seeds = attrs.seeders != null ? attrs.seeders : (deepFind(raw, ['seeders', 'seeds']) || 0);
+        var peers = attrs.leechers != null ? attrs.leechers : (deepFind(raw, ['leechers', 'peers']) || 0);
+        var releaseYear = attrs.release_year || null;
+
+        var magnet = '';
+        var isDirect = false;
+
+        if (typeof attrs.magnet_link === 'string' && attrs.magnet_link.indexOf('magnet:') === 0) {
+            magnet = attrs.magnet_link;
+        } else if (attrs.download_link) {
+            magnet = attrs.download_link;
+            isDirect = true;
+        } else {
+            // Запасний варіант: будь-яке поле з "download"/"magnet" у назві,
+            // значення якого схоже на посилання.
+            for (var key in attrs) {
+                if (!attrs.hasOwnProperty(key) || !/download|magnet/i.test(key)) continue;
+                var v = attrs[key];
+                if (typeof v === 'string' && v.indexOf('magnet:') === 0) { magnet = v; break; }
+                if (typeof v === 'string' && /^https?:\/\//.test(v)) { magnet = v; isDirect = true; break; }
+            }
+        }
+
+        return {
+            name: String(name),
+            size: parseFloat(size) || 0,
+            seeds: parseInt(seeds, 10) || 0,
+            peers: parseInt(peers, 10) || 0,
+            magnet: magnet || '',
+            isDirect: isDirect,
+            releaseYear: releaseYear,
+            tmdbId: attrs.tmdb_id || null,
+            category: attrs.category || '',
+            tmdbName: '',
+            __raw: raw
+        };
+    }
+
+    function sendRequest(url, headers, onSuccess, onError) {
+        var network = new Lampa.Reguest();
+        network.timeout(15000);
+
+        network.native(url, function (response) {
+            var data = response;
+            if (typeof response === 'string') {
+                try { data = JSON.parse(response); } catch (e) {}
+            }
+            if (data) {
+                onSuccess(data);
+            } else {
+                if (onError) onError('parse_error');
+            }
+        }, function (xhr) {
+            var status = xhr ? xhr.status : 0;
+            if (status === 401) onError('unauthorized');
+            else if (status === 403) onError('forbidden');
+            else onError(status === 0 ? 'network' : 'http_' + status);
+        }, false, { headers: headers });
+    }
+
+    function request(query, page, onSuccess, onError) {
+        page = page || 1;
+        var cached = getFromCache(query, page);
+        if (cached) {
+            onSuccess(cached, true);
+            return;
+        }
+
+        var key = getKey();
+        if (!key) {
+            if (onError) onError('no_key');
+            return;
+        }
+
+        var cleanKey = encodeURIComponent(key);
+        var targetUrl = API_BASE + '/torrents/filter' +
+                        '?name=' + encodeURIComponent(query) +
+                        '&perPage=' + PER_PAGE +
+                        '&page=' + page +
+                        '&api_key=' + cleanKey +
+                        '&token=' + cleanKey;
+
+        var headers = {
+            'Authorization': 'Bearer ' + key,
+            'Accept': 'application/json'
+        };
+
+        sendRequest(targetUrl, headers, function (data) {
+            var items = parseArrayFromData(data).map(normalizeItem);
+            saveToCache(query, page, items);
+            onSuccess(items, false);
+        }, function (errCode) {
+            if (errCode === 'network' || errCode === 'forbidden') {
+                var proxy1 = 'https://corsproxy.io/?' + encodeURIComponent(targetUrl);
+                sendRequest(proxy1, {}, function (data) {
+                    var items = parseArrayFromData(data).map(normalizeItem);
+                    saveToCache(query, page, items);
+                    onSuccess(items, false);
+                }, function () {
+                    var proxy2 = 'https://api.allorigins.win/raw?url=' + encodeURIComponent(targetUrl);
+                    sendRequest(proxy2, {}, function (data) {
+                        var items = parseArrayFromData(data).map(normalizeItem);
+                        saveToCache(query, page, items);
+                        onSuccess(items, false);
+                    }, onError);
+                });
+            } else {
+                if (onError) onError(errCode);
+            }
+        });
+    }
+
+    // =========================================================
+    // 5. Допоміжні функції
+    // =========================================================
+    function formatSize(bytes) {
+        if (!bytes) return '';
+        var units = ['Б', 'КБ', 'МБ', 'ГБ', 'ТБ'];
+        var i = 0;
+        var n = parseFloat(bytes);
+        while (n >= 1024 && i < units.length - 1) {
+            n /= 1024;
+            i++;
+        }
+        return n.toFixed(1) + ' ' + units[i];
+    }
+
+    function badge(value, icon) {
+    var n = parseInt(value, 10);
+
+    if (isNaN(n)) {
+        return '<span class="utopia-badge" style="opacity:.4;">' +
+            icon + ' ?' +
+        '</span>';
+    }
+
+    var cls = n >= 10
+        ? 'utopia-badge--good'
+        : (n >= 1 ? 'utopia-badge--mid' : 'utopia-badge--bad');
+
+    return '<span class="utopia-badge ' + cls + '">' +
+        icon + ' ' + n +
+    '</span>';
+}
+
+    function errorMessage(code) {
+        var map = {
+            no_key: 'Спочатку вкажіть API ключ у налаштуваннях плагіна UTOPIA.',
+            unauthorized: 'Неправильний API ключ (401). Перевірте його в налаштуваннях.',
+            forbidden: 'Заблоковано сервером/браузером (403 або CORS).',
+            parse_error: 'Сервер повернув некоректну відповідь.',
+            network: 'Помилка мережі або CORS (заблоковано сервером/браузером).',
+            timeout: 'Сервер не відповів вчасно.'
+        };
+        return map[code] || ('Сталася помилка (' + code + ').');
+    }
+
+    function sortItems(items, mode) {
+        var arr = items.slice();
+        if (mode === 'seeds') {
+            arr.sort(function (a, b) { return b.seeds - a.seeds; });
+        } else if (mode === 'size_desc') {
+            arr.sort(function (a, b) { return (parseFloat(b.size) || 0) - (parseFloat(a.size) || 0); });
+        } else if (mode === 'size_asc') {
+            arr.sort(function (a, b) { return (parseFloat(a.size) || 0) - (parseFloat(b.size) || 0); });
+        }
+        return arr;
+    }
+
+    var SORT_LABELS = {
+        default: 'За релевантністю',
+        seeds: 'Спочатку більше сідів',
+        size_desc: 'Спочатку більший розмір',
+        size_asc: 'Спочатку менший розмір'
+    };
+
+    // Компактний опис торента для дебагу: список полів + усе, що схоже
+    // на посилання. Вміщається на екран і не залежить від розміру опису.
+    function summarizeItem(item) {
+        var attrs = (item.__raw && item.__raw.attributes) || {};
+        var links = {};
+        for (var k in attrs) {
+            if (attrs.hasOwnProperty(k) && /link|magnet|hash|download|url/i.test(k)) links[k] = attrs[k];
+        }
+        return { id: item.__raw && item.__raw.id, name: item.name, attributeKeys: Object.keys(attrs), linkFields: links };
+    }
+
+    // =========================================================
+    // 6. Компонент екрана
+    // =========================================================
+    function TorrentsComponent(object) {
+        var scroll = new Lampa.Scroll({ mask: true, over: true, step: 200 });
+        var wrap = $('<div class="utopia-wrap"></div>');
+       var header = $(
+    '<div class="utopia-header">' +
+
+        '<div class="utopia-header__info">' +
+            '<div class="utopia-header__title"></div>' +
+            '<div class="utopia-header__original"></div>' +
+            '<div class="utopia-header__meta"></div>' +
+        '</div>' +
+
+        '<div class="utopia-header__actions">' +
+
+            '<div class="utopia-action selector utopia-portrait-back">' +
+                '\ud83d\udcc4' +
+            '</div>' +
+
+            '<div class="utopia-action selector utopia-sort-btn">' +
+                '\u2195 Сортування' +
+            '</div>' +
+
+            '<div class="utopia-action selector utopia-debug-btn" style="display:none;">' +
+                '\ud83d\udc1e Діагностика' +
+            '</div>' +
+
+        '</div>' +
+
+    '</div>'
+);
+var moviePanel = $(
+    '<div class="utopia-movie">' +
+
+        '<div class="utopia-movie__top">' +
+
+            '<div class="utopia-movie__poster selector">' +
+                '<img class="utopia-movie__poster-img" />' +
+            '</div>' +
+
+            '<div class="utopia-movie__details">' +
+                '<div class="utopia-movie__year"></div>' +
+                '<div class="utopia-movie__country"></div>' +
+                '<div class="utopia-movie__rating"></div>' +
+                '<div class="utopia-movie__imdb"></div>' +
+                '<div class="utopia-movie__pg"></div>' +
+            '</div>' +
+
+        '</div>' +
+
+        '<div class="utopia-movie__title"></div>' +
+        '<div class="utopia-movie__genres"></div>' +
+        '<div class="utopia-movie__overview"></div>' +
+
+    '</div>'
+);
+
+        var listBox = $('<div class="utopia-list"></div>');
+        var page = 1;
+        var items = [];
+        var sortMode = 'default';
+        var loading = false;
+        var moreButtonEl = null;
+        function renderMoviePanel() {
+    var movie = object.movie || {};
+
+    var title = movie.title || movie.name || '';
+
+    var year = '';
+    if (movie.release_date) {
+        year = String(movie.release_date).slice(0, 4);
+    } else if (movie.first_air_date) {
+        year = String(movie.first_air_date).slice(0, 4);
+    }
+
+        var countries = '';
+    try {
+        var tmdbApi = Lampa.Api && Lampa.Api.sources && Lampa.Api.sources.tmdb;
+        if (tmdbApi && typeof tmdbApi.parseCountries === 'function') {
+            countries = tmdbApi.parseCountries(movie).join(', ');
+        }
+    } catch (e) {}
+
+    if (!countries && Array.isArray(movie.production_countries)) {
+        countries = movie.production_countries
+            .map(function (c) { return c && c.name ? c.name : ''; })
+            .filter(Boolean)
+            .join(', ');
+    }
+
+    var rating = '';
+    if (movie.vote_average) {
+        rating = Math.round(Number(movie.vote_average) * 10) + '%';
+    }
+
+    var imdb = '';
+    var imdbValue = parseFloat(movie.imdb_rating);
+    if (imdbValue) {
+        imdb = imdbValue.toFixed(1);
+    }
+
+        var pg = '';
+    try {
+        var tmdbApi2 = Lampa.Api && Lampa.Api.sources && Lampa.Api.sources.tmdb;
+        if (tmdbApi2 && typeof tmdbApi2.parsePG === 'function') {
+            pg = tmdbApi2.parsePG(movie) || '';
+        }
+    } catch (e) {}
+
+    var genres = '';
+    if (Array.isArray(movie.genres)) {
+        genres = movie.genres
+            .slice(0, 5)
+            .map(function (genre) {
+                return genre && genre.name
+                    ? genre.name
+                    : String(genre || '');
+            })
+            .filter(Boolean)
+            .join(', ');
+    }
+
+    moviePanel.find('.utopia-movie__title').text(title);
+    moviePanel.find('.utopia-movie__year').text(year);
+    moviePanel.find('.utopia-movie__country').text(countries);
+    moviePanel.find('.utopia-movie__rating').text(
+        rating ? 'TMDb ' + rating : ''
+    );
+    moviePanel.find('.utopia-movie__imdb').text(
+        imdb ? 'IMDb ★ ' + imdb : ''
+    );
+    moviePanel.find('.utopia-movie__pg').text(pg);
+    moviePanel.find('.utopia-movie__genres').text(genres);
+    moviePanel.find('.utopia-movie__overview').text(
+        movie.overview || ''
+    );
+
+    /*
+     * Lampa у повній картці вже формує готове поле img.
+     * Використовуємо його в першу чергу.
+     */
+    var posterUrl = movie.img || movie.poster || movie.poster_path || '';
+
+    if (posterUrl) {
+        moviePanel
+            .find('.utopia-movie__poster-img')
+            .attr('src', posterUrl)
+            .show();
+    } else {
+        moviePanel
+            .find('.utopia-movie__poster-img')
+            .hide();
+    }
+}
+
+            var primaryQuery = object.search;
+        var altQuery = (object.search_original &&
+            String(object.search_original).toLowerCase() !== String(primaryQuery).toLowerCase())
+            ? object.search_original
+            : '';
+        var query = altQuery || primaryQuery;
+        var usedAlt = false;
+
+        injectStyles();
+
+        function bindScrollFollow(el) {
+            el.on('hover:focus', function (e) {
+                var node = $(e.target);
+                var box = node.parent();
+
+                while (box.length && box[0] !== document.body) {
+                    var overflowY = box.css('overflow-y');
+                    if ((overflowY === 'auto' || overflowY === 'scroll') &&
+                        box[0].scrollHeight > box[0].clientHeight + 1) break;
+                    box = box.parent();
+                }
+
+                if (!box.length || box[0] === document.body) return;
+
+                var fontSize = parseFloat(box.css('font-size')) || 16;
+                var padTop = fontSize * 5;
+                var padBottom = fontSize * 3.8;
+                var boxRect = box[0].getBoundingClientRect();
+                var nodeRect = node[0].getBoundingClientRect();
+                var target = box.scrollTop();
+
+                if (nodeRect.top < boxRect.top + padTop) {
+                    target += nodeRect.top - (boxRect.top + padTop);
+                } else if (nodeRect.bottom > boxRect.bottom - padBottom) {
+                    target += nodeRect.bottom - (boxRect.bottom - padBottom);
+                } else {
+                    return;
+                }
+
+                box.stop(true).animate({ scrollTop: target }, 350);
+            });
+            return el;
+        }
+
+        // Готує дані для показу в дебаг-екрані: обрізає задовгі текстові
+        // поля (типу media_info/description, які бувають на кілька тисяч
+        // символів), щоб textarea не гальмувала й не "вішала" WebView.
+        function truncateForDebug(value, depth) {
+            depth = depth || 0;
+            if (depth > 6) return '(...)';
+            if (typeof value === 'string') {
+                return value.length > 1500 ? value.slice(0, 1500) + '... (обрізано, всього ' + value.length + ' символів)' : value;
+            }
+            if (Array.isArray(value)) {
+                return value.slice(0, 20).map(function (v) { return truncateForDebug(v, depth + 1); });
+            }
+            if (value && typeof value === 'object') {
+                var out = {};
+                for (var k in value) {
+                    if (value.hasOwnProperty(k)) out[k] = truncateForDebug(value[k], depth + 1);
+                }
+                return out;
+            }
+            return value;
+        }
+
+        function showDebugModal(title, data) {
+    var jsonText;
+
+    try {
+        jsonText = typeof data === 'string'
+            ? data
+            : JSON.stringify(data, null, 2);
+    } catch (e) {
+        jsonText = String(data);
+    }
+
+    var modal = $(
+        '<div class="utopia-debug-modal">' +
+            '<textarea class="utopia-debug-textarea" readonly></textarea>' +
+            '<div class="utopia-debug-actions">' +
+                '<div class="utopia-action selector utopia-debug-copy">📋 Скопіювати</div>' +
+                '<div class="utopia-action selector utopia-debug-close">Закрити</div>' +
+            '</div>' +
+        '</div>'
+    );
+
+    modal.find('.utopia-debug-textarea').val(jsonText);
+
+    var copyButton = modal.find('.utopia-debug-copy');
+    var closeButton = modal.find('.utopia-debug-close');
+
+    function copyText() {
+        function success() {
+            Lampa.Noty.show('UTOPIA: скопійовано');
+        }
+
+        function fallback() {
+            try {
+                var textarea = modal.find('.utopia-debug-textarea')[0];
+
+                textarea.focus();
+                textarea.select();
+                textarea.setSelectionRange(0, textarea.value.length);
+
+                var ok = document.execCommand('copy');
+
+                if (ok) {
+                    success();
+                } else {
+                    Lampa.Noty.show('UTOPIA: не вдалося скопіювати');
+                }
+            } catch (e) {
+                Lampa.Noty.show('UTOPIA: не вдалося скопіювати');
+            }
+        }
+
+        try {
+            if (
+                Lampa.Utils &&
+                typeof Lampa.Utils.copyTextToClipboard === 'function'
+            ) {
+                Lampa.Utils.copyTextToClipboard(
+                    jsonText,
+                    success,
+                    fallback
+                );
+                return;
+            }
+        } catch (e) {}
+
+        fallback();
+    }
+
+    copyButton.on('click hover:enter', copyText);
+
+    closeButton.on('click hover:enter', function () {
+        Lampa.Modal.close();
+        Lampa.Controller.toggle('content');
+    });
+
+    Lampa.Modal.open({
+        title: title + ' [' + VERSION + ']',
+        html: modal,
+        size: 'medium',
+        scroll_to_center: true,
+        select: copyButton,
+        onBack: function () {
+            Lampa.Modal.close();
+            Lampa.Controller.toggle('content');
+        }
+    });
+}
+
+        this.create = function () {
+            header.find('.utopia-header__title')
+                .text(primaryQuery)
+                .css({ 'font-size': '1.3em', 'font-weight': '700', 'opacity': '1', 'display': 'block' });
+
+            if (altQuery) {
+                header.find('.utopia-header__original')
+                    .text(altQuery)
+                    .css({ 'font-size': '0.85em', 'opacity': '0.6', 'margin-top': '0.2em', 'display': 'block' });
+            } else {
+                header.find('.utopia-header__original').hide();
+            }
+
+            bindScrollFollow(header.find('.utopia-sort-btn')).on('click hover:enter', showSortMenu);
+                        var backBusy = false;
+            bindScrollFollow(header.find('.utopia-portrait-back')).on('click hover:enter', function () {
+                if (backBusy) return;
+                backBusy = true;
+                setTimeout(function () { backBusy = false; }, 600);
+
+                Lampa.Activity.backward();
+            });
+            bindScrollFollow(header.find('.utopia-debug-btn')).on('click hover:enter', function () {
+                showDebugModal('Дані картки фільму (object)', {
+                    search: object.search,
+                    search_original: object.search_original,
+                    movie: object.movie
+                });
+            });
+
+            wrap.on('touchstart touchmove touchend wheel mousewheel', function (e) {
+                e.stopPropagation();
+            });
+
+                        var posterBusy = false;
+            moviePanel.find('.utopia-movie__poster').on('click hover:enter', function () {
+                if (posterBusy) return;
+                posterBusy = true;
+                setTimeout(function () { posterBusy = false; }, 600);
+
+                Lampa.Activity.backward();
+            });
+
+            wrap.append(header);
+            wrap.append(moviePanel);
+            listBox.appendTo(wrap);
+
+            renderMoviePanel();
+
+            scroll.append(wrap);
+
+            scroll.render().addClass('layer--wheight');
+            return this.render();
+        };
+
+        this.render = function () { return scroll.render(); };
+
+        this.start = function () {
+            if (Lampa.Activity.active().activity !== this.activity) return;
+            if (!hasKey()) {
+                renderNoKeyState();
+                return;
+            }
+            if (!items.length) loadPage(1);
+
+            Lampa.Controller.add('content', {
+                    toggle: function () {
+                    Lampa.Controller.collectionSet(scroll.render());
+                    var firstVisible = scroll.render().find('.selector').filter(':visible').first();
+                    Lampa.Controller.collectionFocus(firstVisible.length ? firstVisible[0] : false, scroll.render());
+                },
+                                up: function () {
+                    var focused = listBox.find('.selector.focus');
+                    var prev = focused.length ? focused.prev('.selector') : $();
+                    if (prev.length) {
+                        Lampa.Controller.collectionFocus(prev[0], scroll.render());
+                        return;
+                    }
+                    if (Navigator.canmove('up')) { Navigator.move('up'); return; }
+                    try { Lampa.Controller.toggle('head'); } catch (e) {}
+                },
+                down: function () { Navigator.move('down'); },
+                left: function () {
+                    if (Navigator.canmove('left')) Navigator.move('left');
+                    else Lampa.Controller.toggle('menu');
+                },
+                right: function () { Navigator.move('right'); },
+                back: function () { Lampa.Activity.backward(); }
+            });
+            Lampa.Controller.toggle('content');
+        };
+
+        function setMeta(text) {
+            header.find('.utopia-header__meta').text(text);
+        }
+
+        function renderNoKeyState() {
+            listBox.empty();
+            listBox.append(
+                $('<div class="utopia-state">' +
+                '<div class="utopia-state__icon">\ud83d\udd11</div>' +
+                '<div class="utopia-state__title">Ключ не вказано</div>' +
+                '<div class="utopia-state__text">Щоб шукати торенти на UTOPIA, спочатку додайте API ключ у налаштуваннях плагіна.</div>' +
+                '</div>')
+            );
+        }
+
+        function renderErrorState(code) {
+            listBox.empty();
+            var box = $(
+                '<div class="utopia-state">' +
+                '<div class="utopia-state__icon">\u26a0\ufe0f</div>' +
+                '<div class="utopia-state__title">Не вдалося завантажити результати</div>' +
+                '<div class="utopia-state__text"></div>' +
+                '<div class="utopia-btn selector utopia-retry">Спробувати ще раз</div>' +
+                '</div>'
+            );
+            box.find('.utopia-state__text').text(errorMessage(code));
+            bindScrollFollow(box.find('.utopia-retry')).on('click hover:enter', function () {
+                loadPage(page || 1);
+            });
+            listBox.append(box);
+            Lampa.Controller.enable('content');
+        }
+
+        function renderEmptyState() {
+            listBox.empty();
+            listBox.append(
+                $('<div class="utopia-state">' +
+                '<div class="utopia-state__icon">\ud83d\udd0d</div>' +
+                '<div class="utopia-state__title">Нічого не знайдено</div>' +
+                '<div class="utopia-state__text">Спробуй перевірити пізніше - можливо, підходящих роздач поки немає.</div>' +
+                '</div>')
+            );
+        }
+
+        function getFullMovieTitle(item) {
+            var name = String(item.name || '').trim();
+            var year = item.releaseYear ? String(item.releaseYear) : '';
+
+            name = name.replace(/^[\s._-]+|[\s._-]+$/g, '');
+
+            var match = name.match(
+                /(?:^|[.\s_-])(?:19|20)\d{2}(?=[.\s_-]|$)|(?:^|[.\s_-])S\d{1,2}(?=[.\s_-]|$)|(?:^|[.\s_-])(?:2160p|1080p|720p|WEB-DL|WEBRip|BluRay|BDRip|HDRip)(?=[.\s_-]|$)/i
+            );
+
+            if (match && match.index !== undefined) {
+                name = name.substring(0, match.index);
+            }
+
+            name = name.replace(/[._]+/g, ' ');
+            name = name.replace(/\s+/g, ' ').trim();
+
+            if (year) {
+                name += ' (' + year + ')';
+            }
+
+            return name;
+        }
+
+        function showSortMenu() {
+            var options = ['default', 'seeds', 'size_desc', 'size_asc'].map(function (mode) {
+                return {
+                    title: (mode === sortMode ? '\u2713 ' : '') + SORT_LABELS[mode],
+                    mode: mode
+                };
+            });
+            Lampa.Select.show({
+                title: 'Сортування результатів',
+                items: options,
+                onSelect: function (selected) {
+                    sortMode = selected.mode;
+                    renderList();
+                    Lampa.Controller.toggle('content');
+                },
+                onBack: function () {
+                    Lampa.Controller.toggle('content');
+                }
+            });
+        }
+
+        function buildRow(item) {
+            var row = $(
+                '<div class="utopia-item selector">' +
+                '<div class="utopia-item__left">' +
+                '<div class="utopia-item__movie"></div>' +
+                '<div class="utopia-item__title"></div>' +
+                '<div class="utopia-item__meta"></div>' +
+                '</div>' +
+                '<div class="utopia-item__badges"></div>' +
+                '</div>'
+            );
+
+            if (item.tmdbId && !item.tmdbName) {
+                var tmdbType = item.category === 'TV' ? 'tv/' : 'movie/';
+
+                Lampa.Api.sources.tmdb.get(tmdbType + item.tmdbId, { language: 'uk-UA' }, function (data) {
+                    if (data && (data.title || data.name)) {
+                        item.tmdbName = (data.title || data.name) + (item.releaseYear ? ' (' + item.releaseYear + ')' : '');
+                        row.find('.utopia-item__movie').text(item.tmdbName);
+                    }
+                });
+            }
+
+            row.find('.utopia-item__movie').text(item.tmdbName || getFullMovieTitle(item));
+            row.find('.utopia-item__title').text(item.name);
+            row.find('.utopia-item__meta').text(item.size ? formatSize(item.size) : 'Розмір невідомий');
+            row.find('.utopia-item__badges').html(badge(item.seeds, '\u25b2') + '&nbsp;&nbsp;' + badge(item.peers, '\u25bc'));
+
+            // ВАЖЛИВО: клік має запускати відтворення, а не дебаг-екран -
+            // дебаг лишається тільки як fallback усередині playTorrent,
+            // коли справді нема ні magnet, ні download_link.
+            row.on('click hover:enter', function () { chooseAction(item); });
+
+            bindScrollFollow(row);
+            return row;
+        }
+
+        // Копіює посилання на .torrent у буфер обміну одним натисканням.
+        // Далі його вставляють у Transmission/Transdroid ("Add by URL"),
+        // і клієнт сам завантажує файл. Якщо копіювання не вдалось -
+        // показуємо вікно з посиланням, щоб скопіювати вручну.
+        function copyLink(item) {
+            var text = item.magnet;
+
+            Lampa.Storage.set('utopia_last_torrent_url', text);
+
+            function ok() {
+                Lampa.Noty.show('UTOPIA: посилання скопійовано. Вставте його у додаток для торентів (Add by URL)');
+            }
+            function fail() {
+                showDebugModal('Скопіюй посилання вручну', text);
+            }
+            function fallbackCopy() {
+                try {
+                    var ta = document.createElement('textarea');
+                    ta.value = text;
+                    ta.style.position = 'fixed';
+                    ta.style.opacity = '0';
+                    document.body.appendChild(ta);
+                    ta.focus();
+                    ta.select();
+                    var done = document.execCommand('copy');
+                    document.body.removeChild(ta);
+                    if (done) ok(); else fail();
+                } catch (e) { fail(); }
+            }
+
+            try {
+                if (Lampa.Utils && typeof Lampa.Utils.copyTextToClipboard === 'function') {
+                    Lampa.Utils.copyTextToClipboard(text, ok, fail);
+                    return;
+                }
+            } catch (e) {}
+            fallbackCopy();
+        }
+
+function downloadTorrent(item) {
+    var url = item && item.magnet
+        ? item.magnet
+        : Lampa.Storage.get('utopia_last_torrent_url', '');
+
+    if (!url) {
+        Lampa.Noty.show('UTOPIA: немає URL торента');
+        return;
+    }
+
+    Lampa.Storage.set('utopia_last_torrent_url', url);
+
+    if (
+        typeof AndroidJS === 'undefined' ||
+        typeof AndroidJS.openBrowser !== 'function'
+    ) {
+        Lampa.Noty.show('UTOPIA: завантаження недоступне');
+        return;
+    }
+
+    try {
+        AndroidJS.openBrowser(url);
+    } catch (e) {
+        console.error('[UTOPIA DOWNLOAD]', e);
+        Lampa.Noty.show('UTOPIA: помилка завантаження');
+    }
+}
+
+function showTorrentActionMenu(item) {
+    var items = [];
+
+// Спочатку receiver'и
+if (
+    window.LampaTorrentReceivers &&
+    typeof window.LampaTorrentReceivers.getAvailable === 'function'
+) {
+    var receivers = window.LampaTorrentReceivers.getAvailable();
+
+    receivers.forEach(function (receiver) {
+        items.push({
+            title: '▶️ Відправити в ' + receiver.title,
+            action: 'receiver',
+            receiver: receiver
+        });
+    });
+}
+
+// Потім завантаження
+items.push({
+    title: '↕️ Завантажити .torrent',
+    action: 'download'
+});
+
+    items.push(
+        {
+            title: '☑️ Скопіювати посилання',
+            action: 'copy'
+        },
+        {
+            title: '❎ Скасувати',
+            action: 'cancel'
+        }
+    );
+
+    Lampa.Select.show({
+        title: 'торент',
+        items: items,
+
+        onSelect: function (selected) {
+            if (selected.action === 'download') {
+
+                downloadTorrent(item);
+
+                Lampa.Controller.toggle('content');
+
+            } else if (selected.action === 'receiver') {
+
+                var url = item && item.magnet
+                    ? item.magnet
+                    : Lampa.Storage.get(
+                        'utopia_last_torrent_url',
+                        ''
+                    );
+
+                if (
+                    selected.receiver &&
+                    typeof selected.receiver.send === 'function'
+                ) {
+                    try {
+                        selected.receiver.send(url);
+                    } catch (e) {
+                        console.error(
+                            '[TORRENT RECEIVER]',
+                            selected.receiver.id,
+                            e
+                        );
+
+                        Lampa.Noty.show(
+                            'Помилка відправки в ' +
+                            selected.receiver.title
+                        );
+                    }
+                }
+
+                // ВАЖЛИВО:
+                // receiver сам відкриває свій наступний Select.
+                // Тому тут НЕ робимо toggle('content').
+                return;
+
+            } else if (selected.action === 'copy') {
+
+                copyLink(item);
+
+                Lampa.Controller.toggle('content');
+
+            } else if (selected.action === 'cancel') {
+
+                Lampa.Controller.toggle('content');
+            }
+        },
+
+        onBack: function () {
+            Lampa.Controller.toggle('content');
+        }
+    });
+}
+
+        function chooseAction(item) {
+    if (item.isDirect && item.magnet) {
+        showTorrentActionMenu(item);
+    } else {
+        playTorrent(item);
+    }
+}
+
+        function playTorrent(item) {
+            if (typeof item.magnet === 'string' && item.magnet.indexOf('magnet:') === 0) {
+                Lampa.Torrent.play({ url: item.magnet, name: item.name });
+                return;
+            }
+
+            if (!item.isDirect || !item.magnet) {
+                showDebugModal('Немає magnet/download', summarizeItem(item));
+                return;
+            }
+
+            Lampa.Loading.start('utopia_prepare', 'UTOPIA: готуємо торент...');
+
+            var headers = { 'Authorization': 'Bearer ' + getKey() };
+
+            fetchTorrentFileBytes(item.magnet, headers, function (buffer, rawText) {
+                Lampa.Loading.stop('utopia_prepare');
+                try {
+                    var infoRange = findInfoDictRange(buffer);
+                    if (!infoRange) throw new Error('не знайдено секцію info у .torrent файлі');
+
+                    var infoBytes = new Uint8Array(buffer, infoRange.start, infoRange.end - infoRange.start);
+                    var hashHex = sha1Hex(infoBytes);
+                    var realMagnet = buildMagnetFromHash(hashHex, item.name);
+
+                    Lampa.Torrent.play({ url: realMagnet, name: item.name });
+                } catch (e) {
+                    showDebugModal('Помилка розбору .torrent файлу', {
+                        error: String(e),
+                        byteLength: buffer ? buffer.byteLength : 0,
+                        rawPreview: rawText ? rawText.slice(0, 300) : '',
+                        download_link: item.magnet
+                    });
+                }
+            }, function (code) {
+                Lampa.Loading.stop('utopia_prepare');
+                Lampa.Noty.show('UTOPIA: не вдалося завантажити .torrent файл - ' + errorMessage(code));
+            });
+        }
+
+        function ensureMoreButton() {
+            if (!moreButtonEl) {
+                moreButtonEl = $('<div class="utopia-more selector">Показати ще \u2193</div>');
+                bindScrollFollow(moreButtonEl).on('click hover:enter', function () {
+                    if (!loading) loadPage(page + 1);
+                });
+            }
+            return moreButtonEl;
+        }
+
+        function addMoreButtonIfNeeded() {
+            if (items.length >= page * PER_PAGE) {
+                listBox.append(ensureMoreButton());
+            } else if (moreButtonEl) {
+                moreButtonEl.remove();
+                moreButtonEl = null;
+            }
+        }
+
+        function updateMetaText(fromCache) {
+            var metaSuffix = '';
+            if (fromCache) metaSuffix = ' \u00b7 дані з кешу';
+            else if (usedAlt) metaSuffix = ' \u00b7 за оригінальною назвою';
+            if (sortMode !== 'default') metaSuffix += ' \u00b7 ' + SORT_LABELS[sortMode];
+            setMeta('Знайдено: ' + items.length + metaSuffix);
+        }
+
+        function renderList() {
+            listBox.empty();
+            moreButtonEl = null;
+            var sorted = sortItems(items, sortMode);
+            sorted.forEach(function (item) {
+                listBox.append(buildRow(item));
+            });
+            addMoreButtonIfNeeded();
+            updateMetaText(false);
+            Lampa.Controller.enable('content');
+        }
+
+        function appendRows(newItems) {
+            newItems.forEach(function (item) {
+                var row = buildRow(item);
+                if (moreButtonEl) row.insertBefore(moreButtonEl);
+                else listBox.append(row);
+            });
+            addMoreButtonIfNeeded();
+            updateMetaText(false);
+            Lampa.Controller.enable('content');
+        }
+
+        function loadPage(targetPage) {
+            if (loading) return;
+            loading = true;
+            var isFirst = targetPage === 1;
+            var previousCount = isFirst ? 0 : items.length;
+
+            if (isFirst) {
+                listBox.empty();
+                setMeta('Пошук триває...');
+                Lampa.Loading.start('utopia_search', 'UTOPIA: пошук...');
+            } else {
+                setMeta('Завантажую ще результати...');
+                Lampa.Loading.start('utopia_search_more', 'UTOPIA: завантаження...');
+            }
+
+            request(query, targetPage, function (pageItems, fromCache) {
+                loading = false;
+                Lampa.Loading.stop('utopia_search');
+                Lampa.Loading.stop('utopia_search_more');
+
+                page = targetPage;
+                if (isFirst) items = [];
+                items = items.concat(pageItems);
+
+                if (!items.length) {
+                    if (isFirst && altQuery && !usedAlt) {
+                        usedAlt = true;
+                        query = altQuery;
+                        loadPage(1);
+                        return;
+                    }
+                    renderEmptyState();
+                    return;
+                }
+
+                if (!isFirst && sortMode === 'default') {
+                    appendRows(items.slice(previousCount));
+                    if (fromCache) updateMetaText(true);
+                } else {
+                    renderList();
+                    if (fromCache) updateMetaText(true);
+                }
+            }, function (code) {
+                loading = false;
+                Lampa.Loading.stop('utopia_search');
+                Lampa.Loading.stop('utopia_search_more');
+
+                if (isFirst) {
+                    renderErrorState(code);
+                } else {
+                    Lampa.Noty.show('UTOPIA: ' + errorMessage(code));
+                    if (sortMode === 'default') addMoreButtonIfNeeded();
+                    else renderList();
+                    Lampa.Controller.enable('content');
+                }
+            });
+        }
+
+        this.back = function () { Lampa.Activity.backward(); };
+        this.pause = function () {};
+        this.stop = function () {};
+        this.destroy = function () {
+            scroll.destroy();
+            wrap.remove();
+        };
+    }
+
+    Lampa.Component.add('utopia_torrents', TorrentsComponent);
+
+    // =========================================================
+    // 7. Кнопка на картці
+    // =========================================================
+    function addButtonToCard(root, object) {
+        if (root.find('.utopia-search-btn').length) return;
+
+        var movie = object.movie || {};
+        var title = movie.title || movie.name || '';
+        var originalTitle = movie.original_title || '';
+        if (!title) return;
+
+        var button = $(
+    '<div class="full-start__button selector utopia-search-btn">' +
+        '<span style="display:flex;align-items:center;gap:.45em;">' +
+            '<svg width="1.5em" height="1.5em" viewBox="0 0 64 64" ' +
+                'xmlns="http://www.w3.org/2000/svg" ' +
+                'style="flex-shrink:0;display:block;">' +
+                '<image href="https://raw.githubusercontent.com/yakutza82/lampa-utopia/refs/heads/main/pngegg2wh.png" ' +
+                    'x="0" y="0" width="64" height="64" />' +
+            '</svg>' +
+            'UTOPIA - торент' +
+        '</span>' +
+    '</div>'
+);
+
+        button.on('click hover:enter', function () {
+            if (!hasKey()) {
+                Lampa.Noty.show('UTOPIA: спочатку вкажіть API ключ у налаштуваннях плагіна');
+                return;
+            }
+            Lampa.Activity.push({
+                url: '',
+                title: 'UTOPIA: ' + title,
+                component: 'utopia_torrents',
+                movie: movie,
+                search: title,
+                search_original: originalTitle,
+                page: 1
+            });
+        });
+
+        var anchor = root.find('.view--torrent');
+        if (anchor.length) {
+            anchor.after(button);
+            return;
+        }
+
+        var target = root.find('.full-start-new__buttons');
+        if (!target.length) target = root.find('.full-start__buttons');
+        if (target.length) target.append(button);
+    }
+
+    function initCardButton() {
+        Lampa.Listener.follow('full', function (e) {
+            if (e.type === 'complite') {
+                addButtonToCard(e.object.activity.render(), e.data);
+            }
+        });
+    }
+
+    // =========================================================
+    // 8. Ініціалізація
+    // =========================================================
+    function init() {
+        injectStyles();
+        initSettings();
+        initCardButton();
+    }
+
+    if (window.appready) {
+        init();
+    } else {
+        Lampa.Listener.follow('app', function (e) {
+            if (e.type === 'ready') init();
+        });
+    }
+
+})();
