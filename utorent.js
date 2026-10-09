@@ -1195,18 +1195,7 @@
 
             form.hidden.forEach(function (h) { if (h.value) exclude[h.value] = true; });
             note('   поля форми: ' + form.hidden.map(function (h) { return h.name; }).join(', ') + ', ' + form.user + ', ' + form.pass);
-            var extraHeaders = {
-    'Origin': SITE_ORIGIN,
-    'Referer': loginUrl,
-    'Accept': 'application/json',
-    'X-Requested-With': 'XMLHttpRequest',
-    'Content-Type': 'application/x-www-form-urlencoded'
-};
-
-if (jar['XSRF-TOKEN']) {
-    extraHeaders['X-XSRF-TOKEN'] = decodeURIComponent(jar['XSRF-TOKEN']);
-}
-
+            
 siteNative(loginUrl, pairs.join('&'), headers(extraHeaders), function (err2, res2) { ... });
 
             // 2. Вхід
