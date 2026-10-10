@@ -72,16 +72,6 @@
 
     // =========================================================
     // -1. Побудова робочого magnet з .torrent-файлу
-    //
-    // UTOPIA не завжди дає готовий magnet - часто натомість дає
-    // посилання на завантаження самого .torrent-файлу. Щоб все одно
-    // відкрити його одним кліком (без ручного скачування), тут:
-    // 1) вручну розбираємо bencode-структуру .torrent файлу,
-    //    щоб знайти РІВНО ті байти, де лежить секція "info";
-    // 2) рахуємо SHA-1 від цих байтів - це і є справжній BTIH-хеш;
-    // 3) збираємо з нього робочий magnet-рядок.
-    // SHA-1 порахований власноруч (не через Web Crypto), бо
-    // crypto.subtle іноді недоступний у не-https/file:// оточенні.
     // =========================================================
     function findInfoDictRange(buffer) {
         var buf = new Uint8Array(buffer);
@@ -89,11 +79,11 @@
 
         function readString() {
             var start = pos;
-            while (buf[pos] !== 0x3a) pos++; // ':'
+            while (buf[pos] !== 0x3a) pos++;
             var lenStr = '';
             for (var i = start; i < pos; i++) lenStr += String.fromCharCode(buf[i]);
             var len = parseInt(lenStr, 10);
-            pos++; // skip ':'
+            pos++;
             var text = '';
             for (var j = 0; j < len; j++) text += String.fromCharCode(buf[pos + j]);
             pos += len;
@@ -102,22 +92,22 @@
 
         function skipValue() {
             var c = buf[pos];
-            if (c === 0x69) { // 'i' - integer
+            if (c === 0x69) {
                 pos++;
                 while (buf[pos] !== 0x65) pos++;
                 pos++;
-            } else if (c === 0x6c) { // 'l' - list
+            } else if (c === 0x6c) {
                 pos++;
                 while (buf[pos] !== 0x65) skipValue();
                 pos++;
-            } else if (c === 0x64) { // 'd' - dict
+            } else if (c === 0x64) {
                 pos++;
                 while (buf[pos] !== 0x65) {
                     readString();
                     skipValue();
                 }
                 pos++;
-            } else if (c >= 0x30 && c <= 0x39) { // string
+            } else if (c >= 0x30 && c <= 0x39) {
                 readString();
             } else {
                 throw new Error('bad bencode byte at ' + pos);
@@ -125,7 +115,7 @@
         }
 
         if (buf[pos] !== 0x64) throw new Error('.torrent файл має починатись зі словника');
-        pos++; // skip top-level 'd'
+        pos++;
 
         var infoRange = null;
         while (buf[pos] !== 0x65) {
@@ -183,11 +173,6 @@
         return toHex(h0) + toHex(h1) + toHex(h2) + toHex(h3) + toHex(h4);
     }
 
-    // Качаємо .torrent-файл ЧЕРЕЗ ТОЙ САМИЙ механізм, що вже успішно
-    // обходить CORS для звичайних JSON-запитів (Lampa.Reguest().native()) -
-    // звичайний XMLHttpRequest, як з'ясувалось, CORS не обходить.
-    // native() віддає відповідь як звичайний РЯДОК (як і для JSON), тому
-    // переводимо кожен символ назад у байт (код символу як є, без UTF-8).
     function fetchTorrentFileBytes(url, headers, onSuccess, onError) {
         var network = new Lampa.Reguest();
         network.timeout(20000);
@@ -301,8 +286,6 @@
     'border-color:rgba(255,255,255,.75);' +
 '}' +
 
-        /* Картка фільму */
-
 '.utopia-movie{' +
     'display:flex;' +
     'flex-direction:column;' +
@@ -396,7 +379,6 @@
     'padding-bottom:1em;' +
 '}' +
 
-        /* торенти */
         '.utopia-list{' +
             'display:flex;' +
             'flex-direction:column;' +
@@ -532,7 +514,6 @@
             'margin-bottom:1.1em;' +
         '}' +
 
-        /* Portrait */
         '@media screen and (orientation:portrait){' +
 
             '.utopia-movie{' +
@@ -569,7 +550,6 @@
 
         '}' +
 
-        /* Landscape */
         '@media screen and (orientation:landscape){' +
 
     '.utopia-wrap{' +
@@ -677,8 +657,6 @@
         return !!getKey();
     }
 
-    // Поле "API ключ" працює як кнопка: ключ редагується у власному вікні,
-    // а "Назад" у клавіатурі нічого не зберігає (див. editApiKey).
     var keyField = {
         name: 'API ключ UTOPIA',
         description: ''
@@ -725,10 +703,6 @@
         backToSettings();
     }
 
-    // Клавіатура Lampa повертає тільки текст і не каже, чим її закрили ("ОК" чи "Назад"),
-    // тому якщо ключ змінився, показуємо підтвердження: Застосувати / Скасувати.
-    // "Назад" у підтвердженні = скасувати.
-        // Вікно підтвердження: Застосувати / Скасувати ("Назад" = скасувати).
     function askApply(key) {
         setTimeout(function () {
             Lampa.Select.show({
@@ -748,14 +722,6 @@
         }, 200);
     }
 
-    // Клавіатура Lampa повертає тільки текст і не каже, чим її закрили. Кнопка "Скасувати"
-    // віддає порожній рядок, а "Назад" - текст, що є зараз. Тому:
-    //  - порожній результат або той самий ключ = нічого не змінюємо;
-    //  - змінений ключ = показуємо підтвердження "Застосувати / Скасувати".
-    // Видалити ключ можна лише окремим пунктом меню (див. editApiKey).
-        // Живий перегляд введеного тексту на ТБ.
-    // Рядок введення Lampa показує довгий ключ в один рядок і ховає кінець, тому не видно,
-    // що саме набрано. Ми дублюємо текст угорі екрана з переносом рядків і лічильником символів.
     var typingPreview = { timer: null, guard: null, box: null, textEl: null, countEl: null, last: null };
 
     function isMobileScreen() {
@@ -766,7 +732,6 @@
         }
     }
 
-    // Поле, в яке клавіатура Lampa пише введений текст
     function findKeyboardField() {
         var field = document.getElementById('orsay-keyboard');
 
@@ -826,7 +791,6 @@
     function startTypingPreview() {
         stopTypingPreview();
 
-        // На телефоні клавіатура зручна й так
         if (isMobileScreen()) return;
 
         typingPreview.timer = setInterval(function () {
@@ -842,7 +806,6 @@
             typingPreview.textEl.textContent = text || '(порожньо)';
         }, 150);
 
-        // Страховка: якщо вікно клавіатури закрилось без відповіді
         typingPreview.guard = setTimeout(stopTypingPreview, 10 * 60 * 1000);
     }
 
@@ -881,15 +844,11 @@
     function editApiKey() {
         var current = getKey();
 
-        // Ключа ще немає - одразу чиста клавіатура
         if (!current) {
             openKeyboard('');
             return;
         }
 
-        // Збережений ключ у рядку введення виходить за межі екрана (особливо на ТБ),
-        // а курсор стоїть на початку - здається, що введення не працює. Тому спершу
-        // вибір: чиста клавіатура, редагування поточного ключа або видалення.
         Lampa.Select.show({
             title: 'API ключ UTOPIA',
             items: [
@@ -913,13 +872,9 @@
     // =========================================================
     // 2. Налаштування
     // =========================================================
-    // ----- Отримання ключа з сайту: вхід логіном і паролем (ЕКСПЕРИМЕНТ) -----
-    // Працює лише в застосунку Lampa для Android: тільки він віддає заголовки відповіді
-    // (Set-Cookie) і дозволяє передавати Cookie. Запити йдуть прямо на utp.to, БЕЗ сторонніх
-    // проксі. Пароль нікуди не зберігається і не потрапляє у звіт.
     var SITE_ORIGIN = 'https://utp.to';
-    var siteLastRun = 0;        // коли востаннє запускали вхід
-    var siteCooldownUntil = 0;  // до якого часу чекаємо після помилки 429
+    var siteLastRun = 0;
+    var siteCooldownUntil = 0;
     var SITE_UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/154.0.0.0 Safari/537.36';
 
     function siteUserName() {
@@ -940,7 +895,6 @@
         });
     }
 
-    // Відповідь застосунку: або { headers, body }, або (без підтримки заголовків) просто текст
     function siteParse(res) {
         var obj = res;
 
@@ -988,7 +942,6 @@
         return added;
     }
 
-    // Назви кукі та їхня довжина (значення не показуємо)
     function siteCookieSizes(jar) {
         return Object.keys(jar).map(function (name) {
             return name + ' (' + String(jar[name]).length + ' симв.)';
@@ -1014,7 +967,6 @@
         return /<input[^>]*type\s*=\s*["']password["']/i.test(html) && /name\s*=\s*["']_token["']/i.test(html);
     }
 
-    // Поля форми входу: ім'я поля логіна й пароля та всі приховані поля (_token та інші)
     function siteLoginFields(html) {
         var fields = { user: '', pass: '', hidden: [] };
         var tags = html.match(/<input\b[^>]*>/gi) || [];
@@ -1050,8 +1002,6 @@
         return token.slice(0, 4) + '…' + token.slice(-4) + ' (' + token.length + ' симв.)';
     }
 
-    // Шукає схожі на ключ рядки на сторінці. primary - поля вводу й елементи з кодом,
-    // broad - будь-який довгий рядок у тексті (запасний варіант).
     function siteCandidates(html, exclude) {
         var cleaned = html.replace(/<script[\s\S]*?<\/script>/gi, ' ').replace(/<style[\s\S]*?<\/style>/gi, ' ');
         var primary = [];
@@ -1087,13 +1037,12 @@
         if (err.status !== undefined && err.status !== null) parts.push('код ' + err.status);
         if (err.statusText) parts.push(String(err.statusText));
 
-        var text = String(err.responseText || '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 80);
+        var text = String(err.responseText || '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 160);
         if (text) parts.push(text);
 
         return parts.join(', ') || 'невідома помилка';
     }
 
-    // Текст помилки з JSON-відповіді сайту (Laravel віддає { message, errors })
     function siteErrorMessage(err) {
         try {
             var data = JSON.parse(String(err.responseText || ''));
@@ -1110,8 +1059,9 @@
         return '';
     }
 
-    // Вхід на сайт і пошук ключа. finish({ ok, candidates, report }).
-    // У звіт потрапляють лише назви кукі та замасковані ключі - ні пароля, ні значень кукі.
+    // =========================================================
+    // 2a. Вхід на сайт (виправлено: X-XSRF-TOKEN / X-CSRF-TOKEN)
+    // =========================================================
     function siteFetchKey(username, password, finish) {
         var report = [];
         var jar = { laravel_cookie_consent: '1' };
@@ -1176,39 +1126,68 @@
             note('   поля форми: ' + form.hidden.map(function (h) { return h.name; }).join(', ') + ', ' + form.user + ', ' + form.pass);
 
             // 2. Вхід
-            var pairs = form.hidden.map(function (h) {
-                return encodeURIComponent(h.name) + '=' + encodeURIComponent(h.value);
-            });
+            // ВАЖЛИВО: _token у тіло НЕ додаємо. Laravel Sanctum в AJAX-режимі
+            // читає CSRF лише з заголовків X-XSRF-TOKEN (з cookie XSRF-TOKEN)
+            // або X-CSRF-TOKEN. Тіло з _token для JSON-запитів ігнорується.
+            var pairs = form.hidden
+                .filter(function (h) { return h.name !== '_token'; })
+                .map(function (h) {
+                    return encodeURIComponent(h.name) + '=' + encodeURIComponent(h.value);
+                });
             pairs.push(encodeURIComponent(form.user) + '=' + encodeURIComponent(username));
             pairs.push(encodeURIComponent(form.pass) + '=' + encodeURIComponent(password));
 
-            // Просимо JSON-відповідь: тоді сайт не робить перенаправлення після входу
-            // (застосунок губить кукі при перенаправленні), а при помилці віддає 422 з поясненням.
-            siteNative(loginUrl, pairs.join('&'), headers({
+            // Дістаємо сирий _token і XSRF-TOKEN з cookie
+            var rawToken = '';
+            form.hidden.forEach(function (h) { if (h.name === '_token') rawToken = h.value; });
+
+            var xsrfCookie = jar['XSRF-TOKEN'] || '';
+            var xsrfHeader = '';
+            if (xsrfCookie) {
+                try { xsrfHeader = decodeURIComponent(xsrfCookie); }
+                catch (e) { xsrfHeader = xsrfCookie; }
+            }
+
+            var postHeaders = {
                 'Origin': SITE_ORIGIN,
                 'Referer': loginUrl,
                 'Accept': 'application/json',
                 'X-Requested-With': 'XMLHttpRequest',
                 'Content-Type': 'application/x-www-form-urlencoded'
-            }), function (err2, res2) {
+            };
+
+            if (rawToken) postHeaders['X-CSRF-TOKEN'] = rawToken;
+            if (xsrfHeader) postHeaders['X-XSRF-TOKEN'] = xsrfHeader;
+
+            note('2) POST /login: Cookie: ' + Object.keys(jar).join(', '));
+            note('   X-CSRF-TOKEN: ' + (rawToken ? 'є (' + rawToken.length + ' симв.)' : 'НЕМАЄ') +
+                 ', X-XSRF-TOKEN: ' + (xsrfHeader ? 'є (' + xsrfHeader.length + ' симв.)' : 'НЕМАЄ'));
+
+            siteNative(loginUrl, pairs.join('&'), headers(postHeaders), function (err2, res2) {
                 if (err2) {
                     var why = siteErrorMessage(err2);
+
+                    // Друкуємо сирий responseText, щоб побачити, що саме каже Laravel
+                    note('   DEBUG status: ' + (err2.status || 0) + ' ' + (err2.statusText || ''));
+                    note('   DEBUG responseText: ' + String(err2.responseText || '').slice(0, 400));
 
                     if (err2.status === 429) {
                         siteCooldownUntil = Date.now() + 5 * 60 * 1000;
                         fail('2) POST /login: забагато спроб входу (429). Зачекай кілька хвилин');
                     }
-                    else if (err2.status === 419) fail('2) POST /login: сторінка входу застаріла (419)');
+                    else if (err2.status === 419) fail('2) POST /login: сторінка входу застаріла (419). Спробуй ще раз');
                     else if (err2.status === 422) fail('2) POST /login: сайт відхилив вхід' + (why ? ': ' + why : '') + ' (код 422). Перевір логін і пароль');
-                    else fail('2) POST /login: ' + siteDescribeError(err2) + ' [відповідь сервера: ' + JSON.stringify(err2) + ']');
+                    else if (err2.status === 401) fail('2) POST /login: 401 Unauthorized' + (why ? ': ' + why : '') + '. Схоже, CSRF-токен не прийнято');
+                    else fail('2) POST /login: ' + siteDescribeError(err2));
                     return;
                 }
 
                 var r2 = siteParse(res2);
                 var added = siteCollectCookies(jar, r2.headers);
-                var location = r2.headers && (r2.headers.location || r2.headers.Location) || '';
-                note('2) POST /login: заголовки ' + (r2.hasHeaders ? 'є' : 'НЕМАЄ') + ', нові кукі: ' + (added.join(', ') || 'немає') + (location ? ', Location: ' + location : '') + ', відповідь: ' + (r2.body.length ? r2.body.length + ' симв.' : 'порожня'));
-
+                var location = (r2.headers && (r2.headers.location || r2.headers.Location)) || '';
+                note('2) POST /login: OK, нові кукі: ' + (added.join(', ') || 'немає') +
+                     (location ? ', Location: ' + location : '') +
+                     ', відповідь: ' + (r2.body.length ? r2.body.length + ' симв.' : 'порожня'));
                 note('   кукі після входу: ' + siteCookieSizes(jar));
 
                 if (/"two_factor"\s*:\s*true/.test(r2.body)) {
@@ -1223,6 +1202,7 @@
                 // 3. Сторінка ключів
                 siteNative(keysUrl, null, headers({ 'Referer': SITE_ORIGIN + '/' }), function (err3, res3) {
                     if (err3) {
+                        note('   DEBUG apikeys responseText: ' + String(err3.responseText || '').slice(0, 400));
                         if (err3.status === 429) {
                             siteCooldownUntil = Date.now() + 5 * 60 * 1000;
                             fail('3) GET apikeys: сайт тимчасово обмежив запити (429). Зачекай кілька хвилин і повтори один раз');
@@ -1371,14 +1351,11 @@
         function got(value) {
             var password = String(value === null || value === undefined ? '' : value);
 
-            // Кнопка "Скасувати" в клавіатурі віддає порожній рядок
             if (!password) {
                 backToSettings();
                 return;
             }
 
-            // "Назад" повертає те, що набрано, тому перед входом питаємо підтвердження:
-            // кожна невдала спроба рахується в ліміті сайту (5 спроб).
             setTimeout(function () {
                 Lampa.Select.show({
                     title: 'Вхід на utp.to',
@@ -1412,7 +1389,6 @@
             return;
         }
 
-        // Сайт обмежує спроби входу (5 за хвилину), тож між запусками тримаємо паузу
         var wait = Math.max(siteCooldownUntil, siteLastRun + 2 * 60 * 1000) - Date.now();
 
         if (wait > 0) {
@@ -1432,7 +1408,7 @@
 
         siteAskPassword(name);
     }
-    
+
     function initSettings() {
         Lampa.SettingsApi.addComponent({
             component: 'utopia',
@@ -1465,7 +1441,6 @@
             onChange: onSiteLogin
         });
 
-        // прибираємо кукі, які залишив старий тестовий скрипт
         try { Lampa.Storage.set('utopia_test_cookies', ''); } catch (e) {}
 
         Lampa.Listener.follow('settings', function (e) {
@@ -1537,7 +1512,6 @@
     function normalizeItem(raw) {
         if (!raw || typeof raw !== 'object') return {};
 
-        // Реальна структура відповіді UTOPIA: { type: "torrent", id: "...", attributes: {...} }
         var attrs = (raw.attributes && typeof raw.attributes === 'object') ? raw.attributes : raw;
 
         var name = attrs.name || deepFind(raw, ['name', 'title', 'filename']) || 'Без назви';
@@ -1555,8 +1529,6 @@
             magnet = attrs.download_link;
             isDirect = true;
         } else {
-            // Запасний варіант: будь-яке поле з "download"/"magnet" у назві,
-            // значення якого схоже на посилання.
             for (var key in attrs) {
                 if (!attrs.hasOwnProperty(key) || !/download|magnet/i.test(key)) continue;
                 var v = attrs[key];
@@ -1718,8 +1690,6 @@
         size_asc: 'Спочатку менший розмір'
     };
 
-    // Компактний опис торента для дебагу: список полів + усе, що схоже
-    // на посилання. Вміщається на екран і не залежить від розміру опису.
     function summarizeItem(item) {
         var attrs = (item.__raw && item.__raw.attributes) || {};
         var links = {};
@@ -1868,10 +1838,6 @@ var moviePanel = $(
         movie.overview || ''
     );
 
-    /*
-     * Lampa у повній картці вже формує готове поле img.
-     * Використовуємо його в першу чергу.
-     */
     var posterUrl = movie.img || movie.poster || movie.poster_path || '';
 
     if (posterUrl) {
@@ -1930,9 +1896,6 @@ var moviePanel = $(
             return el;
         }
 
-        // Готує дані для показу в дебаг-екрані: обрізає задовгі текстові
-        // поля (типу media_info/description, які бувають на кілька тисяч
-        // символів), щоб textarea не гальмувала й не "вішала" WebView.
         function truncateForDebug(value, depth) {
             depth = depth || 0;
             if (depth > 6) return '(...)';
@@ -2249,19 +2212,12 @@ var moviePanel = $(
             row.find('.utopia-item__meta').text(item.size ? formatSize(item.size) : 'Розмір невідомий');
             row.find('.utopia-item__badges').html(badge(item.seeds, '\u25b2') + '&nbsp;&nbsp;' + badge(item.peers, '\u25bc'));
 
-            // ВАЖЛИВО: клік має запускати відтворення, а не дебаг-екран -
-            // дебаг лишається тільки як fallback усередині playTorrent,
-            // коли справді нема ні magnet, ні download_link.
             row.on('click hover:enter', function () { chooseAction(item); });
 
             bindScrollFollow(row);
             return row;
         }
 
-        // Копіює посилання на .torrent у буфер обміну одним натисканням.
-        // Далі його вставляють у Transmission/Transdroid ("Add by URL"),
-        // і клієнт сам завантажує файл. Якщо копіювання не вдалось -
-        // показуємо вікно з посиланням, щоб скопіювати вручну.
         function copyLink(item) {
             var text = item.magnet;
 
@@ -2328,7 +2284,6 @@ function downloadTorrent(item) {
 function showTorrentActionMenu(item) {
     var items = [];
 
-// Спочатку receiver'и
 if (
     window.LampaTorrentReceivers &&
     typeof window.LampaTorrentReceivers.getAvailable === 'function'
@@ -2344,7 +2299,6 @@ if (
     });
 }
 
-// Потім завантаження
 items.push({
     title: '↕️ Завантажити .torrent',
     action: 'download'
@@ -2401,9 +2355,6 @@ items.push({
                     }
                 }
 
-                // ВАЖЛИВО:
-                // receiver сам відкриває свій наступний Select.
-                // Тому тут НЕ робимо toggle('content').
                 return;
 
             } else if (selected.action === 'copy') {
