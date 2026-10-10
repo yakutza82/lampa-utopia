@@ -7,48 +7,28 @@
     if (!window.LampaTorrentReceivers) {
         window.LampaTorrentReceivers = {
             receivers: {},
-
             register: function (receiver) {
-                if (!receiver || !receiver.id || !receiver.title) {
-                    return;
-                }
-
-                if (typeof receiver.send !== 'function') {
-                    return;
-                }
-
+                if (!receiver || !receiver.id || !receiver.title) return;
+                if (typeof receiver.send !== 'function') return;
                 this.receivers[receiver.id] = receiver;
             },
-
             unregister: function (id) {
                 if (!id) return;
-
                 delete this.receivers[id];
             },
-
             getAvailable: function () {
                 var result = [];
                 var receivers = this.receivers;
-
                 Object.keys(receivers).forEach(function (id) {
                     var receiver = receivers[id];
-
                     try {
-                        if (
-                            typeof receiver.isReady !== 'function' ||
-                            receiver.isReady()
-                        ) {
+                        if (typeof receiver.isReady !== 'function' || receiver.isReady()) {
                             result.push(receiver);
                         }
                     } catch (e) {
-                        console.error(
-                            '[TORRENT RECEIVER]',
-                            receiver.id,
-                            e
-                        );
+                        console.error('[TORRENT RECEIVER]', receiver.id, e);
                     }
                 });
-
                 return result;
             }
         };
@@ -134,41 +114,29 @@
 
     function sha1Hex(bytes) {
         function rotl(n, s) { return (n << s) | (n >>> (32 - s)); }
-
         var ml = bytes.length * 8;
         var withOne = new Uint8Array(((bytes.length + 9 + 63) >> 6) << 6);
         withOne.set(bytes);
         withOne[bytes.length] = 0x80;
         var view = new DataView(withOne.buffer);
         view.setUint32(withOne.length - 4, ml >>> 0, false);
-
         var h0 = 0x67452301, h1 = 0xEFCDAB89, h2 = 0x98BADCFE, h3 = 0x10325476, h4 = 0xC3D2E1F0;
-
         for (var chunkStart = 0; chunkStart < withOne.length; chunkStart += 64) {
             var w = new Array(80);
             for (var i = 0; i < 16; i++) w[i] = view.getUint32(chunkStart + i * 4, false);
             for (i = 16; i < 80; i++) w[i] = rotl(w[i - 3] ^ w[i - 8] ^ w[i - 14] ^ w[i - 16], 1);
-
             var a = h0, b = h1, c = h2, d = h3, e = h4;
-
             for (i = 0; i < 80; i++) {
                 var f, k;
                 if (i < 20) { f = (b & c) | ((~b) & d); k = 0x5A827999; }
                 else if (i < 40) { f = b ^ c ^ d; k = 0x6ED9EBA1; }
                 else if (i < 60) { f = (b & c) | (b & d) | (c & d); k = 0x8F1BBCDC; }
                 else { f = b ^ c ^ d; k = 0xCA62C1D6; }
-
                 var temp = (rotl(a, 5) + f + e + k + w[i]) >>> 0;
                 e = d; d = c; c = rotl(b, 30); b = a; a = temp;
             }
-
-            h0 = (h0 + a) >>> 0;
-            h1 = (h1 + b) >>> 0;
-            h2 = (h2 + c) >>> 0;
-            h3 = (h3 + d) >>> 0;
-            h4 = (h4 + e) >>> 0;
+            h0 = (h0 + a) >>> 0; h1 = (h1 + b) >>> 0; h2 = (h2 + c) >>> 0; h3 = (h3 + d) >>> 0; h4 = (h4 + e) >>> 0;
         }
-
         function toHex(n) { return ('00000000' + (n >>> 0).toString(16)).slice(-8); }
         return toHex(h0) + toHex(h1) + toHex(h2) + toHex(h3) + toHex(h4);
     }
@@ -176,7 +144,6 @@
     function fetchTorrentFileBytes(url, headers, onSuccess, onError) {
         var network = new Lampa.Reguest();
         network.timeout(20000);
-
         network.native(url, function (response) {
             if (typeof response !== 'string' || !response.length) {
                 onError('parse_error');
@@ -205,441 +172,49 @@
     // =========================================================
     function injectStyles() {
     if (document.getElementById('utopia-styles')) return;
-
     var css = '' +
-
-        '.utopia-wrap{' +
-            'display:flex;' +
-            'flex-direction:column;' +
-            'gap:1em;' +
-            'padding:1em 1.2em 0;' +
-            'box-sizing:border-box;' +
-        '}' +
-
-        '.utopia-header{' +
-            'display:flex;' +
-            'align-items:flex-start;' +
-            'justify-content:center;' +
-            'gap:1em;' +
-            'flex-wrap:wrap;' +
-            'padding-bottom:1em;' +
-        '}' +
-
-        '.utopia-header__info{' +
-            'display:none;' +
-        '}' +
-
-        '.utopia-header__title{' +
-            'font-size:1.2em;' +
-            'font-weight:600;' +
-            'line-height:1.3;' +
-            'overflow:hidden;' +
-            'text-overflow:ellipsis;' +
-            'white-space:nowrap;' +
-        '}' +
-
-        '.utopia-header__original{' +
-            'font-size:.85em;' +
-            'opacity:.55;' +
-            'margin-top:.25em;' +
-            'overflow:hidden;' +
-            'text-overflow:ellipsis;' +
-            'white-space:nowrap;' +
-        '}' +
-
-        '.utopia-header__meta{' +
-            'font-size:.82em;' +
-            'opacity:.55;' +
-            'margin-top:.35em;' +
-        '}' +
-
-        '.utopia-header__actions{' +
-            'display:flex;' +
-            'align-items:center;' +
-            'gap:.55em;' +
-            'flex-wrap:wrap;' +
-            'flex-shrink:0;' +
-        '}' +
-
-        '.utopia-action{' +
-            'display:flex;' +
-            'align-items:center;' +
-            'justify-content:center;' +
-            'padding:.55em .9em;' +
-            'border-radius:.6em;' +
-            'background:rgba(255,255,255,.08);' +
-            'border:1px solid rgba(255,255,255,.12);' +
-            'font-size:1.6em;' +
-            'white-space:nowrap;' +
-            'box-sizing:border-box;' +
-        '}' +
-
-        '.utopia-sort-btn,' +
-'.utopia-portrait-back{' +
-    'background:#3a3a3a;' +
-    'border-color:#5a5a5a;' +
-'}' +
-
-'.utopia-sort-btn.focus,' +
-'.utopia-portrait-back.focus{' +
-    'background:#565656;' +
-    'border-color:rgba(255,255,255,.75);' +
-'}' +
-
-'.utopia-movie{' +
-    'display:flex;' +
-    'flex-direction:column;' +
-    'box-sizing:border-box;' +
-    'min-width:0;' +
-    'height:100%;' +
-    'overflow-y:auto;' +
-    'overflow-x:hidden;' +
-    'padding:.3em .8em .8em 0;' +
-    'touch-action: pan-y;' +
-    'overscroll-behavior: contain;' +
-'}' +
-
-'.utopia-movie__top{' +
-    'display:flex;' +
-    'align-items:flex-start;' +
-    'gap:.8em;' +
-    'width:100%;' +
-    'box-sizing:border-box;' +
-'}' +
-
-'.utopia-movie__poster{' +
-    'flex:0 0 8em;' +
-    'width:8em;' +
-    'height:12em;' +
-    'overflow:hidden;' +
-    'border-radius:.25em;' +
-    'background:rgba(255,255,255,.05);' +
-'}' +
-
-'.utopia-movie__poster.focus{' +
-    'outline:.2em solid rgba(255,255,255,.85);' +
-    'outline-offset:-.2em;' +
-'}' +
-
-'.utopia-movie__poster-img{' +
-    'display:block;' +
-    'width:100%;' +
-    'height:100%;' +
-    'object-fit:cover;' +
-'}' +
-
-'.utopia-movie__details{' +
-    'flex:1;' +
-    'min-width:0;' +
-    'padding-top:.1em;' +
-'}' +
-
-'.utopia-movie__year,' +
-'.utopia-movie__country,' +
-'.utopia-movie__rating,' +
-'.utopia-movie__imdb,' +
-'.utopia-movie__pg{' +
-    'font-size:1.22em;' +
-    'color:#FFFFFF;' +
-    'line-height:1.45;' +
-    'opacity:1;' +
-'}' +
-
-'.utopia-movie__rating,' +
-'.utopia-movie__imdb{' +
-    'margin-top:.35em;' +
-'}' +
-
-'.utopia-movie__pg{' +
-    'margin-top:.35em;' +
-'}' +
-
-'.utopia-movie__title{' +
-    'font-size:2.25em;' +
-    'color:#FFFFFF;' +
-    'font-weight:700;' +
-    'line-height:1.25;' +
-    'margin-top:1em;' +
-'}' +
-
-'.utopia-movie__genres{' +
-    'font-size:1.22em;' +
-    'color:#FFFFFF;' +
-    'line-height:1.4;' +
-    'opacity:.65;' +
-    'margin-top:.45em;' +
-'}' +
-
-'.utopia-movie__overview{' +
-    'font-size:1.22em;' +
-    'color:#FFFFFF;' +
-    'line-height:1.45;' +
-    'opacity:1;' +
-    'margin-top:1.2em;' +
-    'padding-bottom:1em;' +
-'}' +
-
-        '.utopia-list{' +
-            'display:flex;' +
-            'flex-direction:column;' +
-            'gap:.7em;' +
-        '}' +
-
-        '.utopia-item{' +
-            'position:relative;' +
-            'display:flex;' +
-            'align-items:center;' +
-            'justify-content:space-between;' +
-            'gap:1em;' +
-            'padding:1em 1.15em;' +
-            'border-radius:.7em;' +
-            'background:rgba(255,255,255,.015);' +
-            'border:1px solid rgba(255,255,255,.07);' +
-            'box-sizing:border-box;' +
-            'user-select:none;' +
-            'width:98%;' +
-            'align-self:center;' +
-        '}' +
-
-            '@keyframes utopia-bounce{' +
-            '0%{transform:translateY(0) scale(1);}' +
-            '30%{transform:translateY(-.45em) scale(1.02);}' +
-            '55%{transform:translateY(.12em) scale(.995);}' +
-            '80%{transform:translateY(-.08em) scale(1.005);}' +
-            '100%{transform:translateY(0) scale(1);}' +
-        '}' +
-
-                '.utopia-item.focus{' +
-            'background:rgba(255,255,255,.065);' +
-            'border-color:rgba(255,255,255,.75);' +
-            'animation:utopia-bounce .35s ease-out;' +
-        '}' +
-
-        '.utopia-item__left{' +
-            'flex:1;' +
-            'min-width:0;' +
-        '}' +
-
-        '.utopia-item__movie{' +
-            'font-weight:600;' +
-            'font-size:1.85em;' +
-            'line-height:1.3;' +
-            'margin-bottom:.2em;' +
-            'overflow:hidden;' +
-            'text-overflow:ellipsis;' +
-            'white-space:nowrap;' +
-        '}' +
-
-        '.utopia-item__title{' +
-            'font-size:1.27em;' +
-            'opacity:.58;' +
-            'line-height:1.3;' +
-            'margin-bottom:.3em;' +
-            'overflow:hidden;' +
-            'text-overflow:ellipsis;' +
-            'white-space:nowrap;' +
-        '}' +
-
-        '.utopia-item__meta{' +
-            'font-size:1.16em;' +
-            'opacity:.45;' +
-        '}' +
-
-        '.utopia-item__badges{' +
-            'display:flex;' +
-            'align-items:center;' +
-            'gap:.7em;' +
-            'white-space:nowrap;' +
-            'flex-shrink:0;' +
-            'font-size:1.2em;' +
-            'font-weight:600;' +
-        '}' +
-
-        '.utopia-badge{' +
-            'display:inline-flex;' +
-            'align-items:center;' +
-            'gap:.2em;' +
-        '}' +
-
-        '.utopia-badge--good{color:#7fcf8a;}' +
-        '.utopia-badge--mid{color:#d6b85c;}' +
-        '.utopia-badge--bad{color:#c96b6b;}' +
-
-        '.utopia-more{' +
-            'display:flex;' +
-            'align-items:center;' +
-            'justify-content:center;' +
-            'padding:1em;' +
-            'margin:.3em 0 1em;' +
-            'border-radius:.7em;' +
-            'background:rgba(255,255,255,.05);' +
-            'border:1px solid rgba(255,255,255,.07);' +
-            'font-size:.9em;' +
-            'font-weight:600;' +
-        '}' +
-
-        '.utopia-more.focus{' +
-            'background:rgba(255,255,255,.08);' +
-            'border-color:rgba(255,255,255,.75);' +
-        '}' +
-
-        '.utopia-state{' +
-            'display:flex;' +
-            'flex-direction:column;' +
-            'align-items:center;' +
-            'justify-content:center;' +
-            'text-align:center;' +
-            'padding:4em 1.5em;' +
-            'opacity:.9;' +
-        '}' +
-
-        '.utopia-state__icon{' +
-            'font-size:2.2em;' +
-            'line-height:1;' +
-            'margin-bottom:.55em;' +
-            'opacity:.8;' +
-        '}' +
-
-        '.utopia-state__title{' +
-            'font-size:1.1em;' +
-            'font-weight:600;' +
-            'margin-bottom:.35em;' +
-        '}' +
-
-        '.utopia-state__text{' +
-            'max-width:42em;' +
-            'font-size:.88em;' +
-            'line-height:1.45;' +
-            'opacity:.55;' +
-            'margin-bottom:1.1em;' +
-        '}' +
-
-        '@media screen and (orientation:portrait){' +
-
-            '.utopia-movie{' +
-                'display:none;' +
-            '}' +
-
-            '.utopia-portrait-back,' +
-            '.utopia-sort-btn{' +
-            'font-size:1.5em;' +
-            '}' +
-
-            '.utopia-wrap{' +
-                'height:100%;' +
-                'min-height:0;' +
-                'overflow-y:auto;' +
-                'overflow-x:hidden;' +
-                'touch-action:pan-y;' +
-                'overscroll-behavior:contain;' +
-                '-webkit-mask-image:linear-gradient(to bottom,rgba(0,0,0,0) 0,rgba(0,0,0,.5) .4em,#000 .8em);' +
-                'mask-image:linear-gradient(to bottom,rgba(0,0,0,0) 0,rgba(0,0,0,.5) .4em,#000 .8em);' +
-            '}' +
-
-            '.utopia-header{' +
-                'flex-shrink:0;' +
-                'margin-top:0;' +
-                'justify-content:flex-start;' +
-                'padding-left:1%;' +
-                'padding-bottom:1em;' +
-            '}' +
-
-            '.utopia-list{' +
-                'flex-shrink:0;' +
-            '}' +
-
-        '}' +
-
-        '@media screen and (orientation:landscape){' +
-
-    '.utopia-wrap{' +
-        'display:grid;' +
-        'grid-template-columns:minmax(0,30%) minmax(0,1fr);' +
-        'grid-template-rows:auto minmax(0,1fr);' +
-        'column-gap:1.2em;' +
-        'height:100%;' +
-        'min-height:0;' +
-        'box-sizing:border-box;' +
-        'align-items:stretch;' +
-    '}' +
-
-        '.utopia-header{' +
-            'grid-column:2;' +
-            'grid-row:1;' +
-            'min-width:0;' +
-            'justify-content:flex-start;' +
-            'padding-left:1%;' +
-            'padding-top:0;' +
-            'padding-bottom:1em;' +
-            'position:relative;' +
-            'z-index:2;' +
-            'top:-.5em;' +
-        '}' +
-
-    '.utopia-header__info{' +
-        'display:none;' +
-    '}' +
-
-    '.utopia-movie{' +
-        'grid-column:1;' +
-        'grid-row:1 / span 2;' +
-        'display:flex;' +
-        'height:100%;' +
-        'min-height:0;' +
-        'overflow-y:auto;' +
-        'overflow-x:hidden;' +
-    '}' +
-
-    '.utopia-movie__top{' +
-        'width:100%;' +
-    '}' +
-
-    '.utopia-movie__poster{' +
-        'flex:0 0 7.5em;' +
-        'width:7.5em;' +
-        'height:11.25em;' +
-    '}' +
-
-    '.utopia-list{' +
-        'grid-column:2;' +
-        'grid-row:2;' +
-        'min-width:0;' +
-        'min-height:0;' +
-        'height:auto;' +
-        'overflow-y:auto;' +
-        'overflow-x:hidden;' +
-        'touch-action: pan-y;' +
-        'overscroll-behavior: contain;' +
-        'margin-top:-3em;' +
-        'padding-top:3em;' +
-        'padding-bottom:1.8em;' +
-        '-webkit-mask-image:linear-gradient(to bottom,rgba(0,0,0,0) 0,rgba(0,0,0,.25) 1em,rgba(0,0,0,.55) 2em,#000 3em,#000 calc(100% - 1.8em),rgba(0,0,0,.55) calc(100% - 1.2em),rgba(0,0,0,.35) calc(100% - .6em),rgba(0,0,0,0) 100%);' +
-        'mask-image:linear-gradient(to bottom,rgba(0,0,0,0) 0,rgba(0,0,0,.25) 1em,rgba(0,0,0,.55) 2em,#000 3em,#000 calc(100% - 1.8em),rgba(0,0,0,.55) calc(100% - 1.2em),rgba(0,0,0,.35) calc(100% - .6em),rgba(0,0,0,0) 100%);' +
-    '}' +
-
-    '.utopia-portrait-back{' +
-        'display:none !important;' +
-    '}' +
-
-'}' +
-            
-        '@media screen and (max-width:600px){' +
-
-            '.utopia-wrap{' +
-                'padding:.8em .8em 0;' +
-            '}' +
-
-            '.utopia-item{' +
-                'padding:.9em 1em;' +
-            '}' +
-
-            '.utopia-item__badges{' +
-                'font-size:1.1em;' +
-                'gap:.45em;' +
-            '}' +
-
-        '}';
-
+        '.utopia-wrap{display:flex;flex-direction:column;gap:1em;padding:1em 1.2em 0;box-sizing:border-box;}' +
+        '.utopia-header{display:flex;align-items:flex-start;justify-content:center;gap:1em;flex-wrap:wrap;padding-bottom:1em;}' +
+        '.utopia-header__info{display:none;}' +
+        '.utopia-header__title{font-size:1.2em;font-weight:600;line-height:1.3;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}' +
+        '.utopia-header__original{font-size:.85em;opacity:.55;margin-top:.25em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}' +
+        '.utopia-header__meta{font-size:.82em;opacity:.55;margin-top:.35em;}' +
+        '.utopia-header__actions{display:flex;align-items:center;gap:.55em;flex-wrap:wrap;flex-shrink:0;}' +
+        '.utopia-action{display:flex;align-items:center;justify-content:center;padding:.55em .9em;border-radius:.6em;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.12);font-size:1.6em;white-space:nowrap;box-sizing:border-box;}' +
+        '.utopia-sort-btn,.utopia-portrait-back{background:#3a3a3a;border-color:#5a5a5a;}' +
+        '.utopia-sort-btn.focus,.utopia-portrait-back.focus{background:#565656;border-color:rgba(255,255,255,.75);}' +
+        '.utopia-movie{display:flex;flex-direction:column;box-sizing:border-box;min-width:0;height:100%;overflow-y:auto;overflow-x:hidden;padding:.3em .8em .8em 0;touch-action:pan-y;overscroll-behavior:contain;}' +
+        '.utopia-movie__top{display:flex;align-items:flex-start;gap:.8em;width:100%;box-sizing:border-box;}' +
+        '.utopia-movie__poster{flex:0 0 8em;width:8em;height:12em;overflow:hidden;border-radius:.25em;background:rgba(255,255,255,.05);}' +
+        '.utopia-movie__poster.focus{outline:.2em solid rgba(255,255,255,.85);outline-offset:-.2em;}' +
+        '.utopia-movie__poster-img{display:block;width:100%;height:100%;object-fit:cover;}' +
+        '.utopia-movie__details{flex:1;min-width:0;padding-top:.1em;}' +
+        '.utopia-movie__year,.utopia-movie__country,.utopia-movie__rating,.utopia-movie__imdb,.utopia-movie__pg{font-size:1.22em;color:#FFFFFF;line-height:1.45;opacity:1;}' +
+        '.utopia-movie__rating,.utopia-movie__imdb{margin-top:.35em;}' +
+        '.utopia-movie__pg{margin-top:.35em;}' +
+        '.utopia-movie__title{font-size:2.25em;color:#FFFFFF;font-weight:700;line-height:1.25;margin-top:1em;}' +
+        '.utopia-movie__genres{font-size:1.22em;color:#FFFFFF;line-height:1.4;opacity:.65;margin-top:.45em;}' +
+        '.utopia-movie__overview{font-size:1.22em;color:#FFFFFF;line-height:1.45;opacity:1;margin-top:1.2em;padding-bottom:1em;}' +
+        '.utopia-list{display:flex;flex-direction:column;gap:.7em;}' +
+        '.utopia-item{position:relative;display:flex;align-items:center;justify-content:space-between;gap:1em;padding:1em 1.15em;border-radius:.7em;background:rgba(255,255,255,.015);border:1px solid rgba(255,255,255,.07);box-sizing:border-box;user-select:none;width:98%;align-self:center;}' +
+        '@keyframes utopia-bounce{0%{transform:translateY(0) scale(1);}30%{transform:translateY(-.45em) scale(1.02);}55%{transform:translateY(.12em) scale(.995);}80%{transform:translateY(-.08em) scale(1.005);}100%{transform:translateY(0) scale(1);}}' +
+        '.utopia-item.focus{background:rgba(255,255,255,.065);border-color:rgba(255,255,255,.75);animation:utopia-bounce .35s ease-out;}' +
+        '.utopia-item__left{flex:1;min-width:0;}' +
+        '.utopia-item__movie{font-weight:600;font-size:1.85em;line-height:1.3;margin-bottom:.2em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}' +
+        '.utopia-item__title{font-size:1.27em;opacity:.58;line-height:1.3;margin-bottom:.3em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}' +
+        '.utopia-item__meta{font-size:1.16em;opacity:.45;}' +
+        '.utopia-item__badges{display:flex;align-items:center;gap:.7em;white-space:nowrap;flex-shrink:0;font-size:1.2em;font-weight:600;}' +
+        '.utopia-badge{display:inline-flex;align-items:center;gap:.2em;}' +
+        '.utopia-badge--good{color:#7fcf8a;}.utopia-badge--mid{color:#d6b85c;}.utopia-badge--bad{color:#c96b6b;}' +
+        '.utopia-more{display:flex;align-items:center;justify-content:center;padding:1em;margin:.3em 0 1em;border-radius:.7em;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.07);font-size:.9em;font-weight:600;}' +
+        '.utopia-more.focus{background:rgba(255,255,255,.08);border-color:rgba(255,255,255,.75);}' +
+        '.utopia-state{display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:4em 1.5em;opacity:.9;}' +
+        '.utopia-state__icon{font-size:2.2em;line-height:1;margin-bottom:.55em;opacity:.8;}' +
+        '.utopia-state__title{font-size:1.1em;font-weight:600;margin-bottom:.35em;}' +
+        '.utopia-state__text{max-width:42em;font-size:.88em;line-height:1.45;opacity:.55;margin-bottom:1.1em;}' +
+        '@media screen and (orientation:portrait){.utopia-movie{display:none;}.utopia-portrait-back,.utopia-sort-btn{font-size:1.5em;}.utopia-wrap{height:100%;min-height:0;overflow-y:auto;overflow-x:hidden;touch-action:pan-y;overscroll-behavior:contain;-webkit-mask-image:linear-gradient(to bottom,rgba(0,0,0,0) 0,rgba(0,0,0,.5) .4em,#000 .8em);mask-image:linear-gradient(to bottom,rgba(0,0,0,0) 0,rgba(0,0,0,.5) .4em,#000 .8em);}.utopia-header{flex-shrink:0;margin-top:0;justify-content:flex-start;padding-left:1%;padding-bottom:1em;}.utopia-list{flex-shrink:0;}}' +
+        '@media screen and (orientation:landscape){.utopia-wrap{display:grid;grid-template-columns:minmax(0,30%) minmax(0,1fr);grid-template-rows:auto minmax(0,1fr);column-gap:1.2em;height:100%;min-height:0;box-sizing:border-box;align-items:stretch;}.utopia-header{grid-column:2;grid-row:1;min-width:0;justify-content:flex-start;padding-left:1%;padding-top:0;padding-bottom:1em;position:relative;z-index:2;top:-.5em;}.utopia-header__info{display:none;}.utopia-movie{grid-column:1;grid-row:1 / span 2;display:flex;height:100%;min-height:0;overflow-y:auto;overflow-x:hidden;}.utopia-movie__top{width:100%;}.utopia-movie__poster{flex:0 0 7.5em;width:7.5em;height:11.25em;}.utopia-list{grid-column:2;grid-row:2;min-width:0;min-height:0;height:auto;overflow-y:auto;overflow-x:hidden;touch-action:pan-y;overscroll-behavior:contain;margin-top:-3em;padding-top:3em;padding-bottom:1.8em;-webkit-mask-image:linear-gradient(to bottom,rgba(0,0,0,0) 0,rgba(0,0,0,.25) 1em,rgba(0,0,0,.55) 2em,#000 3em,#000 calc(100% - 1.8em),rgba(0,0,0,.55) calc(100% - 1.2em),rgba(0,0,0,.35) calc(100% - .6em),rgba(0,0,0,0) 100%);mask-image:linear-gradient(to bottom,rgba(0,0,0,0) 0,rgba(0,0,0,.25) 1em,rgba(0,0,0,.55) 2em,#000 3em,#000 calc(100% - 1.8em),rgba(0,0,0,.55) calc(100% - 1.2em),rgba(0,0,0,.35) calc(100% - .6em),rgba(0,0,0,0) 100%);}.utopia-portrait-back{display:none !important;}}' +
+        '@media screen and (max-width:600px){.utopia-wrap{padding:.8em .8em 0;}.utopia-item{padding:.9em 1em;}.utopia-item__badges{font-size:1.1em;gap:.45em;}}';
     var style = document.createElement('style');
     style.id = 'utopia-styles';
     style.type = 'text/css';
@@ -650,17 +225,10 @@
     // =========================================================
     // 1. Сховище
     // =========================================================
-    function getKey() {
-        return Lampa.Storage.get('utopia_api_key', '');
-    }
-    function hasKey() {
-        return !!getKey();
-    }
+    function getKey() { return Lampa.Storage.get('utopia_api_key', ''); }
+    function hasKey() { return !!getKey(); }
 
-    var keyField = {
-        name: 'API ключ UTOPIA',
-        description: ''
-    };
+    var keyField = { name: 'API ключ UTOPIA', description: '' };
 
     function maskKey(key) {
         key = String(key || '');
@@ -670,10 +238,7 @@
     }
 
     function escapeText(text) {
-        return String(text)
-            .replace(/&/g, '&amp;')
-            .replace(/</g, '&lt;')
-            .replace(/>/g, '&gt;');
+        return String(text).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
     }
 
     function keyDescription() {
@@ -682,7 +247,6 @@
 
     function updateKeyDisplay() {
         keyField.description = keyDescription();
-
         try {
             var $el = $('[data-name="utopia_api_key_btn"], [data-param="utopia_api_key_btn"]');
             if ($el.length) {
@@ -715,9 +279,7 @@
                     if (item.action === 'apply') applyApiKey(key);
                     else backToSettings();
                 },
-                onBack: function () {
-                    backToSettings();
-                }
+                onBack: function () { backToSettings(); }
             });
         }, 200);
     }
@@ -725,48 +287,32 @@
     var typingPreview = { timer: null, guard: null, box: null, textEl: null, countEl: null, last: null };
 
     function isMobileScreen() {
-        try {
-            return !!(Lampa.Platform && typeof Lampa.Platform.screen === 'function' && Lampa.Platform.screen('mobile'));
-        } catch (e) {
-            return false;
-        }
+        try { return !!(Lampa.Platform && typeof Lampa.Platform.screen === 'function' && Lampa.Platform.screen('mobile')); }
+        catch (e) { return false; }
     }
 
     function findKeyboardField() {
         var field = document.getElementById('orsay-keyboard');
-
         if (!field) field = document.querySelector('.simple-keyboard-input input, .simple-keyboard-input textarea');
-
         if (!field) {
             var list = document.querySelectorAll('input[type="text"], input:not([type]), textarea');
             for (var i = 0; i < list.length; i++) {
-                if (list[i].offsetParent !== null) {
-                    field = list[i];
-                    break;
-                }
+                if (list[i].offsetParent !== null) { field = list[i]; break; }
             }
         }
-
         return field;
     }
 
     function ensurePreviewBox() {
         if (typingPreview.box) return;
-
         var box = document.createElement('div');
-        box.style.cssText = 'position:fixed;left:4%;right:4%;top:1em;z-index:100000;padding:.6em .9em;' +
-            'border-radius:.5em;background:rgba(0,0,0,.88);color:#fff;font-size:1.4em;line-height:1.35;' +
-            'word-break:break-all;overflow-wrap:anywhere;pointer-events:none;';
-
+        box.style.cssText = 'position:fixed;left:4%;right:4%;top:1em;z-index:100000;padding:.6em .9em;border-radius:.5em;background:rgba(0,0,0,.88);color:#fff;font-size:1.4em;line-height:1.35;word-break:break-all;overflow-wrap:anywhere;pointer-events:none;';
         var countEl = document.createElement('div');
         countEl.style.cssText = 'font-size:.6em;opacity:.65;margin-bottom:.2em;';
-
         var textEl = document.createElement('div');
-
         box.appendChild(countEl);
         box.appendChild(textEl);
         document.body.appendChild(box);
-
         typingPreview.box = box;
         typingPreview.countEl = countEl;
         typingPreview.textEl = textEl;
@@ -775,11 +321,9 @@
     function stopTypingPreview() {
         clearInterval(typingPreview.timer);
         clearTimeout(typingPreview.guard);
-
         if (typingPreview.box && typingPreview.box.parentNode) {
             typingPreview.box.parentNode.removeChild(typingPreview.box);
         }
-
         typingPreview.timer = null;
         typingPreview.guard = null;
         typingPreview.box = null;
@@ -790,49 +334,30 @@
 
     function startTypingPreview() {
         stopTypingPreview();
-
         if (isMobileScreen()) return;
-
         typingPreview.timer = setInterval(function () {
             var field = findKeyboardField();
             if (!field) return;
-
             var text = String(field.value !== undefined ? field.value : (field.textContent || ''));
             if (text === typingPreview.last) return;
-
             typingPreview.last = text;
             ensurePreviewBox();
             typingPreview.countEl.textContent = 'Введено символів: ' + text.length;
             typingPreview.textEl.textContent = text || '(порожньо)';
         }, 150);
-
         typingPreview.guard = setTimeout(stopTypingPreview, 10 * 60 * 1000);
     }
 
-        function openKeyboard(startValue) {
+    function openKeyboard(startValue) {
         var current = getKey();
-
         function done(newValue) {
             stopTypingPreview();
-
             var key = String(newValue === null || newValue === undefined ? '' : newValue).trim();
-
-            if (!key || key === current) {
-                backToSettings();
-                return;
-            }
-
+            if (!key || key === current) { backToSettings(); return; }
             askApply(key);
         }
-
         if (Lampa.Input && typeof Lampa.Input.edit === 'function') {
-            Lampa.Input.edit({
-                title: 'API ключ UTOPIA',
-                value: startValue,
-                free: true,
-                nosave: true
-            }, done);
-
+            Lampa.Input.edit({ title: 'API ключ UTOPIA', value: startValue, free: true, nosave: true }, done);
             startTypingPreview();
         } else {
             var result = prompt('API ключ UTOPIA', startValue);
@@ -843,12 +368,7 @@
 
     function editApiKey() {
         var current = getKey();
-
-        if (!current) {
-            openKeyboard('');
-            return;
-        }
-
+        if (!current) { openKeyboard(''); return; }
         Lampa.Select.show({
             title: 'API ключ UTOPIA',
             items: [
@@ -863,9 +383,7 @@
                 else if (item.action === 'delete') askApply('');
                 else backToSettings();
             },
-            onBack: function () {
-                backToSettings();
-            }
+            onBack: function () { backToSettings(); }
         });
     }
 
@@ -879,67 +397,6 @@
 
     function siteUserName() {
         return String(Lampa.Storage.get('utopia_username', '') || '');
-    }
-
-    function siteNative(url, postdata, headers, callback) {
-        var net = new Lampa.Reguest();
-        net.timeout(20000);
-        net.native(url, function (res) {
-            callback(null, res);
-        }, function (xhr) {
-            callback(xhr || {}, null);
-        }, postdata || false, {
-            dataType: 'text',
-            headers: headers,
-            returnHeaders: true
-        });
-    }
-
-    function siteParse(res) {
-        var obj = res;
-
-        if (typeof obj === 'string') {
-            try {
-                var parsed = JSON.parse(obj);
-                if (parsed && typeof parsed === 'object' && (parsed.body !== undefined || parsed.headers !== undefined)) obj = parsed;
-            } catch (e) {}
-        }
-
-        if (obj && typeof obj === 'object' && (obj.body !== undefined || obj.headers !== undefined)) {
-            var body = obj.body;
-
-            if (body && typeof body === 'object') {
-                try { body = JSON.stringify(body); } catch (e) { body = ''; }
-            }
-
-            return { headers: obj.headers || {}, body: String(body || ''), hasHeaders: !!obj.headers };
-        }
-
-        return { headers: {}, body: typeof res === 'string' ? res : '', hasHeaders: false };
-    }
-
-    function siteCollectCookies(jar, headers) {
-        var list = headers && (headers['set-cookie'] || headers['Set-Cookie']);
-        var added = [];
-
-        if (!list) return added;
-        if (typeof list === 'string') list = list.split('\n');
-
-        list.forEach(function (line) {
-            var part = String(line).split(';')[0];
-            var eq = part.indexOf('=');
-            if (eq <= 0) return;
-
-            var name = part.slice(0, eq).trim();
-            var value = part.slice(eq + 1).trim();
-
-            if (!value || value === 'deleted') delete jar[name];
-            else jar[name] = value;
-
-            if (added.indexOf(name) === -1) added.push(name);
-        });
-
-        return added;
     }
 
     function siteCookieSizes(jar) {
@@ -976,12 +433,10 @@
         var fields = { user: '', pass: '', hidden: [] };
         var tags = html.match(/<input\b[^>]*>/gi) || [];
         var firstText = '';
-
         tags.forEach(function (tag) {
             var type = (siteAttr(tag, 'type') || 'text').toLowerCase();
             var name = siteAttr(tag, 'name');
             if (!name) return;
-
             if (type === 'password') {
                 if (!fields.pass) fields.pass = name;
             } else if (type === 'hidden') {
@@ -991,15 +446,12 @@
                 if (!fields.user && /user|login|email/i.test(name)) fields.user = name;
             }
         });
-
         if (!fields.user) fields.user = firstText;
-
         if (!fields.hidden.some(function (h) { return h.name === '_token'; })) {
             var meta = html.match(/<meta[^>]*name\s*=\s*["']csrf-token["'][^>]*>/i);
             var token = meta ? siteAttr(meta[0], 'content') : '';
             if (token) fields.hidden.push({ name: '_token', value: token });
         }
-
         return fields;
     }
 
@@ -1011,29 +463,24 @@
         var cleaned = html.replace(/<script[\s\S]*?<\/script>/gi, ' ').replace(/<style[\s\S]*?<\/style>/gi, ' ');
         var primary = [];
         var broad = [];
-
         function add(list, value, where) {
             if (!value || exclude[value]) return;
             if (!/[A-Za-z]/.test(value) || !/\d/.test(value)) return;
             for (var i = 0; i < list.length; i++) if (list[i].value === value) return;
             list.push({ value: value, where: where });
         }
-
         (cleaned.match(/<(input|textarea)\b[^>]*>/gi) || []).forEach(function (tag) {
             if (siteAttr(tag, 'name') === '_token') return;
             var value = siteDecode(siteAttr(tag, 'value'));
             if (/^[A-Za-z0-9_\-|]{32,200}$/.test(value)) add(primary, value, 'поле вводу');
         });
-
         var re = /<(code|pre|kbd|samp|td|th|span|p|div|li|dd|b|strong)\b[^>]*>\s*([A-Za-z0-9_\-|]{32,200})\s*<\//gi;
         var m;
         while ((m = re.exec(cleaned)) !== null) add(primary, m[2], 'елемент <' + m[1].toLowerCase() + '>');
-
         var text = cleaned.replace(/<[^>]*>/g, ' ');
         (text.match(/[A-Za-z0-9_\-|]{32,200}/g) || []).forEach(function (value) {
             add(broad, value, 'текст сторінки');
         });
-
         return primary.length ? primary : broad;
     }
 
@@ -1041,36 +488,17 @@
         var parts = [];
         if (err.status !== undefined && err.status !== null) parts.push('код ' + err.status);
         if (err.statusText) parts.push(String(err.statusText));
-
         var text = String(err.responseText || '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 160);
         if (text) parts.push(text);
-
         return parts.join(', ') || 'невідома помилка';
     }
 
-    function siteErrorMessage(err) {
-        try {
-            var data = JSON.parse(String(err.responseText || ''));
-
-            if (data && data.errors) {
-                var first = Object.keys(data.errors)[0];
-                var list = data.errors[first];
-                if (list && list[0]) return String(list[0]);
-            }
-
-            if (data && data.message) return String(data.message);
-        } catch (e) {}
-
-        return '';
-    }
-
     // =========================================================
-    // 2a. Вхід на сайт
-    // === ДІАГНОСТИКА v5: два GET /login підряд, перевірка стабільності сесії ===
+    // 2a. Вхід на сайт через Native HTTP Bridge (AndroidJS.httpReq)
     // =========================================================
     function siteFetchKey(username, password, finish) {
         var report = [];
-        var jar = { laravel_cookie_consent: '1' };
+        var jar = {}; // Native bridge сам керує cookie jar
         var exclude = {};
 
         function note(line) { report.push(line); }
@@ -1080,214 +508,199 @@
             finish({ ok: false, candidates: [], report: report.join('\n') });
         }
 
-        function headers(extra) {
-            var h = {
-                'User-Agent': SITE_UA,
-                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-                'Accept-Language': 'uk,ru;q=0.9,en;q=0.8',
-                'Cookie': siteCookieHeader(jar)
+        // --- Обгортка над AndroidJS.httpReq ---
+        // Формат: Android.httpReq({url, method, headers, data}, callback)
+        // Але прямого виклику Android.httpReq немає в глобальному доступі Lampa.
+        // Тому викликаємо AndroidJS.httpReq напряму (якщо доступний).
+        function nativeRequest(url, options, callback) {
+            if (typeof AndroidJS === 'undefined' || typeof AndroidJS.httpReq !== 'function') {
+                callback({ status: 0, error: 'native_bridge_unavailable' }, null);
+                return;
+            }
+
+            // Формуємо об'єкт запиту у форматі, який очікує міст
+            var reqData = {
+                url: url,
+                method: options.method || 'GET',
+                headers: options.headers || {},
+                data: options.data || ''
             };
 
-            for (var k in extra) h[k] = extra[k];
-            return h;
+            // Native bridge Lampa зберігає callback за індексом
+            // і після відповіді викликає глобальну функцію httpCall(index, callback)
+            var idx = Math.floor(Math.random() * 1000000);
+            var called = false;
+
+            // Тимчасово перевизначаємо httpCall, щоб перехопити відповідь
+            var originalHttpCall = window.httpCall;
+            window.httpCall = function (i, cb) {
+                if (i === idx && !called) {
+                    called = true;
+                    window.httpCall = originalHttpCall;
+                    try {
+                        var resp = (typeof AndroidJS.getResp === 'function') ? AndroidJS.getResp(i) : null;
+                        callback(null, resp);
+                    } catch (e) {
+                        callback({ status: 0, error: 'getResp_failed: ' + e.message }, null);
+                    }
+                } else if (originalHttpCall) {
+                    originalHttpCall(i, cb);
+                }
+            };
+
+            try {
+                AndroidJS.httpReq(idx, reqData);
+            } catch (e) {
+                window.httpCall = originalHttpCall;
+                callback({ status: 0, error: 'httpReq_failed: ' + e.message }, null);
+            }
         }
 
         var loginUrl = SITE_ORIGIN + '/login';
         var keysUrl = SITE_ORIGIN + '/users/' + encodeURIComponent(username) + '/apikeys';
 
-        // 1. Сторінка входу (перший GET)
-        siteNative(loginUrl, null, headers({ 'Referer': SITE_ORIGIN + '/' }), function (err, res) {
-            if (err) {
-                if (err.status === 429) {
-                    siteCooldownUntil = Date.now() + 5 * 60 * 1000;
-                    fail('1) GET /login: сайт тимчасово обмежив запити (429). Зачекай кілька хвилин і повтори');
-                } else {
-                    fail('1) GET /login: ' + siteDescribeError(err));
-                }
+        note('=== СПРОБА ЧЕРЕЗ NATIVE HTTP BRIDGE ===');
+
+        // Крок 1: GET /login через нативний міст
+        nativeRequest(loginUrl, {
+            method: 'GET',
+            headers: {
+                'User-Agent': SITE_UA,
+                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+                'Accept-Language': 'uk,ru;q=0.9,en;q=0.8'
+            }
+        }, function (err1, res1) {
+            if (err1) {
+                fail('1) GET /login (native): ' + (err1.error || 'невідома помилка'));
                 return;
             }
 
-            var r = siteParse(res);
-            siteCollectCookies(jar, r.headers);
+            var body1 = '';
+            if (res1 && typeof res1 === 'object') {
+                body1 = String(res1.body || res1.data || '');
+            } else {
+                body1 = String(res1 || '');
+            }
 
-            var sessionGet1 = jar['laravel_session'] || '';
-            var xsrfGet1 = jar['XSRF-TOKEN'] || '';
+            note('1) GET /login (native): отримано ' + body1.length + ' симв.');
 
-            note('1a) GET /login #1: заголовки ' + (r.hasHeaders ? 'є' : 'НЕМАЄ') + ', кукі: ' + Object.keys(jar).join(', '));
-            note('    laravel_session #1: ' + siteCookieFingerprint(sessionGet1) + ' (довжина: ' + sessionGet1.length + ')');
-            note('    XSRF-TOKEN #1:      ' + siteCookieFingerprint(xsrfGet1) + ' (довжина: ' + xsrfGet1.length + ')');
-
-            if (!r.hasHeaders) {
-                fail('Застосунок не віддає заголовки відповіді. Потрібна свіжа версія Lampa для Android.');
+            // Перевірка, чи є форма входу
+            if (!siteHasLoginForm(body1)) {
+                fail('1) GET /login (native): сторінка не містить форми входу (можливо, редірект або помилка)');
                 return;
             }
 
-            // === ТЕСТ СТАБІЛЬНОСТІ СЕСІЇ: робимо ДРУГИЙ GET /login ===
-            // Якщо laravel_session після другого GET той самий — сесія стабільна.
-            // Якщо інший — сайт НЕ тримає сесію між запитами, і HTML-логін неможливий.
-            siteNative(loginUrl, null, headers({ 'Referer': SITE_ORIGIN + '/' }), function (errGet2, resGet2) {
-                if (errGet2) {
-                    note('    (другий GET не вдався, продовжуємо з першим)');
-                } else {
-                    var r2 = siteParse(resGet2);
-                    var addedGet2 = siteCollectCookies(jar, r2.headers);
+            var form = siteLoginFields(body1);
+            if (!form.pass || !form.user) {
+                fail('1) GET /login (native): не знайдено поля логіна/пароля');
+                return;
+            }
 
-                    var sessionGet2 = jar['laravel_session'] || '';
-                    var xsrfGet2 = jar['XSRF-TOKEN'] || '';
+            note('    поля форми: ' + form.hidden.map(function (h) { return h.name; }).join(', ') + ', ' + form.user + ', ' + form.pass);
 
-                    note('1b) GET /login #2: нові кукі: ' + (addedGet2.join(', ') || 'немає'));
-                    note('    laravel_session #2: ' + siteCookieFingerprint(sessionGet2) + ' (довжина: ' + sessionGet2.length + ')');
-                    note('    XSRF-TOKEN #2:      ' + siteCookieFingerprint(xsrfGet2) + ' (довжина: ' + xsrfGet2.length + ')');
-                    note('    сесія стабільна між двома GET? ' + (sessionGet1 === sessionGet2 ? 'ТАК ✔' : 'НІ ✖ — Laravel робить нову сесію на кожен запит!'));
-
-                    // Якщо сесія змінилась — беремо значення з другого GET
-                    // і _token саме з другої сторінки (щоб CSRF відповідав актуальній сесії)
-                    if (sessionGet1 !== sessionGet2) {
-                        note('    → беремо _token зі СТОРІНКИ #2 (щоб CSRF відповідав актуальній сесії)');
-                    } else {
-                        note('    → сесія стабільна, використовуємо _token зі СТОРІНКИ #1');
-                    }
-
-                    var useBody = (sessionGet1 !== sessionGet2) ? r2.body : r.body;
-                    continueWithForm(useBody);
-                    return;
-                }
-
-                continueWithForm(r.body);
+            // Крок 2: POST /login через нативний міст
+            var pairs = form.hidden.map(function (h) {
+                return encodeURIComponent(h.name) + '=' + encodeURIComponent(h.value);
             });
+            pairs.push(encodeURIComponent(form.user) + '=' + encodeURIComponent(username));
+            pairs.push(encodeURIComponent(form.pass) + '=' + encodeURIComponent(password));
+            pairs.push('remember=on');
 
-            // Продовження: парсимо форму з переданого HTML і робимо POST
-            function continueWithForm(html) {
-                var form = siteLoginFields(html);
-
-                if (!form.pass || !form.user) {
-                    fail('На сторінці входу не знайдено поля логіна/пароля (поля: ' + (form.user || '-') + ' / ' + (form.pass || '-') + ')');
-                    return;
-                }
-
-                if (!form.hidden.some(function (h) { return h.name === '_token'; })) {
-                    fail('На сторінці входу не знайдено захисний токен _token');
-                    return;
-                }
-
-                form.hidden.forEach(function (h) { if (h.value) exclude[h.value] = true; });
-                note('    поля форми (парсер): ' + form.hidden.map(function (h) { return h.name; }).join(', ') + ', ' + form.user + ', ' + form.pass);
-
-                // =============================================
-                // 2. Вхід
-                // =============================================
-                var pairs = form.hidden.map(function (h) {
-                    return encodeURIComponent(h.name) + '=' + encodeURIComponent(h.value);
-                });
-                pairs.push(encodeURIComponent(form.user) + '=' + encodeURIComponent(username));
-                pairs.push(encodeURIComponent(form.pass) + '=' + encodeURIComponent(password));
-                pairs.push('remember=on');
-
-                var postHeaders = {
-                    'Origin': SITE_ORIGIN,
-                    'Referer': SITE_ORIGIN + '/',
+            nativeRequest(loginUrl, {
+                method: 'POST',
+                headers: {
+                    'User-Agent': SITE_UA,
+                    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+                    'Accept-Language': 'uk,ru;q=0.9,en;q=0.8',
                     'Content-Type': 'application/x-www-form-urlencoded',
-                    'Upgrade-Insecure-Requests': '1'
-                };
+                    'Referer': SITE_ORIGIN + '/',
+                    'Origin': SITE_ORIGIN
+                },
+                data: pairs.join('&')
+            }, function (err2, res2) {
+                if (err2) {
+                    fail('2) POST /login (native): ' + (err2.error || 'невідома помилка'));
+                    return;
+                }
 
-                note('2) POST /login (HTML-форма): Cookie: ' + Object.keys(jar).join(', '));
-                note('    тіло: _token, ' + form.user + ', ' + form.pass + ', remember');
+                var body2 = '';
+                if (res2 && typeof res2 === 'object') {
+                    body2 = String(res2.body || res2.data || '');
+                } else {
+                    body2 = String(res2 || '');
+                }
 
-                siteNative(loginUrl, pairs.join('&'), headers(postHeaders), function (err2, res2) {
-                    if (err2) {
-                        var why = siteErrorMessage(err2);
+                note('2) POST /login (native): отримано ' + body2.length + ' симв.');
 
-                        note('    DEBUG status: ' + (err2.status || 0) + ' ' + (err2.statusText || ''));
-                        note('    DEBUG responseText: ' + String(err2.responseText || '').slice(0, 400));
+                if (siteHasLoginForm(body2)) {
+                    note('    ⚠ відповідь знову містить форму входу');
 
-                        if (err2.status === 429) {
-                            siteCooldownUntil = Date.now() + 5 * 60 * 1000;
-                            fail('2) POST /login: забагато спроб входу (429). Зачекай кілька хвилин');
-                        }
-                        else if (err2.status === 419) fail('2) POST /login: сторінка входу застаріла (419). CSRF не прийнято');
-                        else if (err2.status === 422) fail('2) POST /login: сайт відхилив вхід' + (why ? ': ' + why : '') + ' (код 422). Перевір логін і пароль');
-                        else if (err2.status === 401) fail('2) POST /login: 401 Unauthorized' + (why ? ': ' + why : ''));
-                        else fail('2) POST /login: ' + siteDescribeError(err2));
+                    var visibleText = body2
+                        .replace(/<script[\s\S]*?<\/script>/gi, ' ')
+                        .replace(/<style[\s\S]*?<\/style>/gi, ' ')
+                        .replace(/<[^>]+>/g, ' ')
+                        .replace(/&nbsp;/g, ' ')
+                        .replace(/&amp;/g, '&')
+                        .replace(/&quot;/g, '"')
+                        .replace(/&#039;/g, "'")
+                        .replace(/\s+/g, ' ')
+                        .trim();
+
+                    note('    ТЕКСТ: ' + visibleText.slice(0, 500));
+                    fail('2) POST /login (native): сайт відхилив вхід навіть через нативний міст');
+                    return;
+                }
+
+                note('    ✔ Схоже, вхід вдався! Форми входу немає.');
+
+                // Крок 3: GET apikeys через нативний міст
+                nativeRequest(keysUrl, {
+                    method: 'GET',
+                    headers: {
+                        'User-Agent': SITE_UA,
+                        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+                        'Accept-Language': 'uk,ru;q=0.9,en;q=0.8',
+                        'Referer': SITE_ORIGIN + '/'
+                    }
+                }, function (err3, res3) {
+                    if (err3) {
+                        fail('3) GET apikeys (native): ' + (err3.error || 'невідома помилка'));
                         return;
                     }
 
-                    var rPost = siteParse(res2);
-                    var added = siteCollectCookies(jar, rPost.headers);
-                    var location = (rPost.headers && (rPost.headers.location || rPost.headers.Location)) || '';
+                    var body3 = '';
+                    if (res3 && typeof res3 === 'object') {
+                        body3 = String(res3.body || res3.data || '');
+                    } else {
+                        body3 = String(res3 || '');
+                    }
 
-                    note('2) POST /login: статус 200, нові кукі: ' + (added.join(', ') || 'немає') +
-                         (location ? ', Location: ' + location : '') +
-                         ', відповідь: ' + (rPost.body.length ? rPost.body.length + ' симв.' : 'порожня'));
+                    note('3) GET apikeys (native): отримано ' + body3.length + ' симв.');
 
-                    note('    laravel_session після POST: ' + siteCookieFingerprint(jar['laravel_session'] || ''));
-                    note('    XSRF-TOKEN після POST:      ' + siteCookieFingerprint(jar['XSRF-TOKEN'] || ''));
-                    note('    кукі після входу: ' + siteCookieSizes(jar));
-
-                    if (/"two_factor"\s*:\s*true/.test(rPost.body)) {
-                        fail('На акаунті ввімкнена двофакторна автентифікація - цей спосіб не підходить');
+                    if (siteHasLoginForm(body3)) {
+                        fail('3) GET apikeys (native): не авторизовано (сайт показав форму входу)');
                         return;
                     }
 
-                    if (siteHasLoginForm(rPost.body)) {
-                        note('    ⚠ відповідь містить форму входу');
+                    var csrf = body3.match(/<meta[^>]*name\s*=\s*["']csrf-token["'][^>]*>/i);
+                    if (csrf) exclude[siteAttr(csrf[0], 'content')] = true;
 
-                        var visibleText = rPost.body
-                            .replace(/<script[\s\S]*?<\/script>/gi, ' ')
-                            .replace(/<style[\s\S]*?<\/style>/gi, ' ')
-                            .replace(/<[^>]+>/g, ' ')
-                            .replace(/&nbsp;/g, ' ')
-                            .replace(/&amp;/g, '&')
-                            .replace(/&quot;/g, '"')
-                            .replace(/&#039;/g, "'")
-                            .replace(/\s+/g, ' ')
-                            .trim();
+                    var found = siteCandidates(body3, exclude);
+                    note('3) GET apikeys (native): схожих на ключ рядків: ' + found.length);
 
-                        note('    ТЕКСТ СТОРІНКИ: ' + visibleText.slice(0, 800));
-                    }
-
-                    // 3. Сторінка ключів
-                    siteNative(keysUrl, null, headers({ 'Referer': SITE_ORIGIN + '/' }), function (err3, res3) {
-                        if (err3) {
-                            note('    DEBUG apikeys responseText: ' + String(err3.responseText || '').slice(0, 400));
-                            if (err3.status === 429) {
-                                siteCooldownUntil = Date.now() + 5 * 60 * 1000;
-                                fail('3) GET apikeys: сайт тимчасово обмежив запити (429). Зачекай кілька хвилин і повтори один раз');
-                            } else {
-                                fail('3) GET apikeys: ' + siteDescribeError(err3));
-                            }
-                            return;
-                        }
-
-                        var r3 = siteParse(res3);
-                        siteCollectCookies(jar, r3.headers);
-
-                        note('3) GET apikeys: laravel_session = ' + siteCookieFingerprint(jar['laravel_session'] || ''));
-
-                        if (siteHasLoginForm(r3.body)) {
-                            fail('3) GET apikeys: не авторизовано (сайт показав форму входу). Причина: невірний логін/пароль або застосунок втратив кукі при перенаправленні');
-                            return;
-                        }
-
-                        var csrf = r3.body.match(/<meta[^>]*name\s*=\s*["']csrf-token["'][^>]*>/i);
-                        if (csrf) exclude[siteAttr(csrf[0], 'content')] = true;
-
-                        var found = siteCandidates(r3.body, exclude);
-                        note('3) GET apikeys: сторінку отримано (' + r3.body.length + ' симв.), схожих на ключ рядків: ' + found.length);
-
-                        found.forEach(function (c, i) {
-                            note('    ' + (i + 1) + ') ' + siteMask(c.value) + ' - ' + c.where);
-                        });
-
-                        if (!found.length) {
-                            fail('Ключ на сторінці не знайдено (він може бути прихований або показуватись лише після натискання кнопки)');
-                            return;
-                        }
-
-                        note('✔ Готово');
-                        finish({ ok: true, candidates: found, report: report.join('\n') });
+                    found.forEach(function (c, i) {
+                        note('    ' + (i + 1) + ') ' + siteMask(c.value) + ' - ' + c.where);
                     });
+
+                    if (!found.length) {
+                        fail('Ключ на сторінці не знайдено');
+                        return;
+                    }
+
+                    note('✔ Готово (через native bridge)');
+                    finish({ ok: true, candidates: found, report: report.join('\n') });
                 });
-            }
+            });
         });
     }
 
@@ -1301,14 +714,11 @@
                 '</div>' +
             '</div>'
         );
-
         modal.find('textarea').val(text);
-
         function close() {
             Lampa.Modal.close();
             backToSettings();
         }
-
         modal.find('.utopia-rep-copy').on('click hover:enter', function () {
             try {
                 Lampa.Utils.copyTextToClipboard(text, function () {
@@ -1320,9 +730,7 @@
                 Lampa.Noty.show('UTOPIA: не вдалося скопіювати');
             }
         });
-
         modal.find('.utopia-rep-close').on('click hover:enter', close);
-
         Lampa.Modal.open({
             title: 'UTOPIA: звіт входу',
             html: modal,
@@ -1338,16 +746,10 @@
             var name = String(value || '').trim().replace(/^@/, '');
             var found = name.match(/\/users\/([^\/?#\s]+)/i);
             if (found) name = found[1];
-
-            if (!name) {
-                backToSettings();
-                return;
-            }
-
+            if (!name) { backToSettings(); return; }
             Lampa.Storage.set('utopia_username', name);
             done();
         }
-
         Lampa.Input.edit({
             title: "Ім'я користувача на utp.to",
             value: siteUserName(),
@@ -1358,8 +760,7 @@
 
     function siteRun(username, password) {
         siteLastRun = Date.now();
-        Lampa.Noty.show('UTOPIA: входжу на utp.to...');
-
+        Lampa.Noty.show('UTOPIA: входжу через нативний міст...');
         try { Lampa.Loading.start('utopia_site_login', 'UTOPIA: вхід...'); } catch (e) {}
 
         siteFetchKey(username, password, function (result) {
@@ -1379,7 +780,6 @@
             var items = result.candidates.slice(0, 8).map(function (c) {
                 return { title: siteMask(c.value), subtitle: c.where, value: c.value, action: 'pick' };
             });
-
             items.push({ title: '📄 Показати звіт', action: 'report' });
 
             Lampa.Select.show({
@@ -1389,9 +789,7 @@
                     if (item.action === 'pick') askApply(item.value);
                     else setTimeout(function () { showSiteReport(result.report); }, 200);
                 },
-                onBack: function () {
-                    backToSettings();
-                }
+                onBack: function () { backToSettings(); }
             });
         });
     }
@@ -1399,12 +797,7 @@
     function siteAskPassword(name) {
         function got(value) {
             var password = String(value === null || value === undefined ? '' : value);
-
-            if (!password) {
-                backToSettings();
-                return;
-            }
-
+            if (!password) { backToSettings(); return; }
             setTimeout(function () {
                 Lampa.Select.show({
                     title: 'Вхід на utp.to',
@@ -1416,13 +809,10 @@
                         if (item.action === 'go') siteRun(name, password);
                         else backToSettings();
                     },
-                    onBack: function () {
-                        backToSettings();
-                    }
+                    onBack: function () { backToSettings(); }
                 });
             }, 200);
         }
-
         Lampa.Input.edit({
             title: 'Пароль utp.to для ' + name,
             value: '',
@@ -1439,22 +829,19 @@
         }
 
         var wait = Math.max(siteCooldownUntil, siteLastRun + 2 * 60 * 1000) - Date.now();
-
         if (wait > 0) {
-            Lampa.Noty.show('UTOPIA: зачекай ще ' + Math.ceil(wait / 1000) + ' с, щоб сайт не заблокував за забагато спроб');
+            Lampa.Noty.show('UTOPIA: зачекай ще ' + Math.ceil(wait / 1000) + ' с');
             backToSettings();
             return;
         }
 
         var name = siteUserName();
-
         if (!name) {
             siteAskUserName(function () {
                 setTimeout(onSiteLogin, 200);
             });
             return;
         }
-
         siteAskPassword(name);
     }
 
@@ -1462,13 +849,7 @@
         Lampa.SettingsApi.addComponent({
             component: 'utopia',
             name: 'UTOPIA',
-            icon:
-        '<svg width="1.5em" height="1.5em" viewBox="0 0 64 64" ' +
-        'xmlns="http://www.w3.org/2000/svg" ' +
-        'style="display:block;flex-shrink:0;">' +
-            '<image href="https://raw.githubusercontent.com/yakutza82/lampa-utopia/refs/heads/main/pngegg2wh.png" ' +
-            'x="0" y="0" width="64" height="64" />' +
-        '</svg>'
+            icon: '<svg width="1.5em" height="1.5em" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" style="display:block;flex-shrink:0;"><image href="https://raw.githubusercontent.com/yakutza82/lampa-utopia/refs/heads/main/pngegg2wh.png" x="0" y="0" width="64" height="64" /></svg>'
         });
 
         keyField.description = keyDescription();
@@ -1480,17 +861,15 @@
             onChange: editApiKey
         });
 
-                Lampa.SettingsApi.addParam({
+        Lampa.SettingsApi.addParam({
             component: 'utopia',
             param: { name: 'utopia_site_login_btn', type: 'button' },
             field: {
-                name: 'Отримати ключ із сайту (експеримент)',
-                description: 'Вхід на utp.to логіном і паролем. Пароль не зберігається'
+                name: 'Отримати ключ із сайту (native)',
+                description: 'Вхід на utp.to через нативний HTTP-міст Android'
             },
             onChange: onSiteLogin
         });
-
-        try { Lampa.Storage.set('utopia_test_cookies', ''); } catch (e) {}
 
         Lampa.Listener.follow('settings', function (e) {
             if (e.type === 'open' || e.name === 'utopia') setTimeout(updateKeyDisplay, 100);
@@ -1511,18 +890,13 @@
     // =========================================================
     var CACHE = {};
     var CACHE_TTL = 10 * 60 * 1000;
-
-    function cacheKey(query, page) {
-        return String(query).toLowerCase() + '::' + page;
-    }
-
+    function cacheKey(query, page) { return String(query).toLowerCase() + '::' + page; }
     function getFromCache(query, page) {
         var entry = CACHE[cacheKey(query, page)];
         if (!entry) return null;
         if (Date.now() - entry.time > CACHE_TTL) return null;
         return entry.data;
     }
-
     function saveToCache(query, page, data) {
         CACHE[cacheKey(query, page)] = { data: data, time: Date.now() };
     }
@@ -1545,9 +919,7 @@
         if (!obj || typeof obj !== 'object') return null;
         for (var i = 0; i < keys.length; i++) {
             var k = keys[i];
-            if (obj[k] !== undefined && obj[k] !== null && obj[k] !== '') {
-                return obj[k];
-            }
+            if (obj[k] !== undefined && obj[k] !== null && obj[k] !== '') return obj[k];
         }
         for (var p in obj) {
             if (obj.hasOwnProperty(p) && typeof obj[p] === 'object' && obj[p] !== null) {
@@ -1560,18 +932,14 @@
 
     function normalizeItem(raw) {
         if (!raw || typeof raw !== 'object') return {};
-
         var attrs = (raw.attributes && typeof raw.attributes === 'object') ? raw.attributes : raw;
-
         var name = attrs.name || deepFind(raw, ['name', 'title', 'filename']) || 'Без назви';
         var size = attrs.size != null ? attrs.size : (deepFind(raw, ['size']) || 0);
         var seeds = attrs.seeders != null ? attrs.seeders : (deepFind(raw, ['seeders', 'seeds']) || 0);
         var peers = attrs.leechers != null ? attrs.leechers : (deepFind(raw, ['leechers', 'peers']) || 0);
         var releaseYear = attrs.release_year || null;
-
         var magnet = '';
         var isDirect = false;
-
         if (typeof attrs.magnet_link === 'string' && attrs.magnet_link.indexOf('magnet:') === 0) {
             magnet = attrs.magnet_link;
         } else if (attrs.download_link) {
@@ -1585,36 +953,25 @@
                 if (typeof v === 'string' && /^https?:\/\//.test(v)) { magnet = v; isDirect = true; break; }
             }
         }
-
         return {
-            name: String(name),
-            size: parseFloat(size) || 0,
-            seeds: parseInt(seeds, 10) || 0,
-            peers: parseInt(peers, 10) || 0,
-            magnet: magnet || '',
-            isDirect: isDirect,
-            releaseYear: releaseYear,
-            tmdbId: attrs.tmdb_id || null,
-            category: attrs.category || '',
-            tmdbName: '',
-            __raw: raw
+            name: String(name), size: parseFloat(size) || 0,
+            seeds: parseInt(seeds, 10) || 0, peers: parseInt(peers, 10) || 0,
+            magnet: magnet || '', isDirect: isDirect, releaseYear: releaseYear,
+            tmdbId: attrs.tmdb_id || null, category: attrs.category || '',
+            tmdbName: '', __raw: raw
         };
     }
 
     function sendRequest(url, headers, onSuccess, onError) {
         var network = new Lampa.Reguest();
         network.timeout(15000);
-
         network.native(url, function (response) {
             var data = response;
             if (typeof response === 'string') {
                 try { data = JSON.parse(response); } catch (e) {}
             }
-            if (data) {
-                onSuccess(data);
-            } else {
-                if (onError) onError('parse_error');
-            }
+            if (data) onSuccess(data);
+            else if (onError) onError('parse_error');
         }, function (xhr) {
             var status = xhr ? xhr.status : 0;
             if (status === 401) onError('unauthorized');
@@ -1626,17 +983,9 @@
     function request(query, page, onSuccess, onError) {
         page = page || 1;
         var cached = getFromCache(query, page);
-        if (cached) {
-            onSuccess(cached, true);
-            return;
-        }
-
+        if (cached) { onSuccess(cached, true); return; }
         var key = getKey();
-        if (!key) {
-            if (onError) onError('no_key');
-            return;
-        }
-
+        if (!key) { if (onError) onError('no_key'); return; }
         var cleanKey = encodeURIComponent(key);
         var targetUrl = API_BASE + '/torrents/filter' +
                         '?name=' + encodeURIComponent(query) +
@@ -1644,12 +993,7 @@
                         '&page=' + page +
                         '&api_key=' + cleanKey +
                         '&token=' + cleanKey;
-
-        var headers = {
-            'Authorization': 'Bearer ' + key,
-            'Accept': 'application/json'
-        };
-
+        var headers = { 'Authorization': 'Bearer ' + key, 'Accept': 'application/json' };
         sendRequest(targetUrl, headers, function (data) {
             var items = parseArrayFromData(data).map(normalizeItem);
             saveToCache(query, page, items);
@@ -1683,30 +1027,16 @@
         var units = ['Б', 'КБ', 'МБ', 'ГБ', 'ТБ'];
         var i = 0;
         var n = parseFloat(bytes);
-        while (n >= 1024 && i < units.length - 1) {
-            n /= 1024;
-            i++;
-        }
+        while (n >= 1024 && i < units.length - 1) { n /= 1024; i++; }
         return n.toFixed(1) + ' ' + units[i];
     }
 
     function badge(value, icon) {
-    var n = parseInt(value, 10);
-
-    if (isNaN(n)) {
-        return '<span class="utopia-badge" style="opacity:.4;">' +
-            icon + ' ?' +
-        '</span>';
+        var n = parseInt(value, 10);
+        if (isNaN(n)) return '<span class="utopia-badge" style="opacity:.4;">' + icon + ' ?</span>';
+        var cls = n >= 10 ? 'utopia-badge--good' : (n >= 1 ? 'utopia-badge--mid' : 'utopia-badge--bad');
+        return '<span class="utopia-badge ' + cls + '">' + icon + ' ' + n + '</span>';
     }
-
-    var cls = n >= 10
-        ? 'utopia-badge--good'
-        : (n >= 1 ? 'utopia-badge--mid' : 'utopia-badge--bad');
-
-    return '<span class="utopia-badge ' + cls + '">' +
-        icon + ' ' + n +
-    '</span>';
-}
 
     function errorMessage(code) {
         var map = {
@@ -1722,13 +1052,9 @@
 
     function sortItems(items, mode) {
         var arr = items.slice();
-        if (mode === 'seeds') {
-            arr.sort(function (a, b) { return b.seeds - a.seeds; });
-        } else if (mode === 'size_desc') {
-            arr.sort(function (a, b) { return (parseFloat(b.size) || 0) - (parseFloat(a.size) || 0); });
-        } else if (mode === 'size_asc') {
-            arr.sort(function (a, b) { return (parseFloat(a.size) || 0) - (parseFloat(b.size) || 0); });
-        }
+        if (mode === 'seeds') arr.sort(function (a, b) { return b.seeds - a.seeds; });
+        else if (mode === 'size_desc') arr.sort(function (a, b) { return (parseFloat(b.size) || 0) - (parseFloat(a.size) || 0); });
+        else if (mode === 'size_asc') arr.sort(function (a, b) { return (parseFloat(a.size) || 0) - (parseFloat(b.size) || 0); });
         return arr;
     }
 
@@ -1754,158 +1080,94 @@
     function TorrentsComponent(object) {
         var scroll = new Lampa.Scroll({ mask: true, over: true, step: 200 });
         var wrap = $('<div class="utopia-wrap"></div>');
-       var header = $(
-    '<div class="utopia-header">' +
-
-        '<div class="utopia-header__info">' +
-            '<div class="utopia-header__title"></div>' +
-            '<div class="utopia-header__original"></div>' +
-            '<div class="utopia-header__meta"></div>' +
-        '</div>' +
-
-        '<div class="utopia-header__actions">' +
-
-            '<div class="utopia-action selector utopia-portrait-back">' +
-                '\ud83d\udcc4' +
-            '</div>' +
-
-            '<div class="utopia-action selector utopia-sort-btn">' +
-                '\u2195 Сортування' +
-            '</div>' +
-
-            '<div class="utopia-action selector utopia-debug-btn" style="display:none;">' +
-                '\ud83d\udc1e Діагностика' +
-            '</div>' +
-
-        '</div>' +
-
-    '</div>'
-);
-var moviePanel = $(
-    '<div class="utopia-movie">' +
-
-        '<div class="utopia-movie__top">' +
-
-            '<div class="utopia-movie__poster selector">' +
-                '<img class="utopia-movie__poster-img" />' +
-            '</div>' +
-
-            '<div class="utopia-movie__details">' +
-                '<div class="utopia-movie__year"></div>' +
-                '<div class="utopia-movie__country"></div>' +
-                '<div class="utopia-movie__rating"></div>' +
-                '<div class="utopia-movie__imdb"></div>' +
-                '<div class="utopia-movie__pg"></div>' +
-            '</div>' +
-
-        '</div>' +
-
-        '<div class="utopia-movie__title"></div>' +
-        '<div class="utopia-movie__genres"></div>' +
-        '<div class="utopia-movie__overview"></div>' +
-
-    '</div>'
-);
-
+        var header = $(
+            '<div class="utopia-header">' +
+                '<div class="utopia-header__info">' +
+                    '<div class="utopia-header__title"></div>' +
+                    '<div class="utopia-header__original"></div>' +
+                    '<div class="utopia-header__meta"></div>' +
+                '</div>' +
+                '<div class="utopia-header__actions">' +
+                    '<div class="utopia-action selector utopia-portrait-back">\ud83d\udcc4</div>' +
+                    '<div class="utopia-action selector utopia-sort-btn">\u2195 Сортування</div>' +
+                    '<div class="utopia-action selector utopia-debug-btn" style="display:none;">\ud83d\udc1e Діагностика</div>' +
+                '</div>' +
+            '</div>'
+        );
+        var moviePanel = $(
+            '<div class="utopia-movie">' +
+                '<div class="utopia-movie__top">' +
+                    '<div class="utopia-movie__poster selector"><img class="utopia-movie__poster-img" /></div>' +
+                    '<div class="utopia-movie__details">' +
+                        '<div class="utopia-movie__year"></div>' +
+                        '<div class="utopia-movie__country"></div>' +
+                        '<div class="utopia-movie__rating"></div>' +
+                        '<div class="utopia-movie__imdb"></div>' +
+                        '<div class="utopia-movie__pg"></div>' +
+                    '</div>' +
+                '</div>' +
+                '<div class="utopia-movie__title"></div>' +
+                '<div class="utopia-movie__genres"></div>' +
+                '<div class="utopia-movie__overview"></div>' +
+            '</div>'
+        );
         var listBox = $('<div class="utopia-list"></div>');
         var page = 1;
         var items = [];
         var sortMode = 'default';
         var loading = false;
         var moreButtonEl = null;
+
         function renderMoviePanel() {
-    var movie = object.movie || {};
-
-    var title = movie.title || movie.name || '';
-
-    var year = '';
-    if (movie.release_date) {
-        year = String(movie.release_date).slice(0, 4);
-    } else if (movie.first_air_date) {
-        year = String(movie.first_air_date).slice(0, 4);
-    }
-
-        var countries = '';
-    try {
-        var tmdbApi = Lampa.Api && Lampa.Api.sources && Lampa.Api.sources.tmdb;
-        if (tmdbApi && typeof tmdbApi.parseCountries === 'function') {
-            countries = tmdbApi.parseCountries(movie).join(', ');
+            var movie = object.movie || {};
+            var title = movie.title || movie.name || '';
+            var year = '';
+            if (movie.release_date) year = String(movie.release_date).slice(0, 4);
+            else if (movie.first_air_date) year = String(movie.first_air_date).slice(0, 4);
+            var countries = '';
+            try {
+                var tmdbApi = Lampa.Api && Lampa.Api.sources && Lampa.Api.sources.tmdb;
+                if (tmdbApi && typeof tmdbApi.parseCountries === 'function') {
+                    countries = tmdbApi.parseCountries(movie).join(', ');
+                }
+            } catch (e) {}
+            if (!countries && Array.isArray(movie.production_countries)) {
+                countries = movie.production_countries.map(function (c) { return c && c.name ? c.name : ''; }).filter(Boolean).join(', ');
+            }
+            var rating = '';
+            if (movie.vote_average) rating = Math.round(Number(movie.vote_average) * 10) + '%';
+            var imdb = '';
+            var imdbValue = parseFloat(movie.imdb_rating);
+            if (imdbValue) imdb = imdbValue.toFixed(1);
+            var pg = '';
+            try {
+                var tmdbApi2 = Lampa.Api && Lampa.Api.sources && Lampa.Api.sources.tmdb;
+                if (tmdbApi2 && typeof tmdbApi2.parsePG === 'function') pg = tmdbApi2.parsePG(movie) || '';
+            } catch (e) {}
+            var genres = '';
+            if (Array.isArray(movie.genres)) {
+                genres = movie.genres.slice(0, 5).map(function (genre) {
+                    return genre && genre.name ? genre.name : String(genre || '');
+                }).filter(Boolean).join(', ');
+            }
+            moviePanel.find('.utopia-movie__title').text(title);
+            moviePanel.find('.utopia-movie__year').text(year);
+            moviePanel.find('.utopia-movie__country').text(countries);
+            moviePanel.find('.utopia-movie__rating').text(rating ? 'TMDb ' + rating : '');
+            moviePanel.find('.utopia-movie__imdb').text(imdb ? 'IMDb ★ ' + imdb : '');
+            moviePanel.find('.utopia-movie__pg').text(pg);
+            moviePanel.find('.utopia-movie__genres').text(genres);
+            moviePanel.find('.utopia-movie__overview').text(movie.overview || '');
+            var posterUrl = movie.img || movie.poster || movie.poster_path || '';
+            if (posterUrl) {
+                moviePanel.find('.utopia-movie__poster-img').attr('src', posterUrl).show();
+            } else {
+                moviePanel.find('.utopia-movie__poster-img').hide();
+            }
         }
-    } catch (e) {}
 
-    if (!countries && Array.isArray(movie.production_countries)) {
-        countries = movie.production_countries
-            .map(function (c) { return c && c.name ? c.name : ''; })
-            .filter(Boolean)
-            .join(', ');
-    }
-
-    var rating = '';
-    if (movie.vote_average) {
-        rating = Math.round(Number(movie.vote_average) * 10) + '%';
-    }
-
-    var imdb = '';
-    var imdbValue = parseFloat(movie.imdb_rating);
-    if (imdbValue) {
-        imdb = imdbValue.toFixed(1);
-    }
-
-        var pg = '';
-    try {
-        var tmdbApi2 = Lampa.Api && Lampa.Api.sources && Lampa.Api.sources.tmdb;
-        if (tmdbApi2 && typeof tmdbApi2.parsePG === 'function') {
-            pg = tmdbApi2.parsePG(movie) || '';
-        }
-    } catch (e) {}
-
-    var genres = '';
-    if (Array.isArray(movie.genres)) {
-        genres = movie.genres
-            .slice(0, 5)
-            .map(function (genre) {
-                return genre && genre.name
-                    ? genre.name
-                    : String(genre || '');
-            })
-            .filter(Boolean)
-            .join(', ');
-    }
-
-    moviePanel.find('.utopia-movie__title').text(title);
-    moviePanel.find('.utopia-movie__year').text(year);
-    moviePanel.find('.utopia-movie__country').text(countries);
-    moviePanel.find('.utopia-movie__rating').text(
-        rating ? 'TMDb ' + rating : ''
-    );
-    moviePanel.find('.utopia-movie__imdb').text(
-        imdb ? 'IMDb ★ ' + imdb : ''
-    );
-    moviePanel.find('.utopia-movie__pg').text(pg);
-    moviePanel.find('.utopia-movie__genres').text(genres);
-    moviePanel.find('.utopia-movie__overview').text(
-        movie.overview || ''
-    );
-
-    var posterUrl = movie.img || movie.poster || movie.poster_path || '';
-
-    if (posterUrl) {
-        moviePanel
-            .find('.utopia-movie__poster-img')
-            .attr('src', posterUrl)
-            .show();
-    } else {
-        moviePanel
-            .find('.utopia-movie__poster-img')
-            .hide();
-    }
-}
-
-            var primaryQuery = object.search;
-        var altQuery = (object.search_original &&
-            String(object.search_original).toLowerCase() !== String(primaryQuery).toLowerCase())
-            ? object.search_original
-            : '';
+        var primaryQuery = object.search;
+        var altQuery = (object.search_original && String(object.search_original).toLowerCase() !== String(primaryQuery).toLowerCase()) ? object.search_original : '';
         var query = altQuery || primaryQuery;
         var usedAlt = false;
 
@@ -1915,31 +1177,21 @@ var moviePanel = $(
             el.on('hover:focus', function (e) {
                 var node = $(e.target);
                 var box = node.parent();
-
                 while (box.length && box[0] !== document.body) {
                     var overflowY = box.css('overflow-y');
-                    if ((overflowY === 'auto' || overflowY === 'scroll') &&
-                        box[0].scrollHeight > box[0].clientHeight + 1) break;
+                    if ((overflowY === 'auto' || overflowY === 'scroll') && box[0].scrollHeight > box[0].clientHeight + 1) break;
                     box = box.parent();
                 }
-
                 if (!box.length || box[0] === document.body) return;
-
                 var fontSize = parseFloat(box.css('font-size')) || 16;
                 var padTop = fontSize * 5;
                 var padBottom = fontSize * 3.8;
                 var boxRect = box[0].getBoundingClientRect();
                 var nodeRect = node[0].getBoundingClientRect();
                 var target = box.scrollTop();
-
-                if (nodeRect.top < boxRect.top + padTop) {
-                    target += nodeRect.top - (boxRect.top + padTop);
-                } else if (nodeRect.bottom > boxRect.bottom - padBottom) {
-                    target += nodeRect.bottom - (boxRect.bottom - padBottom);
-                } else {
-                    return;
-                }
-
+                if (nodeRect.top < boxRect.top + padTop) target += nodeRect.top - (boxRect.top + padTop);
+                else if (nodeRect.bottom > boxRect.bottom - padBottom) target += nodeRect.bottom - (boxRect.bottom - padBottom);
+                else return;
                 box.stop(true).animate({ scrollTop: target }, 350);
             });
             return el;
@@ -1965,113 +1217,76 @@ var moviePanel = $(
         }
 
         function showDebugModal(title, data) {
-    var jsonText;
-
-    try {
-        jsonText = typeof data === 'string'
-            ? data
-            : JSON.stringify(data, null, 2);
-    } catch (e) {
-        jsonText = String(data);
-    }
-
-    var modal = $(
-        '<div class="utopia-debug-modal">' +
-            '<textarea class="utopia-debug-textarea" readonly></textarea>' +
-            '<div class="utopia-debug-actions">' +
-                '<div class="utopia-action selector utopia-debug-copy">📋 Скопіювати</div>' +
-                '<div class="utopia-action selector utopia-debug-close">Закрити</div>' +
-            '</div>' +
-        '</div>'
-    );
-
-    modal.find('.utopia-debug-textarea').val(jsonText);
-
-    var copyButton = modal.find('.utopia-debug-copy');
-    var closeButton = modal.find('.utopia-debug-close');
-
-    function copyText() {
-        function success() {
-            Lampa.Noty.show('UTOPIA: скопійовано');
-        }
-
-        function fallback() {
+            var jsonText;
             try {
-                var textarea = modal.find('.utopia-debug-textarea')[0];
-
-                textarea.focus();
-                textarea.select();
-                textarea.setSelectionRange(0, textarea.value.length);
-
-                var ok = document.execCommand('copy');
-
-                if (ok) {
-                    Lampa.Noty.show('UTOPIA: скопійовано');
-                } else {
-                    Lampa.Noty.show('UTOPIA: не вдалося скопіювати');
-                }
+                jsonText = typeof data === 'string' ? data : JSON.stringify(data, null, 2);
             } catch (e) {
-                Lampa.Noty.show('UTOPIA: не вдалося скопіювати');
+                jsonText = String(data);
             }
-        }
-
-        try {
-            if (
-                Lampa.Utils &&
-                typeof Lampa.Utils.copyTextToClipboard === 'function'
-            ) {
-                Lampa.Utils.copyTextToClipboard(
-                    jsonText,
-                    success,
-                    fallback
-                );
-                return;
+            var modal = $(
+                '<div class="utopia-debug-modal">' +
+                    '<textarea class="utopia-debug-textarea" readonly></textarea>' +
+                    '<div class="utopia-debug-actions">' +
+                        '<div class="utopia-action selector utopia-debug-copy">📋 Скопіювати</div>' +
+                        '<div class="utopia-action selector utopia-debug-close">Закрити</div>' +
+                    '</div>' +
+                '</div>'
+            );
+            modal.find('.utopia-debug-textarea').val(jsonText);
+            var copyButton = modal.find('.utopia-debug-copy');
+            var closeButton = modal.find('.utopia-debug-close');
+            function copyText() {
+                function success() { Lampa.Noty.show('UTOPIA: скопійовано'); }
+                function fallback() {
+                    try {
+                        var textarea = modal.find('.utopia-debug-textarea')[0];
+                        textarea.focus();
+                        textarea.select();
+                        textarea.setSelectionRange(0, textarea.value.length);
+                        var ok = document.execCommand('copy');
+                        if (ok) success();
+                        else Lampa.Noty.show('UTOPIA: не вдалося скопіювати');
+                    } catch (e) { Lampa.Noty.show('UTOPIA: не вдалося скопіювати'); }
+                }
+                try {
+                    if (Lampa.Utils && typeof Lampa.Utils.copyTextToClipboard === 'function') {
+                        Lampa.Utils.copyTextToClipboard(jsonText, success, fallback);
+                        return;
+                    }
+                } catch (e) {}
+                fallback();
             }
-        } catch (e) {}
-
-        fallback();
-    }
-
-    copyButton.on('click hover:enter', copyText);
-
-    closeButton.on('click hover:enter', function () {
-        Lampa.Modal.close();
-        Lampa.Controller.toggle('content');
-    });
-
-    Lampa.Modal.open({
-        title: title + ' [' + VERSION + ']',
-        html: modal,
-        size: 'medium',
-        scroll_to_center: true,
-        select: copyButton,
-        onBack: function () {
-            Lampa.Modal.close();
-            Lampa.Controller.toggle('content');
+            copyButton.on('click hover:enter', copyText);
+            closeButton.on('click hover:enter', function () {
+                Lampa.Modal.close();
+                Lampa.Controller.toggle('content');
+            });
+            Lampa.Modal.open({
+                title: title + ' [' + VERSION + ']',
+                html: modal,
+                size: 'medium',
+                scroll_to_center: true,
+                select: copyButton,
+                onBack: function () {
+                    Lampa.Modal.close();
+                    Lampa.Controller.toggle('content');
+                }
+            });
         }
-    });
-}
 
         this.create = function () {
-            header.find('.utopia-header__title')
-                .text(primaryQuery)
-                .css({ 'font-size': '1.3em', 'font-weight': '700', 'opacity': '1', 'display': 'block' });
-
+            header.find('.utopia-header__title').text(primaryQuery).css({ 'font-size': '1.3em', 'font-weight': '700', 'opacity': '1', 'display': 'block' });
             if (altQuery) {
-                header.find('.utopia-header__original')
-                    .text(altQuery)
-                    .css({ 'font-size': '0.85em', 'opacity': '0.6', 'margin-top': '0.2em', 'display': 'block' });
+                header.find('.utopia-header__original').text(altQuery).css({ 'font-size': '0.85em', 'opacity': '0.6', 'margin-top': '0.2em', 'display': 'block' });
             } else {
                 header.find('.utopia-header__original').hide();
             }
-
             bindScrollFollow(header.find('.utopia-sort-btn')).on('click hover:enter', showSortMenu);
-                        var backBusy = false;
+            var backBusy = false;
             bindScrollFollow(header.find('.utopia-portrait-back')).on('click hover:enter', function () {
                 if (backBusy) return;
                 backBusy = true;
                 setTimeout(function () { backBusy = false; }, 600);
-
                 Lampa.Activity.backward();
             });
             bindScrollFollow(header.find('.utopia-debug-btn')).on('click hover:enter', function () {
@@ -2081,28 +1296,21 @@ var moviePanel = $(
                     movie: object.movie
                 });
             });
-
             wrap.on('touchstart touchmove touchend wheel mousewheel', function (e) {
                 e.stopPropagation();
             });
-
-                        var posterBusy = false;
+            var posterBusy = false;
             moviePanel.find('.utopia-movie__poster').on('click hover:enter', function () {
                 if (posterBusy) return;
                 posterBusy = true;
                 setTimeout(function () { posterBusy = false; }, 600);
-
                 Lampa.Activity.backward();
             });
-
             wrap.append(header);
             wrap.append(moviePanel);
             listBox.appendTo(wrap);
-
             renderMoviePanel();
-
             scroll.append(wrap);
-
             scroll.render().addClass('layer--wheight');
             return this.render();
         };
@@ -2111,19 +1319,15 @@ var moviePanel = $(
 
         this.start = function () {
             if (Lampa.Activity.active().activity !== this.activity) return;
-            if (!hasKey()) {
-                renderNoKeyState();
-                return;
-            }
+            if (!hasKey()) { renderNoKeyState(); return; }
             if (!items.length) loadPage(1);
-
             Lampa.Controller.add('content', {
-                    toggle: function () {
+                toggle: function () {
                     Lampa.Controller.collectionSet(scroll.render());
                     var firstVisible = scroll.render().find('.selector').filter(':visible').first();
                     Lampa.Controller.collectionFocus(firstVisible.length ? firstVisible[0] : false, scroll.render());
                 },
-                                up: function () {
+                up: function () {
                     var focused = listBox.find('.selector.focus');
                     var prev = focused.length ? focused.prev('.selector') : $();
                     if (prev.length) {
@@ -2144,31 +1348,25 @@ var moviePanel = $(
             Lampa.Controller.toggle('content');
         };
 
-        function setMeta(text) {
-            header.find('.utopia-header__meta').text(text);
-        }
+        function setMeta(text) { header.find('.utopia-header__meta').text(text); }
 
         function renderNoKeyState() {
             listBox.empty();
-            listBox.append(
-                $('<div class="utopia-state">' +
+            listBox.append($('<div class="utopia-state">' +
                 '<div class="utopia-state__icon">\ud83d\udd11</div>' +
                 '<div class="utopia-state__title">Ключ не вказано</div>' +
                 '<div class="utopia-state__text">Щоб шукати торенти на UTOPIA, спочатку додайте API ключ у налаштуваннях плагіна.</div>' +
-                '</div>')
-            );
+                '</div>'));
         }
 
         function renderErrorState(code) {
             listBox.empty();
-            var box = $(
-                '<div class="utopia-state">' +
+            var box = $('<div class="utopia-state">' +
                 '<div class="utopia-state__icon">\u26a0\ufe0f</div>' +
                 '<div class="utopia-state__title">Не вдалося завантажити результати</div>' +
                 '<div class="utopia-state__text"></div>' +
                 '<div class="utopia-btn selector utopia-retry">Спробувати ще раз</div>' +
-                '</div>'
-            );
+                '</div>');
             box.find('.utopia-state__text').text(errorMessage(code));
             bindScrollFollow(box.find('.utopia-retry')).on('click hover:enter', function () {
                 loadPage(page || 1);
@@ -2179,36 +1377,26 @@ var moviePanel = $(
 
         function renderEmptyState() {
             listBox.empty();
-            listBox.append(
-                $('<div class="utopia-state">' +
+            listBox.append($('<div class="utopia-state">' +
                 '<div class="utopia-state__icon">\ud83d\udd0d</div>' +
                 '<div class="utopia-state__title">Нічого не знайдено</div>' +
                 '<div class="utopia-state__text">Спробуй перевірити пізніше - можливо, підходящих роздач поки немає.</div>' +
-                '</div>')
-            );
+                '</div>'));
         }
 
         function getFullMovieTitle(item) {
             var name = String(item.name || '').trim();
             var year = item.releaseYear ? String(item.releaseYear) : '';
-
             name = name.replace(/^[\s._-]+|[\s._-]+$/g, '');
-
             var match = name.match(
                 /(?:^|[.\s_-])(?:19|20)\d{2}(?=[.\s_-]|$)|(?:^|[.\s_-])S\d{1,2}(?=[.\s_-]|$)|(?:^|[.\s_-])(?:2160p|1080p|720p|WEB-DL|WEBRip|BluRay|BDRip|HDRip)(?=[.\s_-]|$)/i
             );
-
             if (match && match.index !== undefined) {
                 name = name.substring(0, match.index);
             }
-
             name = name.replace(/[._]+/g, ' ');
             name = name.replace(/\s+/g, ' ').trim();
-
-            if (year) {
-                name += ' (' + year + ')';
-            }
-
+            if (year) name += ' (' + year + ')';
             return name;
         }
 
@@ -2227,27 +1415,21 @@ var moviePanel = $(
                     renderList();
                     Lampa.Controller.toggle('content');
                 },
-                onBack: function () {
-                    Lampa.Controller.toggle('content');
-                }
+                onBack: function () { Lampa.Controller.toggle('content'); }
             });
         }
 
         function buildRow(item) {
-            var row = $(
-                '<div class="utopia-item selector">' +
+            var row = $('<div class="utopia-item selector">' +
                 '<div class="utopia-item__left">' +
                 '<div class="utopia-item__movie"></div>' +
                 '<div class="utopia-item__title"></div>' +
                 '<div class="utopia-item__meta"></div>' +
                 '</div>' +
                 '<div class="utopia-item__badges"></div>' +
-                '</div>'
-            );
-
+                '</div>');
             if (item.tmdbId && !item.tmdbName) {
                 var tmdbType = item.category === 'TV' ? 'tv/' : 'movie/';
-
                 Lampa.Api.sources.tmdb.get(tmdbType + item.tmdbId, { language: 'uk-UA' }, function (data) {
                     if (data && (data.title || data.name)) {
                         item.tmdbName = (data.title || data.name) + (item.releaseYear ? ' (' + item.releaseYear + ')' : '');
@@ -2255,29 +1437,20 @@ var moviePanel = $(
                     }
                 });
             }
-
             row.find('.utopia-item__movie').text(item.tmdbName || getFullMovieTitle(item));
             row.find('.utopia-item__title').text(item.name);
             row.find('.utopia-item__meta').text(item.size ? formatSize(item.size) : 'Розмір невідомий');
             row.find('.utopia-item__badges').html(badge(item.seeds, '\u25b2') + '&nbsp;&nbsp;' + badge(item.peers, '\u25bc'));
-
             row.on('click hover:enter', function () { chooseAction(item); });
-
             bindScrollFollow(row);
             return row;
         }
 
         function copyLink(item) {
             var text = item.magnet;
-
             Lampa.Storage.set('utopia_last_torrent_url', text);
-
-            function ok() {
-                Lampa.Noty.show('UTOPIA: посилання скопійовано. Вставте його у додаток для торентів (Add by URL)');
-            }
-            function fail() {
-                showDebugModal('Скопіюй посилання вручну', text);
-            }
+            function ok() { Lampa.Noty.show('UTOPIA: посилання скопійовано. Вставте його у додаток для торентів (Add by URL)'); }
+            function fail() { showDebugModal('Скопіюй посилання вручну', text); }
             function fallbackCopy() {
                 try {
                     var ta = document.createElement('textarea');
@@ -2292,7 +1465,6 @@ var moviePanel = $(
                     if (done) ok(); else fail();
                 } catch (e) { fail(); }
             }
-
             try {
                 if (Lampa.Utils && typeof Lampa.Utils.copyTextToClipboard === 'function') {
                     Lampa.Utils.copyTextToClipboard(text, ok, fail);
@@ -2302,161 +1474,91 @@ var moviePanel = $(
             fallbackCopy();
         }
 
-function downloadTorrent(item) {
-    var url = item && item.magnet
-        ? item.magnet
-        : Lampa.Storage.get('utopia_last_torrent_url', '');
-
-    if (!url) {
-        Lampa.Noty.show('UTOPIA: немає URL торента');
-        return;
-    }
-
-    Lampa.Storage.set('utopia_last_torrent_url', url);
-
-    if (
-        typeof AndroidJS === 'undefined' ||
-        typeof AndroidJS.openBrowser !== 'function'
-    ) {
-        Lampa.Noty.show('UTOPIA: завантаження недоступне');
-        return;
-    }
-
-    try {
-        AndroidJS.openBrowser(url);
-    } catch (e) {
-        console.error('[UTOPIA DOWNLOAD]', e);
-        Lampa.Noty.show('UTOPIA: помилка завантаження');
-    }
-}
-
-function showTorrentActionMenu(item) {
-    var items = [];
-
-if (
-    window.LampaTorrentReceivers &&
-    typeof window.LampaTorrentReceivers.getAvailable === 'function'
-) {
-    var receivers = window.LampaTorrentReceivers.getAvailable();
-
-    receivers.forEach(function (receiver) {
-        items.push({
-            title: '▶️ Відправити в ' + receiver.title,
-            action: 'receiver',
-            receiver: receiver
-        });
-    });
-}
-
-items.push({
-    title: '↕️ Завантажити .torrent',
-    action: 'download'
-});
-
-    items.push(
-        {
-            title: '☑️ Скопіювати посилання',
-            action: 'copy'
-        },
-        {
-            title: '❎ Скасувати',
-            action: 'cancel'
-        }
-    );
-
-    Lampa.Select.show({
-        title: 'торент',
-        items: items,
-
-        onSelect: function (selected) {
-            if (selected.action === 'download') {
-
-                downloadTorrent(item);
-
-                Lampa.Controller.toggle('content');
-
-            } else if (selected.action === 'receiver') {
-
-                var url = item && item.magnet
-                    ? item.magnet
-                    : Lampa.Storage.get(
-                        'utopia_last_torrent_url',
-                        ''
-                    );
-
-                if (
-                    selected.receiver &&
-                    typeof selected.receiver.send === 'function'
-                ) {
-                    try {
-                        selected.receiver.send(url);
-                    } catch (e) {
-                        console.error(
-                            '[TORRENT RECEIVER]',
-                            selected.receiver.id,
-                            e
-                        );
-
-                        Lampa.Noty.show(
-                            'Помилка відправки в ' +
-                            selected.receiver.title
-                        );
-                    }
-                }
-
+        function downloadTorrent(item) {
+            var url = item && item.magnet ? item.magnet : Lampa.Storage.get('utopia_last_torrent_url', '');
+            if (!url) { Lampa.Noty.show('UTOPIA: немає URL торента'); return; }
+            Lampa.Storage.set('utopia_last_torrent_url', url);
+            if (typeof AndroidJS === 'undefined' || typeof AndroidJS.openBrowser !== 'function') {
+                Lampa.Noty.show('UTOPIA: завантаження недоступне');
                 return;
-
-            } else if (selected.action === 'copy') {
-
-                copyLink(item);
-
-                Lampa.Controller.toggle('content');
-
-            } else if (selected.action === 'cancel') {
-
-                Lampa.Controller.toggle('content');
             }
-        },
-
-        onBack: function () {
-            Lampa.Controller.toggle('content');
+            try { AndroidJS.openBrowser(url); }
+            catch (e) {
+                console.error('[UTOPIA DOWNLOAD]', e);
+                Lampa.Noty.show('UTOPIA: помилка завантаження');
+            }
         }
-    });
-}
+
+        function showTorrentActionMenu(item) {
+            var items = [];
+            if (window.LampaTorrentReceivers && typeof window.LampaTorrentReceivers.getAvailable === 'function') {
+                var receivers = window.LampaTorrentReceivers.getAvailable();
+                receivers.forEach(function (receiver) {
+                    items.push({
+                        title: '▶️ Відправити в ' + receiver.title,
+                        action: 'receiver',
+                        receiver: receiver
+                    });
+                });
+            }
+            items.push({ title: '↕️ Завантажити .torrent', action: 'download' });
+            items.push({ title: '☑️ Скопіювати посилання', action: 'copy' });
+            items.push({ title: '❎ Скасувати', action: 'cancel' });
+            Lampa.Select.show({
+                title: 'торент',
+                items: items,
+                onSelect: function (selected) {
+                    if (selected.action === 'download') {
+                        downloadTorrent(item);
+                        Lampa.Controller.toggle('content');
+                    } else if (selected.action === 'receiver') {
+                        var url = item && item.magnet ? item.magnet : Lampa.Storage.get('utopia_last_torrent_url', '');
+                        if (selected.receiver && typeof selected.receiver.send === 'function') {
+                            try { selected.receiver.send(url); }
+                            catch (e) {
+                                console.error('[TORRENT RECEIVER]', selected.receiver.id, e);
+                                Lampa.Noty.show('Помилка відправки в ' + selected.receiver.title);
+                            }
+                        }
+                        return;
+                    } else if (selected.action === 'copy') {
+                        copyLink(item);
+                        Lampa.Controller.toggle('content');
+                    } else if (selected.action === 'cancel') {
+                        Lampa.Controller.toggle('content');
+                    }
+                },
+                onBack: function () { Lampa.Controller.toggle('content'); }
+            });
+        }
 
         function chooseAction(item) {
-    if (item.isDirect && item.magnet) {
-        showTorrentActionMenu(item);
-    } else {
-        playTorrent(item);
-    }
-}
+            if (item.isDirect && item.magnet) {
+                showTorrentActionMenu(item);
+            } else {
+                playTorrent(item);
+            }
+        }
 
         function playTorrent(item) {
             if (typeof item.magnet === 'string' && item.magnet.indexOf('magnet:') === 0) {
                 Lampa.Torrent.play({ url: item.magnet, name: item.name });
                 return;
             }
-
             if (!item.isDirect || !item.magnet) {
                 showDebugModal('Немає magnet/download', summarizeItem(item));
                 return;
             }
-
             Lampa.Loading.start('utopia_prepare', 'UTOPIA: готуємо торент...');
-
             var headers = { 'Authorization': 'Bearer ' + getKey() };
-
             fetchTorrentFileBytes(item.magnet, headers, function (buffer, rawText) {
                 Lampa.Loading.stop('utopia_prepare');
                 try {
                     var infoRange = findInfoDictRange(buffer);
                     if (!infoRange) throw new Error('не знайдено секцію info у .torrent файлі');
-
                     var infoBytes = new Uint8Array(buffer, infoRange.start, infoRange.end - infoRange.start);
                     var hashHex = sha1Hex(infoBytes);
                     var realMagnet = buildMagnetFromHash(hashHex, item.name);
-
                     Lampa.Torrent.play({ url: realMagnet, name: item.name });
                 } catch (e) {
                     showDebugModal('Помилка розбору .torrent файлу', {
@@ -2503,9 +1605,7 @@ items.push({
             listBox.empty();
             moreButtonEl = null;
             var sorted = sortItems(items, sortMode);
-            sorted.forEach(function (item) {
-                listBox.append(buildRow(item));
-            });
+            sorted.forEach(function (item) { listBox.append(buildRow(item)); });
             addMoreButtonIfNeeded();
             updateMetaText(false);
             Lampa.Controller.enable('content');
@@ -2527,7 +1627,6 @@ items.push({
             loading = true;
             var isFirst = targetPage === 1;
             var previousCount = isFirst ? 0 : items.length;
-
             if (isFirst) {
                 listBox.empty();
                 setMeta('Пошук триває...');
@@ -2536,16 +1635,13 @@ items.push({
                 setMeta('Завантажую ще результати...');
                 Lampa.Loading.start('utopia_search_more', 'UTOPIA: завантаження...');
             }
-
             request(query, targetPage, function (pageItems, fromCache) {
                 loading = false;
                 Lampa.Loading.stop('utopia_search');
                 Lampa.Loading.stop('utopia_search_more');
-
                 page = targetPage;
                 if (isFirst) items = [];
                 items = items.concat(pageItems);
-
                 if (!items.length) {
                     if (isFirst && altQuery && !usedAlt) {
                         usedAlt = true;
@@ -2556,7 +1652,6 @@ items.push({
                     renderEmptyState();
                     return;
                 }
-
                 if (!isFirst && sortMode === 'default') {
                     appendRows(items.slice(previousCount));
                     if (fromCache) updateMetaText(true);
@@ -2568,7 +1663,6 @@ items.push({
                 loading = false;
                 Lampa.Loading.stop('utopia_search');
                 Lampa.Loading.stop('utopia_search_more');
-
                 if (isFirst) {
                     renderErrorState(code);
                 } else {
@@ -2596,26 +1690,23 @@ items.push({
     // =========================================================
     function addButtonToCard(root, object) {
         if (root.find('.utopia-search-btn').length) return;
-
         var movie = object.movie || {};
         var title = movie.title || movie.name || '';
         var originalTitle = movie.original_title || '';
         if (!title) return;
-
         var button = $(
-    '<div class="full-start__button selector utopia-search-btn">' +
-        '<span style="display:flex;align-items:center;gap:.45em;">' +
-            '<svg width="1.5em" height="1.5em" viewBox="0 0 64 64" ' +
-                'xmlns="http://www.w3.org/2000/svg" ' +
-                'style="flex-shrink:0;display:block;">' +
-                '<image href="https://raw.githubusercontent.com/yakutza82/lampa-utopia/refs/heads/main/pngegg2wh.png" ' +
-                    'x="0" y="0" width="64" height="64" />' +
-            '</svg>' +
-            'UTOPIA - торент' +
-        '</span>' +
-    '</div>'
-);
-
+            '<div class="full-start__button selector utopia-search-btn">' +
+                '<span style="display:flex;align-items:center;gap:.45em;">' +
+                    '<svg width="1.5em" height="1.5em" viewBox="0 0 64 64" ' +
+                        'xmlns="http://www.w3.org/2000/svg" ' +
+                        'style="flex-shrink:0;display:block;">' +
+                        '<image href="https://raw.githubusercontent.com/yakutza82/lampa-utopia/refs/heads/main/pngegg2wh.png" ' +
+                            'x="0" y="0" width="64" height="64" />' +
+                    '</svg>' +
+                    'UTOPIA - торент' +
+                '</span>' +
+            '</div>'
+        );
         button.on('click hover:enter', function () {
             if (!hasKey()) {
                 Lampa.Noty.show('UTOPIA: спочатку вкажіть API ключ у налаштуваннях плагіна');
@@ -2631,13 +1722,11 @@ items.push({
                 page: 1
             });
         });
-
         var anchor = root.find('.view--torrent');
         if (anchor.length) {
             anchor.after(button);
             return;
         }
-
         var target = root.find('.full-start-new__buttons');
         if (!target.length) target = root.find('.full-start__buttons');
         if (target.length) target.append(button);
