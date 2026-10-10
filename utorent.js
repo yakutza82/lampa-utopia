@@ -840,14 +840,13 @@
     // 2. Налаштування
     // =========================================================
     var SITE_ORIGIN = 'https://utp.to';
-    var SITE_UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/154.0.0.0 Safari/537.36';
 
     function siteUserName() {
         return String(Lampa.Storage.get('utopia_username', '') || '');
     }
 
     // =========================================================
-    // 2a. Відкриття сторінки з API-ключами у системному браузері
+    // 2a. Відкриття сторінки з API-ключем у системному браузері
     // =========================================================
     function siteAskUserName(done) {
         function finish(value) {
@@ -867,10 +866,6 @@
     }
 
     function onSiteLogin() {
-        // У цій версії Lampa нативний HTTP-міст не працює (httpReq — заглушка).
-        // Тому відкриваємо сторінку з ключами у системному браузері:
-        // користувач там логіниться, копіює ключ і повертається в Lampa.
-
         var name = siteUserName();
 
         function openKeys() {
@@ -878,18 +873,49 @@
                 ? (SITE_ORIGIN + '/users/' + encodeURIComponent(name) + '/apikeys')
                 : (SITE_ORIGIN + '/login');
 
-            if (typeof AndroidJS !== 'undefined' && typeof AndroidJS.openBrowser === 'function') {
-                try {
-                    AndroidJS.openBrowser(url);
-                    Lampa.Noty.show('UTOPIA: відкрито браузер. Увійдіть, скопіюйте ключ і поверніться в Lampa');
-                } catch (e) {
-                    Lampa.Noty.show('UTOPIA: не вдалося відкрити браузер: ' + e.message);
+            // Показуємо підказку перед відкриттям браузера
+            Lampa.Modal.open({
+                title: 'UTOPIA: як отримати API ключ',
+                html: $(
+                    '<div style="line-height:1.5;font-size:1.05em;">' +
+                        '<p>Зараз відкриється браузер на сторінці з вашим API ключем.</p>' +
+                        '<ol style="padding-left:1.3em;">' +
+                            '<li>Якщо потрібно — увійдіть своїм логіном і паролем.</li>' +
+                            '<li>Знайдіть свій API ключ на сторінці.</li>' +
+                            '<li>Натисніть і утримуйте ключ → <b>«Копіювати»</b>.</li>' +
+                            '<li>Поверніться в <b>Lampa</b>.</li>' +
+                            '<li>Відкрийте <b>Налаштування → UTOPIA → API ключ UTOPIA</b> і вставте ключ.</li>' +
+                        '</ol>' +
+                        '<p style="opacity:.6;font-size:.9em;">' +
+                            'Ключ зберігається лише локально у налаштуваннях Lampa.' +
+                        '</p>' +
+                    '</div>'
+                ),
+                size: 'medium',
+                scroll_to_center: true,
+                onBack: function () {
+                    Lampa.Modal.close();
+                    backToSettings();
                 }
-            } else {
-                Lampa.Noty.show('UTOPIA: відкрийте вручну ' + url);
-            }
+            });
 
-            backToSettings();
+            // Через 4 секунди закриваємо підказку і відкриваємо браузер
+            setTimeout(function () {
+                try { Lampa.Modal.close(); } catch (e) {}
+
+                if (typeof AndroidJS !== 'undefined' && typeof AndroidJS.openBrowser === 'function') {
+                    try {
+                        AndroidJS.openBrowser(url);
+                        Lampa.Noty.show('UTOPIA: відкрито браузер. Скопіюйте ключ і поверніться в Lampa');
+                    } catch (e) {
+                        Lampa.Noty.show('UTOPIA: не вдалося відкрити браузер: ' + e.message);
+                    }
+                } else {
+                    Lampa.Noty.show('UTOPIA: відкрийте вручну ' + url);
+                }
+
+                backToSettings();
+            }, 4000);
         }
 
         if (!name) {
@@ -929,8 +955,8 @@
             component: 'utopia',
             param: { name: 'utopia_site_login_btn', type: 'button' },
             field: {
-                name: 'Відкрити сторінку з ключами',
-                description: 'Відкриває utp.to у браузері. Увійдіть, скопіюйте ключ і поверніться'
+                name: 'Відкрити сторінку з API ключем',
+                description: 'Відкриває utp.to у браузері, де ви можете скопіювати свій API ключ'
             },
             onChange: onSiteLogin
         });
