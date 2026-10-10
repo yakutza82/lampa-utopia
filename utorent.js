@@ -943,33 +943,6 @@
         return primary.length ? primary : broad;
     }
 
-    function siteDescribeError(err) {
-        var parts = [];
-        if (err.status !== undefined && err.status !== null) parts.push('код ' + err.status);
-        if (err.statusText) parts.push(String(err.statusText));
-
-        var text = String(err.responseText || '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 160);
-        if (text) parts.push(text);
-
-        return parts.join(', ') || 'невідома помилка';
-    }
-
-    function siteErrorMessage(err) {
-        try {
-            var data = JSON.parse(String(err.responseText || ''));
-
-            if (data && data.errors) {
-                var first = Object.keys(data.errors)[0];
-                var list = data.errors[first];
-                if (list && list[0]) return String(list[0]);
-            }
-
-            if (data && data.message) return String(data.message);
-        } catch (e) {}
-
-        return '';
-    }
-
     function showSiteReport(text) {
         var modal = $(
             '<div>' +
@@ -1013,93 +986,303 @@
     }
 
     // =========================================================
-    // 2a. ДІАГНОСТИКА: список доступних функцій AndroidJS
+    // 2a. Вхід через AndroidJS.httpReq (нативний HTTP-стек Android)
+    //
+    // Формат виклику (стандарт AndroidJS Bridge Lampa):
+    //   AndroidJS.httpReq(index, url, data, headers, method)
+    // Відповідь приходить через глобальний window.httpCall(index, callback),
+    // а тіло відповіді можна отримати викликом AndroidJS.getResp(index).
     // =========================================================
-    function onSiteLogin() {
-        var lines = [];
+    function nativeHttpGet(url, extraHeaders, callback) {
+        nativeHttpAny('GET', url, '', extraHeaders, callback);
+    }
 
-        lines.push('UTOPIA: діагностика нативного моста');
-        lines.push('Версія плагіна: ' + VERSION);
-        lines.push('');
+    function nativeHttpPost(url, postData, extraHeaders, callback) {
+        nativeHttpAny('POST', url, postData, extraHeaders, callback);
+    }
 
-        if (typeof AndroidJS === 'undefined') {
-            lines.push('❌ AndroidJS НЕ визначено.');
-            lines.push('   Це означає, що ви НЕ в застосунку Lampa для Android,');
-            lines.push('   або у вашій версії Lampa нативний міст відсутній.');
-        } else {
-            lines.push('✔ AndroidJS визначено, тип: ' + typeof AndroidJS);
-            lines.push('');
+    function nativeHttpAny(method, url, postData, extraHeaders, callback) {
+        if (typeof AndroidJS === 'undefined' || typeof AndroidJS.httpReq !== 'function') {
+            callback({ error: 'native_bridge_unavailable' }, null);
+            return;
+        }
 
-            try {
-                var keys = Object.keys(AndroidJS);
-                lines.push('Ключів у AndroidJS: ' + keys.length);
-                lines.push('');
+        var idx = 'utopia_' + Math.floor(Math.random() * 1000000);
+        var finished = false;
 
-                if (keys.length === 0) {
-                    lines.push('⚠ AndroidJS порожній — жодних полів/функцій не видно.');
-                } else {
-                    lines.push('Список полів/функцій:');
-                    keys.forEach(function (k) {
-                        var type = 'unknown';
-                        var extra = '';
-                        try {
-                            type = typeof AndroidJS[k];
-                            if (type === 'function') {
-                                extra = ' (приймає аргументів: ' + AndroidJS[k].length + ')';
-                            } else if (type === 'string') {
-                                extra = ' = "' + String(AndroidJS[k]).slice(0, 60) + '"';
-                            } else if (type === 'number' || type === 'boolean') {
-                                extra = ' = ' + AndroidJS[k];
-                            }
-                        } catch (e) {
-                            extra = ' (помилка доступу: ' + e.message + ')';
-                        }
-                        lines.push('  • ' + k + ' : ' + type + extra);
-                    });
+        var headers = extraHeaders || {};
+        headers['User-Agent'] = headers['User-Agent'] || SITE_UA;
+
+        // AndroidJS.httpReq(index, url, data, headers, method)
+        // Важливо: сам міст викликає window.httpCall(index, callback), коли отримає відповідь.
+        var originalHttpCall = window.httpCall;
+
+        window.httpCall = function (returnedIdx, cb) {
+            if (String(returnedIdx) === String(idx) && !finished) {
+                finished = true;
+                window.httpCall = originalHttpCall;
+
+                var body = '';
+                try {
+                    if (typeof AndroidJS.getResp === 'function') {
+                        body = AndroidJS.getResp(idx);
+                    }
+                } catch (e) {
+                    callback({ error: 'getResp_failed: ' + e.message }, null);
+                    return;
                 }
-            } catch (e) {
-                lines.push('Не вдалося перелічити ключі AndroidJS: ' + e.message);
-            }
-        }
 
-        lines.push('');
-        lines.push('---');
-        lines.push('Додаткова інформація:');
-        lines.push('typeof Lampa.Reguest: ' + typeof Lampa.Reguest);
-        try {
-            lines.push('Lampa.Platform.screen("android"): ' + Lampa.Platform.screen('android'));
-            lines.push('Lampa.Platform.screen("mobile"): ' + Lampa.Platform.screen('mobile'));
-        } catch (e) {
-            lines.push('Lampa.Platform.screen: помилка ' + e.message);
-        }
-
-        lines.push('');
-        lines.push('typeof window.Android: ' + typeof window.Android);
-        lines.push('typeof window.app: ' + typeof window.app);
-        lines.push('typeof window.NativeBridge: ' + typeof window.NativeBridge);
-        lines.push('typeof window.AndroidBridge: ' + typeof window.AndroidBridge);
-        lines.push('typeof window.Native: ' + typeof window.Native);
-        lines.push('typeof window.jsBridge: ' + typeof window.jsBridge);
-
-        // Перебираємо всі глобальні змінні, які можуть бути мостом
-        try {
-            var globalKeys = Object.keys(window);
-            var bridgeLike = globalKeys.filter(function (k) {
-                return /android|bridge|native|webview|js/i.test(k) && typeof window[k] === 'object';
-            });
-            if (bridgeLike.length) {
-                lines.push('');
-                lines.push('Глобальні об\'єкти, схожі на міст:');
-                bridgeLike.forEach(function (k) {
-                    var type = typeof window[k];
-                    var subKeys = [];
-                    try { subKeys = Object.keys(window[k]).slice(0, 20); } catch (e) {}
-                    lines.push('  • window.' + k + ' : ' + type + ' [' + subKeys.join(', ') + ']');
+                callback(null, {
+                    body: typeof body === 'string' ? body : String(body || '')
                 });
+                return;
             }
-        } catch (e) {}
 
-        showSiteReport(lines.join('\n'));
+            if (originalHttpCall) originalHttpCall(returnedIdx, cb);
+        };
+
+        try {
+            AndroidJS.httpReq(idx, url, postData || '', headers, method);
+        } catch (e) {
+            window.httpCall = originalHttpCall;
+            callback({ error: 'httpReq_failed: ' + e.message }, null);
+        }
+
+        // Захист від зависання: якщо через 25 секунд нічого не прийшло — повертаємо помилку
+        setTimeout(function () {
+            if (!finished) {
+                finished = true;
+                window.httpCall = originalHttpCall;
+                callback({ error: 'timeout' }, null);
+            }
+        }, 25000);
+    }
+
+    function siteFetchKey(username, password, finish) {
+        var report = [];
+        var exclude = {};
+
+        function note(line) { report.push(line); }
+
+        function fail(message) {
+            note('✖ ' + message);
+            finish({ ok: false, candidates: [], report: report.join('\n') });
+        }
+
+        var loginUrl = SITE_ORIGIN + '/login';
+        var keysUrl = SITE_ORIGIN + '/users/' + encodeURIComponent(username) + '/apikeys';
+
+        note('=== СПРОБА ЧЕРЕЗ AndroidJS.httpReq (native bridge) ===');
+
+        // 1. GET /login
+        nativeHttpGet(loginUrl, {
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+            'Accept-Language': 'uk,ru;q=0.9,en;q=0.8'
+        }, function (err1, res1) {
+            if (err1) {
+                fail('1) GET /login (native): ' + (err1.error || 'невідома помилка'));
+                return;
+            }
+
+            var html1 = res1 && res1.body ? res1.body : '';
+            note('1) GET /login (native): отримано ' + html1.length + ' симв.');
+
+            if (!siteHasLoginForm(html1)) {
+                note('    ⚠ на сторінці немає форми входу. Перші 300 симв.:');
+                note('    ' + html1.slice(0, 300));
+                fail('1) GET /login (native): форма входу не знайдена');
+                return;
+            }
+
+            var form = siteLoginFields(html1);
+            note('    поля форми: ' + form.hidden.map(function (h) { return h.name; }).join(', ') + ', ' + form.user + ', ' + form.pass);
+
+            // 2. POST /login
+            var pairs = form.hidden.map(function (h) {
+                return encodeURIComponent(h.name) + '=' + encodeURIComponent(h.value);
+            });
+            pairs.push(encodeURIComponent(form.user) + '=' + encodeURIComponent(username));
+            pairs.push(encodeURIComponent(form.pass) + '=' + encodeURIComponent(password));
+            pairs.push('remember=on');
+
+            nativeHttpPost(loginUrl, pairs.join('&'), {
+                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+                'Accept-Language': 'uk,ru;q=0.9,en;q=0.8',
+                'Content-Type': 'application/x-www-form-urlencoded',
+                'Referer': SITE_ORIGIN + '/',
+                'Origin': SITE_ORIGIN
+            }, function (err2, res2) {
+                if (err2) {
+                    fail('2) POST /login (native): ' + (err2.error || 'невідома помилка'));
+                    return;
+                }
+
+                var html2 = res2 && res2.body ? res2.body : '';
+                note('2) POST /login (native): отримано ' + html2.length + ' симв.');
+
+                var hasLoginForm = siteHasLoginForm(html2);
+
+                if (hasLoginForm) {
+                    var visibleText = html2
+                        .replace(/<script[\s\S]*?<\/script>/gi, ' ')
+                        .replace(/<style[\s\S]*?<\/style>/gi, ' ')
+                        .replace(/<[^>]+>/g, ' ')
+                        .replace(/&nbsp;/g, ' ')
+                        .replace(/&amp;/g, '&')
+                        .replace(/&quot;/g, '"')
+                        .replace(/&#039;/g, "'")
+                        .replace(/\s+/g, ' ')
+                        .trim();
+                    note('    ТЕКСТ: ' + visibleText.slice(0, 400));
+                    fail('2) POST /login (native): сайт знову показав форму входу');
+                    return;
+                }
+
+                note('    ✔ Форми входу немає — вхід вдався!');
+
+                // 3. GET apikeys
+                nativeHttpGet(keysUrl, {
+                    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+                    'Accept-Language': 'uk,ru;q=0.9,en;q=0.8',
+                    'Referer': SITE_ORIGIN + '/'
+                }, function (err3, res3) {
+                    if (err3) {
+                        fail('3) GET apikeys (native): ' + (err3.error || 'невідома помилка'));
+                        return;
+                    }
+
+                    var html3 = res3 && res3.body ? res3.body : '';
+                    note('3) GET apikeys (native): отримано ' + html3.length + ' симв.');
+
+                    if (siteHasLoginForm(html3)) {
+                        fail('3) GET apikeys (native): не авторизовано (сайт показав форму входу)');
+                        return;
+                    }
+
+                    var csrf = html3.match(/<meta[^>]*name\s*=\s*["']csrf-token["'][^>]*>/i);
+                    if (csrf) exclude[siteAttr(csrf[0], 'content')] = true;
+
+                    var found = siteCandidates(html3, exclude);
+                    note('    схожих на ключ рядків: ' + found.length);
+
+                    found.forEach(function (c, i) {
+                        note('    ' + (i + 1) + ') ' + siteMask(c.value) + ' - ' + c.where);
+                    });
+
+                    if (!found.length) {
+                        fail('Ключ на сторінці не знайдено');
+                        return;
+                    }
+
+                    note('✔ Готово');
+                    finish({ ok: true, candidates: found, report: report.join('\n') });
+                });
+            });
+        });
+    }
+
+    function siteAskUserName(done) {
+        function finish(value) {
+            var name = String(value || '').trim().replace(/^@/, '');
+            var found = name.match(/\/users\/([^\/?#\s]+)/i);
+            if (found) name = found[1];
+            if (!name) { backToSettings(); return; }
+            Lampa.Storage.set('utopia_username', name);
+            done();
+        }
+        Lampa.Input.edit({
+            title: "Ім'я користувача на utp.to",
+            value: siteUserName(),
+            free: true,
+            nosave: true
+        }, finish);
+    }
+
+    function siteRun(username, password) {
+        siteLastRun = Date.now();
+        Lampa.Noty.show('UTOPIA: входжу на utp.to (native)...');
+        try { Lampa.Loading.start('utopia_site_login', 'UTOPIA: вхід...'); } catch (e) {}
+
+        siteFetchKey(username, password, function (result) {
+            try { Lampa.Loading.stop('utopia_site_login'); } catch (e) {}
+
+            if (!result.ok) {
+                showSiteReport(result.report);
+                return;
+            }
+
+            if (result.candidates.length === 1) {
+                Lampa.Noty.show('UTOPIA: ключ знайдено');
+                askApply(result.candidates[0].value);
+                return;
+            }
+
+            var items = result.candidates.slice(0, 8).map(function (c) {
+                return { title: siteMask(c.value), subtitle: c.where, value: c.value, action: 'pick' };
+            });
+            items.push({ title: '📄 Показати звіт', action: 'report' });
+
+            Lampa.Select.show({
+                title: 'Знайдено кілька рядків. Який із них ключ?',
+                items: items,
+                onSelect: function (item) {
+                    if (item.action === 'pick') askApply(item.value);
+                    else setTimeout(function () { showSiteReport(result.report); }, 200);
+                },
+                onBack: function () { backToSettings(); }
+            });
+        });
+    }
+
+    function siteAskPassword(name) {
+        function got(value) {
+            var password = String(value === null || value === undefined ? '' : value);
+            if (!password) { backToSettings(); return; }
+            setTimeout(function () {
+                Lampa.Select.show({
+                    title: 'Вхід на utp.to',
+                    items: [
+                        { title: '🔐 Увійти як ' + escapeText(name), subtitle: 'довжина пароля: ' + password.length, action: 'go' },
+                        { title: '✖ Скасувати', action: 'cancel' }
+                    ],
+                    onSelect: function (item) {
+                        if (item.action === 'go') siteRun(name, password);
+                        else backToSettings();
+                    },
+                    onBack: function () { backToSettings(); }
+                });
+            }, 200);
+        }
+        Lampa.Input.edit({
+            title: 'Пароль utp.to для ' + name,
+            value: '',
+            free: true,
+            nosave: true
+        }, got);
+    }
+
+    function onSiteLogin() {
+        if (typeof AndroidJS === 'undefined') {
+            Lampa.Noty.show('UTOPIA: вхід із плагіна працює лише в застосунку Lampa для Android');
+            backToSettings();
+            return;
+        }
+
+        var wait = Math.max(siteCooldownUntil, siteLastRun + 2 * 60 * 1000) - Date.now();
+        if (wait > 0) {
+            Lampa.Noty.show('UTOPIA: зачекай ще ' + Math.ceil(wait / 1000) + ' с');
+            backToSettings();
+            return;
+        }
+
+        var name = siteUserName();
+        if (!name) {
+            siteAskUserName(function () {
+                setTimeout(onSiteLogin, 200);
+            });
+            return;
+        }
+        siteAskPassword(name);
     }
 
     function initSettings() {
@@ -1128,8 +1311,8 @@
             component: 'utopia',
             param: { name: 'utopia_site_login_btn', type: 'button' },
             field: {
-                name: 'Діагностика моста (тимчасово)',
-                description: 'Показує, які нативні функції доступні у цій Lampa'
+                name: 'Отримати ключ із сайту (native)',
+                description: 'Вхід на utp.to через нативний HTTP-міст Android'
             },
             onChange: onSiteLogin
         });
