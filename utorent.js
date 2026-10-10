@@ -1,7 +1,7 @@
 (function () {
     'use strict';
 
-        // ============================================================
+    // ============================================================
     // Універсальний реєстр торент-приймачів
     // ============================================================
     if (!window.LampaTorrentReceivers) {
@@ -1060,7 +1060,8 @@
     }
 
     // =========================================================
-    // 2a. Вхід на сайт (виправлено: X-XSRF-TOKEN / X-CSRF-TOKEN)
+    // 2a. Вхід на сайт
+    // === ДІАГНОСТИКА: тепер надсилаємо як звичайну HTML-форму ===
     // =========================================================
     function siteFetchKey(username, password, finish) {
         var report = [];
@@ -1125,49 +1126,31 @@
             form.hidden.forEach(function (h) { if (h.value) exclude[h.value] = true; });
             note('   поля форми: ' + form.hidden.map(function (h) { return h.name; }).join(', ') + ', ' + form.user + ', ' + form.pass);
 
-            // 2. Вхід
-            // ВАЖЛИВО: _token у тіло НЕ додаємо. Laravel Sanctum в AJAX-режимі
-            // читає CSRF лише з заголовків X-XSRF-TOKEN (з cookie XSRF-TOKEN)
-            // або X-CSRF-TOKEN. Тіло з _token для JSON-запитів ігнорується.
-            var pairs = form.hidden
-                .filter(function (h) { return h.name !== '_token'; })
-                .map(function (h) {
-                    return encodeURIComponent(h.name) + '=' + encodeURIComponent(h.value);
-                });
+            // =============================================
+            // 2. Вхід — ДІАГНОСТИКА: звичайна HTML-форма
+            // =============================================
+            // Надсилаємо як реальний браузер: _token у тілі, без XHR-заголовків.
+            // Тіло містить ВСІ приховані поля (включно з _token).
+            var pairs = form.hidden.map(function (h) {
+                return encodeURIComponent(h.name) + '=' + encodeURIComponent(h.value);
+            });
             pairs.push(encodeURIComponent(form.user) + '=' + encodeURIComponent(username));
             pairs.push(encodeURIComponent(form.pass) + '=' + encodeURIComponent(password));
-
-            // Дістаємо сирий _token і XSRF-TOKEN з cookie
-            var rawToken = '';
-            form.hidden.forEach(function (h) { if (h.name === '_token') rawToken = h.value; });
-
-            var xsrfCookie = jar['XSRF-TOKEN'] || '';
-            var xsrfHeader = '';
-            if (xsrfCookie) {
-                try { xsrfHeader = decodeURIComponent(xsrfCookie); }
-                catch (e) { xsrfHeader = xsrfCookie; }
-            }
 
             var postHeaders = {
                 'Origin': SITE_ORIGIN,
                 'Referer': loginUrl,
-                'Accept': 'application/json',
-                'X-Requested-With': 'XMLHttpRequest',
                 'Content-Type': 'application/x-www-form-urlencoded'
+                // Accept та X-Requested-With ПРИБРАНО — тепер це схоже на звичайну форму
             };
 
-            if (rawToken) postHeaders['X-CSRF-TOKEN'] = rawToken;
-            if (xsrfHeader) postHeaders['X-XSRF-TOKEN'] = xsrfHeader;
-
-            note('2) POST /login: Cookie: ' + Object.keys(jar).join(', '));
-            note('   X-CSRF-TOKEN: ' + (rawToken ? 'є (' + rawToken.length + ' симв.)' : 'НЕМАЄ') +
-                 ', X-XSRF-TOKEN: ' + (xsrfHeader ? 'є (' + xsrfHeader.length + ' симв.)' : 'НЕМАЄ'));
+            note('2) POST /login (HTML-форма): Cookie: ' + Object.keys(jar).join(', '));
+            note('   тіло: ' + form.hidden.map(function (h) { return h.name; }).join(', ') + ', ' + form.user + ', ' + form.pass);
 
             siteNative(loginUrl, pairs.join('&'), headers(postHeaders), function (err2, res2) {
                 if (err2) {
                     var why = siteErrorMessage(err2);
 
-                    // Друкуємо сирий responseText, щоб побачити, що саме каже Laravel
                     note('   DEBUG status: ' + (err2.status || 0) + ' ' + (err2.statusText || ''));
                     note('   DEBUG responseText: ' + String(err2.responseText || '').slice(0, 400));
 
@@ -1175,9 +1158,9 @@
                         siteCooldownUntil = Date.now() + 5 * 60 * 1000;
                         fail('2) POST /login: забагато спроб входу (429). Зачекай кілька хвилин');
                     }
-                    else if (err2.status === 419) fail('2) POST /login: сторінка входу застаріла (419). Спробуй ще раз');
+                    else if (err2.status === 419) fail('2) POST /login: сторінка входу застаріла (419). CSRF не прийнято');
                     else if (err2.status === 422) fail('2) POST /login: сайт відхилив вхід' + (why ? ': ' + why : '') + ' (код 422). Перевір логін і пароль');
-                    else if (err2.status === 401) fail('2) POST /login: 401 Unauthorized' + (why ? ': ' + why : '') + '. Схоже, CSRF-токен не прийнято');
+                    else if (err2.status === 401) fail('2) POST /login: 401 Unauthorized' + (why ? ': ' + why : ''));
                     else fail('2) POST /login: ' + siteDescribeError(err2));
                     return;
                 }
