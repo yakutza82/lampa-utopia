@@ -954,8 +954,6 @@
         }).join('; ');
     }
 
-    // Короткий відбиток значення cookie — перші 8 символів.
-    // Достатньо, щоб порівнювати між кроками, і безпечно для звіту.
     function siteCookieFingerprint(value) {
         if (!value) return '(немає)';
         return String(value).slice(0, 8) + '…';
@@ -1068,8 +1066,7 @@
 
     // =========================================================
     // 2a. Вхід на сайт
-    // === ДІАГНОСТИКА v4: порівнюємо laravel_session між кроками ===
-    // === + явно вказуємо Referer: https://utp.to/             ===
+    // === ДІАГНОСТИКА v5: два GET /login підряд, перевірка стабільності сесії ===
     // =========================================================
     function siteFetchKey(username, password, finish) {
         var report = [];
@@ -1098,7 +1095,7 @@
         var loginUrl = SITE_ORIGIN + '/login';
         var keysUrl = SITE_ORIGIN + '/users/' + encodeURIComponent(username) + '/apikeys';
 
-        // 1. Сторінка входу
+        // 1. Сторінка входу (перший GET)
         siteNative(loginUrl, null, headers({ 'Referer': SITE_ORIGIN + '/' }), function (err, res) {
             if (err) {
                 if (err.status === 429) {
@@ -1112,177 +1109,185 @@
 
             var r = siteParse(res);
             siteCollectCookies(jar, r.headers);
-            note('1) GET /login: заголовки ' + (r.hasHeaders ? 'є' : 'НЕМАЄ') + ', кукі: ' + Object.keys(jar).join(', '));
+
+            var sessionGet1 = jar['laravel_session'] || '';
+            var xsrfGet1 = jar['XSRF-TOKEN'] || '';
+
+            note('1a) GET /login #1: заголовки ' + (r.hasHeaders ? 'є' : 'НЕМАЄ') + ', кукі: ' + Object.keys(jar).join(', '));
+            note('    laravel_session #1: ' + siteCookieFingerprint(sessionGet1) + ' (довжина: ' + sessionGet1.length + ')');
+            note('    XSRF-TOKEN #1:      ' + siteCookieFingerprint(xsrfGet1) + ' (довжина: ' + xsrfGet1.length + ')');
 
             if (!r.hasHeaders) {
                 fail('Застосунок не віддає заголовки відповіді. Потрібна свіжа версія Lampa для Android.');
                 return;
             }
 
-            // Запам'ятовуємо початковий стан cookie для порівняння
-            var sessionBefore = jar['laravel_session'] || '';
-            var xsrfBefore = jar['XSRF-TOKEN'] || '';
+            // === ТЕСТ СТАБІЛЬНОСТІ СЕСІЇ: робимо ДРУГИЙ GET /login ===
+            // Якщо laravel_session після другого GET той самий — сесія стабільна.
+            // Якщо інший — сайт НЕ тримає сесію між запитами, і HTML-логін неможливий.
+            siteNative(loginUrl, null, headers({ 'Referer': SITE_ORIGIN + '/' }), function (errGet2, resGet2) {
+                if (errGet2) {
+                    note('    (другий GET не вдався, продовжуємо з першим)');
+                } else {
+                    var r2 = siteParse(resGet2);
+                    var addedGet2 = siteCollectCookies(jar, r2.headers);
 
-            note('   laravel_session після GET: ' + siteCookieFingerprint(sessionBefore) +
-                 ' (довжина: ' + sessionBefore.length + ')');
-            note('   XSRF-TOKEN після GET:      ' + siteCookieFingerprint(xsrfBefore) +
-                 ' (довжина: ' + xsrfBefore.length + ')');
+                    var sessionGet2 = jar['laravel_session'] || '';
+                    var xsrfGet2 = jar['XSRF-TOKEN'] || '';
 
-            var form = siteLoginFields(r.body);
+                    note('1b) GET /login #2: нові кукі: ' + (addedGet2.join(', ') || 'немає'));
+                    note('    laravel_session #2: ' + siteCookieFingerprint(sessionGet2) + ' (довжина: ' + sessionGet2.length + ')');
+                    note('    XSRF-TOKEN #2:      ' + siteCookieFingerprint(xsrfGet2) + ' (довжина: ' + xsrfGet2.length + ')');
+                    note('    сесія стабільна між двома GET? ' + (sessionGet1 === sessionGet2 ? 'ТАК ✔' : 'НІ ✖ — Laravel робить нову сесію на кожен запит!'));
 
-            if (!form.pass || !form.user) {
-                fail('На сторінці входу не знайдено поля логіна/пароля (поля: ' + (form.user || '-') + ' / ' + (form.pass || '-') + ')');
-                return;
-            }
+                    // Якщо сесія змінилась — беремо значення з другого GET
+                    // і _token саме з другої сторінки (щоб CSRF відповідав актуальній сесії)
+                    if (sessionGet1 !== sessionGet2) {
+                        note('    → беремо _token зі СТОРІНКИ #2 (щоб CSRF відповідав актуальній сесії)');
+                    } else {
+                        note('    → сесія стабільна, використовуємо _token зі СТОРІНКИ #1');
+                    }
 
-            if (!form.hidden.some(function (h) { return h.name === '_token'; })) {
-                fail('На сторінці входу не знайдено захисний токен _token');
-                return;
-            }
+                    var useBody = (sessionGet1 !== sessionGet2) ? r2.body : r.body;
+                    continueWithForm(useBody);
+                    return;
+                }
 
-            form.hidden.forEach(function (h) { if (h.value) exclude[h.value] = true; });
-            note('   поля форми (парсер): ' + form.hidden.map(function (h) { return h.name; }).join(', ') + ', ' + form.user + ', ' + form.pass);
-
-            // =============================================
-            // 2. Вхід
-            // =============================================
-            // Тіло форми — точно як у браузері: _token, username, password.
-            // Без дублювання під іншими іменами (у попередній версії це могло плутати сайт).
-            var pairs = form.hidden.map(function (h) {
-                return encodeURIComponent(h.name) + '=' + encodeURIComponent(h.value);
+                continueWithForm(r.body);
             });
-            pairs.push(encodeURIComponent(form.user) + '=' + encodeURIComponent(username));
-            pairs.push(encodeURIComponent(form.pass) + '=' + encodeURIComponent(password));
-            // remember як чекбокс: у браузері відсутність = не відмічено, наявність = "on"
-            pairs.push('remember=on');
 
-            // Referer — на ГОЛОВНУ сторінку, як у справжнього браузера,
-            // який прийшов на /login із головної і надсилає форму.
-            var postHeaders = {
-                'Origin': SITE_ORIGIN,
-                'Referer': SITE_ORIGIN + '/',
-                'Content-Type': 'application/x-www-form-urlencoded',
-                'Upgrade-Insecure-Requests': '1'
-            };
+            // Продовження: парсимо форму з переданого HTML і робимо POST
+            function continueWithForm(html) {
+                var form = siteLoginFields(html);
 
-            note('2) POST /login (HTML-форма): Cookie: ' + Object.keys(jar).join(', '));
-            note('   тіло: _token, ' + form.user + ', ' + form.pass + ', remember');
-
-            siteNative(loginUrl, pairs.join('&'), headers(postHeaders), function (err2, res2) {
-                if (err2) {
-                    var why = siteErrorMessage(err2);
-
-                    note('   DEBUG status: ' + (err2.status || 0) + ' ' + (err2.statusText || ''));
-                    note('   DEBUG responseText: ' + String(err2.responseText || '').slice(0, 400));
-
-                    if (err2.status === 429) {
-                        siteCooldownUntil = Date.now() + 5 * 60 * 1000;
-                        fail('2) POST /login: забагато спроб входу (429). Зачекай кілька хвилин');
-                    }
-                    else if (err2.status === 419) fail('2) POST /login: сторінка входу застаріла (419). CSRF не прийнято');
-                    else if (err2.status === 422) fail('2) POST /login: сайт відхилив вхід' + (why ? ': ' + why : '') + ' (код 422). Перевір логін і пароль');
-                    else if (err2.status === 401) fail('2) POST /login: 401 Unauthorized' + (why ? ': ' + why : ''));
-                    else fail('2) POST /login: ' + siteDescribeError(err2));
+                if (!form.pass || !form.user) {
+                    fail('На сторінці входу не знайдено поля логіна/пароля (поля: ' + (form.user || '-') + ' / ' + (form.pass || '-') + ')');
                     return;
                 }
 
-                var r2 = siteParse(res2);
-
-                // Порівнюємо значення cookie ДО оновлення jar, щоб побачити,
-                // чи змінив Laravel laravel_session (що означає — сесія не прийнята).
-                var sessionAfterHeaders = r2.headers && (r2.headers['set-cookie'] || r2.headers['Set-Cookie']);
-                var sessionNew = '';
-                if (sessionAfterHeaders) {
-                    var lines = typeof sessionAfterHeaders === 'string' ? sessionAfterHeaders.split('\n') : sessionAfterHeaders;
-                    lines.forEach(function (line) {
-                        var part = String(line).split(';')[0];
-                        if (part.indexOf('laravel_session=') === 0) {
-                            sessionNew = part.slice('laravel_session='.length);
-                        }
-                    });
-                }
-
-                var added = siteCollectCookies(jar, r2.headers);
-                var location = (r2.headers && (r2.headers.location || r2.headers.Location)) || '';
-
-                note('2) POST /login: статус ' + (err2 && err2.status ? err2.status : 'OK (200)') +
-                     ', нові кукі: ' + (added.join(', ') || 'немає') +
-                     (location ? ', Location: ' + location : '') +
-                     ', відповідь: ' + (r2.body.length ? r2.body.length + ' симв.' : 'порожня'));
-
-                note('   laravel_session у відповіді POST: ' + (sessionNew ? siteCookieFingerprint(sessionNew) + ' (довжина: ' + sessionNew.length + ')' : '(не приходив у Set-Cookie)'));
-                note('   laravel_session у jar зараз:       ' + siteCookieFingerprint(jar['laravel_session'] || ''));
-                note('   збігається з початковим? ' + ((jar['laravel_session'] || '') === sessionBefore ? 'ТАК ✔' : 'НІ ✖ — сесію перезаписали!'));
-
-                note('   XSRF-TOKEN після POST: ' + siteCookieFingerprint(jar['XSRF-TOKEN'] || '') +
-                     ' (було: ' + siteCookieFingerprint(xsrfBefore) + ')');
-
-                note('   кукі після входу: ' + siteCookieSizes(jar));
-
-                if (/"two_factor"\s*:\s*true/.test(r2.body)) {
-                    fail('На акаунті ввімкнена двофакторна автентифікація - цей спосіб не підходить');
+                if (!form.hidden.some(function (h) { return h.name === '_token'; })) {
+                    fail('На сторінці входу не знайдено захисний токен _token');
                     return;
                 }
 
-                if (siteHasLoginForm(r2.body)) {
-                    note('   ⚠ відповідь містить форму входу — показую текст помилки');
+                form.hidden.forEach(function (h) { if (h.value) exclude[h.value] = true; });
+                note('    поля форми (парсер): ' + form.hidden.map(function (h) { return h.name; }).join(', ') + ', ' + form.user + ', ' + form.pass);
 
-                    var visibleText = r2.body
-                        .replace(/<script[\s\S]*?<\/script>/gi, ' ')
-                        .replace(/<style[\s\S]*?<\/style>/gi, ' ')
-                        .replace(/<[^>]+>/g, ' ')
-                        .replace(/&nbsp;/g, ' ')
-                        .replace(/&amp;/g, '&')
-                        .replace(/&quot;/g, '"')
-                        .replace(/&#039;/g, "'")
-                        .replace(/\s+/g, ' ')
-                        .trim();
-
-                    note('   ТЕКСТ СТОРІНКИ: ' + visibleText.slice(0, 800));
-                }
-
-                // 3. Сторінка ключів
-                siteNative(keysUrl, null, headers({ 'Referer': SITE_ORIGIN + '/' }), function (err3, res3) {
-                    if (err3) {
-                        note('   DEBUG apikeys responseText: ' + String(err3.responseText || '').slice(0, 400));
-                        if (err3.status === 429) {
-                            siteCooldownUntil = Date.now() + 5 * 60 * 1000;
-                            fail('3) GET apikeys: сайт тимчасово обмежив запити (429). Зачекай кілька хвилин і повтори один раз');
-                        } else {
-                            fail('3) GET apikeys: ' + siteDescribeError(err3));
-                        }
-                        return;
-                    }
-
-                    var r3 = siteParse(res3);
-                    siteCollectCookies(jar, r3.headers);
-
-                    note('3) GET apikeys: laravel_session = ' + siteCookieFingerprint(jar['laravel_session'] || ''));
-
-                    if (siteHasLoginForm(r3.body)) {
-                        fail('3) GET apikeys: не авторизовано (сайт показав форму входу). Причина: невірний логін/пароль або застосунок втратив кукі при перенаправленні');
-                        return;
-                    }
-
-                    var csrf = r3.body.match(/<meta[^>]*name\s*=\s*["']csrf-token["'][^>]*>/i);
-                    if (csrf) exclude[siteAttr(csrf[0], 'content')] = true;
-
-                    var found = siteCandidates(r3.body, exclude);
-                    note('3) GET apikeys: сторінку отримано (' + r3.body.length + ' симв.), схожих на ключ рядків: ' + found.length);
-
-                    found.forEach(function (c, i) {
-                        note('   ' + (i + 1) + ') ' + siteMask(c.value) + ' - ' + c.where);
-                    });
-
-                    if (!found.length) {
-                        fail('Ключ на сторінці не знайдено (він може бути прихований або показуватись лише після натискання кнопки)');
-                        return;
-                    }
-
-                    note('✔ Готово');
-                    finish({ ok: true, candidates: found, report: report.join('\n') });
+                // =============================================
+                // 2. Вхід
+                // =============================================
+                var pairs = form.hidden.map(function (h) {
+                    return encodeURIComponent(h.name) + '=' + encodeURIComponent(h.value);
                 });
-            });
+                pairs.push(encodeURIComponent(form.user) + '=' + encodeURIComponent(username));
+                pairs.push(encodeURIComponent(form.pass) + '=' + encodeURIComponent(password));
+                pairs.push('remember=on');
+
+                var postHeaders = {
+                    'Origin': SITE_ORIGIN,
+                    'Referer': SITE_ORIGIN + '/',
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                    'Upgrade-Insecure-Requests': '1'
+                };
+
+                note('2) POST /login (HTML-форма): Cookie: ' + Object.keys(jar).join(', '));
+                note('    тіло: _token, ' + form.user + ', ' + form.pass + ', remember');
+
+                siteNative(loginUrl, pairs.join('&'), headers(postHeaders), function (err2, res2) {
+                    if (err2) {
+                        var why = siteErrorMessage(err2);
+
+                        note('    DEBUG status: ' + (err2.status || 0) + ' ' + (err2.statusText || ''));
+                        note('    DEBUG responseText: ' + String(err2.responseText || '').slice(0, 400));
+
+                        if (err2.status === 429) {
+                            siteCooldownUntil = Date.now() + 5 * 60 * 1000;
+                            fail('2) POST /login: забагато спроб входу (429). Зачекай кілька хвилин');
+                        }
+                        else if (err2.status === 419) fail('2) POST /login: сторінка входу застаріла (419). CSRF не прийнято');
+                        else if (err2.status === 422) fail('2) POST /login: сайт відхилив вхід' + (why ? ': ' + why : '') + ' (код 422). Перевір логін і пароль');
+                        else if (err2.status === 401) fail('2) POST /login: 401 Unauthorized' + (why ? ': ' + why : ''));
+                        else fail('2) POST /login: ' + siteDescribeError(err2));
+                        return;
+                    }
+
+                    var rPost = siteParse(res2);
+                    var added = siteCollectCookies(jar, rPost.headers);
+                    var location = (rPost.headers && (rPost.headers.location || rPost.headers.Location)) || '';
+
+                    note('2) POST /login: статус 200, нові кукі: ' + (added.join(', ') || 'немає') +
+                         (location ? ', Location: ' + location : '') +
+                         ', відповідь: ' + (rPost.body.length ? rPost.body.length + ' симв.' : 'порожня'));
+
+                    note('    laravel_session після POST: ' + siteCookieFingerprint(jar['laravel_session'] || ''));
+                    note('    XSRF-TOKEN після POST:      ' + siteCookieFingerprint(jar['XSRF-TOKEN'] || ''));
+                    note('    кукі після входу: ' + siteCookieSizes(jar));
+
+                    if (/"two_factor"\s*:\s*true/.test(rPost.body)) {
+                        fail('На акаунті ввімкнена двофакторна автентифікація - цей спосіб не підходить');
+                        return;
+                    }
+
+                    if (siteHasLoginForm(rPost.body)) {
+                        note('    ⚠ відповідь містить форму входу');
+
+                        var visibleText = rPost.body
+                            .replace(/<script[\s\S]*?<\/script>/gi, ' ')
+                            .replace(/<style[\s\S]*?<\/style>/gi, ' ')
+                            .replace(/<[^>]+>/g, ' ')
+                            .replace(/&nbsp;/g, ' ')
+                            .replace(/&amp;/g, '&')
+                            .replace(/&quot;/g, '"')
+                            .replace(/&#039;/g, "'")
+                            .replace(/\s+/g, ' ')
+                            .trim();
+
+                        note('    ТЕКСТ СТОРІНКИ: ' + visibleText.slice(0, 800));
+                    }
+
+                    // 3. Сторінка ключів
+                    siteNative(keysUrl, null, headers({ 'Referer': SITE_ORIGIN + '/' }), function (err3, res3) {
+                        if (err3) {
+                            note('    DEBUG apikeys responseText: ' + String(err3.responseText || '').slice(0, 400));
+                            if (err3.status === 429) {
+                                siteCooldownUntil = Date.now() + 5 * 60 * 1000;
+                                fail('3) GET apikeys: сайт тимчасово обмежив запити (429). Зачекай кілька хвилин і повтори один раз');
+                            } else {
+                                fail('3) GET apikeys: ' + siteDescribeError(err3));
+                            }
+                            return;
+                        }
+
+                        var r3 = siteParse(res3);
+                        siteCollectCookies(jar, r3.headers);
+
+                        note('3) GET apikeys: laravel_session = ' + siteCookieFingerprint(jar['laravel_session'] || ''));
+
+                        if (siteHasLoginForm(r3.body)) {
+                            fail('3) GET apikeys: не авторизовано (сайт показав форму входу). Причина: невірний логін/пароль або застосунок втратив кукі при перенаправленні');
+                            return;
+                        }
+
+                        var csrf = r3.body.match(/<meta[^>]*name\s*=\s*["']csrf-token["'][^>]*>/i);
+                        if (csrf) exclude[siteAttr(csrf[0], 'content')] = true;
+
+                        var found = siteCandidates(r3.body, exclude);
+                        note('3) GET apikeys: сторінку отримано (' + r3.body.length + ' симв.), схожих на ключ рядків: ' + found.length);
+
+                        found.forEach(function (c, i) {
+                            note('    ' + (i + 1) + ') ' + siteMask(c.value) + ' - ' + c.where);
+                        });
+
+                        if (!found.length) {
+                            fail('Ключ на сторінці не знайдено (він може бути прихований або показуватись лише після натискання кнопки)');
+                            return;
+                        }
+
+                        note('✔ Готово');
+                        finish({ ok: true, candidates: found, report: report.join('\n') });
+                    });
+                });
+            }
         });
     }
 
