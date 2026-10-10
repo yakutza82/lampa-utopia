@@ -1061,8 +1061,7 @@
 
     // =========================================================
     // 2a. Вхід на сайт
-    // === ДІАГНОСТИКА v2: показуємо текст сторінки при відхиленні ===
-    // === + надсилаємо логін під обома іменами (username & email) ===
+    // === ДІАГНОСТИКА v3: показуємо СИРІ поля форми ===
     // =========================================================
     function siteFetchKey(username, password, finish) {
         var report = [];
@@ -1112,6 +1111,35 @@
                 return;
             }
 
+            // =============================================
+            // ДІАГНОСТИКА: показуємо СИРІ поля форми
+            // =============================================
+
+            // Всі <form> теги
+            var formTags = r.body.match(/<form\b[^>]*>/gi) || [];
+            note('   <form> тегів знайдено: ' + formTags.length);
+            formTags.forEach(function (tag, i) {
+                note('     form[' + i + ']: ' + tag.slice(0, 300));
+            });
+
+            // Всі <input> теги
+            var inputTags = r.body.match(/<input\b[^>]*>/gi) || [];
+            note('   <input> тегів знайдено: ' + inputTags.length);
+            inputTags.forEach(function (tag, i) {
+                var name = siteAttr(tag, 'name');
+                var type = siteAttr(tag, 'type') || 'text';
+                var id = siteAttr(tag, 'id');
+                note('     input[' + i + ']: name="' + name + '" type="' + type + '" id="' + id + '"');
+            });
+
+            // Фрагмент HTML навколо форми входу
+            var passIdx = r.body.search(/type\s*=\s*["']password["']/i);
+            if (passIdx > 0) {
+                note('   HTML навколо password-поля:');
+                note('     ...' + r.body.slice(Math.max(0, passIdx - 300), passIdx + 500).replace(/\s+/g, ' ') + '...');
+            }
+
+            // Стандартний парсинг
             var form = siteLoginFields(r.body);
 
             if (!form.pass || !form.user) {
@@ -1125,27 +1153,20 @@
             }
 
             form.hidden.forEach(function (h) { if (h.value) exclude[h.value] = true; });
-            note('   поля форми: ' + form.hidden.map(function (h) { return h.name; }).join(', ') + ', ' + form.user + ', ' + form.pass);
+            note('   поля форми (парсер): ' + form.hidden.map(function (h) { return h.name; }).join(', ') + ', ' + form.user + ', ' + form.pass);
 
             // =============================================
             // 2. Вхід
             // =============================================
-            // Всі приховані поля + логін під обома іменами (username і email)
-            // + пароль. Laravel використає те поле, яке очікує його валідатор.
             var pairs = form.hidden.map(function (h) {
                 return encodeURIComponent(h.name) + '=' + encodeURIComponent(h.value);
             });
 
             // Логін дублюємо під обома можливими іменами
             pairs.push('username=' + encodeURIComponent(username));
-            if (form.user !== 'username') {
-                pairs.push(encodeURIComponent(form.user) + '=' + encodeURIComponent(username));
-            }
             pairs.push('email=' + encodeURIComponent(username));
-
+            pairs.push(encodeURIComponent(form.user) + '=' + encodeURIComponent(username));
             pairs.push(encodeURIComponent(form.pass) + '=' + encodeURIComponent(password));
-
-            // Галочка "запам'ятати мене" — деякі сайти вимагають її наявності
             pairs.push('remember=on');
 
             var postHeaders = {
@@ -1155,7 +1176,7 @@
             };
 
             note('2) POST /login (HTML-форма): Cookie: ' + Object.keys(jar).join(', '));
-            note('   тіло: _token, username, ' + form.user + ', email, ' + form.pass + ', remember');
+            note('   тіло: _token, username, email, ' + form.user + ', ' + form.pass + ', remember');
 
             siteNative(loginUrl, pairs.join('&'), headers(postHeaders), function (err2, res2) {
                 if (err2) {
@@ -1191,7 +1212,6 @@
                 if (siteHasLoginForm(r2.body)) {
                     note('   ⚠ відповідь містить форму входу — показую текст помилки');
 
-                    // Витягуємо весь видимий текст зі сторінки
                     var visibleText = r2.body
                         .replace(/<script[\s\S]*?<\/script>/gi, ' ')
                         .replace(/<style[\s\S]*?<\/style>/gi, ' ')
@@ -1204,24 +1224,6 @@
                         .trim();
 
                     note('   ТЕКСТ СТОРІНКИ: ' + visibleText.slice(0, 800));
-
-                    // Laravel-блок помилок валідації
-                    var errBlock = r2.body.match(/<[^>]*class="[^"]*(?:invalid-feedback|alert|error|message)[^"]*"[^>]*>([\s\S]*?)<\//i);
-                    if (errBlock) {
-                        note('   БЛОК ПОМИЛКИ: ' + errBlock[1].replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 400));
-                    }
-
-                    // Будь-який div зі словом "помилка"/"error"/"невірно"
-                    var allDivs = r2.body.match(/<div[^>]*>[\s\S]{0,200}?<\//gi) || [];
-                    var errorDivs = allDivs.filter(function (d) {
-                        return /помилк|невірн|неправ|invalid|error|incorrect|failed|капч|captcha|заблок|blocked|too many|спроб|throttle/i.test(d);
-                    });
-                    if (errorDivs.length) {
-                        note('   СХОЖІ НА ПОМИЛКУ БЛОКИ:');
-                        errorDivs.slice(0, 3).forEach(function (d, i) {
-                            note('     ' + (i + 1) + ') ' + d.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 250));
-                        });
-                    }
                 }
 
                 // 3. Сторінка ключів
