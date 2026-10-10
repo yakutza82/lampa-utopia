@@ -954,6 +954,13 @@
         }).join('; ');
     }
 
+    // Короткий відбиток значення cookie — перші 8 символів.
+    // Достатньо, щоб порівнювати між кроками, і безпечно для звіту.
+    function siteCookieFingerprint(value) {
+        if (!value) return '(немає)';
+        return String(value).slice(0, 8) + '…';
+    }
+
     function siteAttr(tag, name) {
         var m = tag.match(new RegExp('\\b' + name + '\\s*=\\s*("([^"]*)"|\'([^\']*)\')', 'i'));
         return m ? (m[2] !== undefined ? m[2] : m[3]) : '';
@@ -1061,7 +1068,8 @@
 
     // =========================================================
     // 2a. Вхід на сайт
-    // === ДІАГНОСТИКА v3: показуємо СИРІ поля форми ===
+    // === ДІАГНОСТИКА v4: порівнюємо laravel_session між кроками ===
+    // === + явно вказуємо Referer: https://utp.to/             ===
     // =========================================================
     function siteFetchKey(username, password, finish) {
         var report = [];
@@ -1111,35 +1119,15 @@
                 return;
             }
 
-            // =============================================
-            // ДІАГНОСТИКА: показуємо СИРІ поля форми
-            // =============================================
+            // Запам'ятовуємо початковий стан cookie для порівняння
+            var sessionBefore = jar['laravel_session'] || '';
+            var xsrfBefore = jar['XSRF-TOKEN'] || '';
 
-            // Всі <form> теги
-            var formTags = r.body.match(/<form\b[^>]*>/gi) || [];
-            note('   <form> тегів знайдено: ' + formTags.length);
-            formTags.forEach(function (tag, i) {
-                note('     form[' + i + ']: ' + tag.slice(0, 300));
-            });
+            note('   laravel_session після GET: ' + siteCookieFingerprint(sessionBefore) +
+                 ' (довжина: ' + sessionBefore.length + ')');
+            note('   XSRF-TOKEN після GET:      ' + siteCookieFingerprint(xsrfBefore) +
+                 ' (довжина: ' + xsrfBefore.length + ')');
 
-            // Всі <input> теги
-            var inputTags = r.body.match(/<input\b[^>]*>/gi) || [];
-            note('   <input> тегів знайдено: ' + inputTags.length);
-            inputTags.forEach(function (tag, i) {
-                var name = siteAttr(tag, 'name');
-                var type = siteAttr(tag, 'type') || 'text';
-                var id = siteAttr(tag, 'id');
-                note('     input[' + i + ']: name="' + name + '" type="' + type + '" id="' + id + '"');
-            });
-
-            // Фрагмент HTML навколо форми входу
-            var passIdx = r.body.search(/type\s*=\s*["']password["']/i);
-            if (passIdx > 0) {
-                note('   HTML навколо password-поля:');
-                note('     ...' + r.body.slice(Math.max(0, passIdx - 300), passIdx + 500).replace(/\s+/g, ' ') + '...');
-            }
-
-            // Стандартний парсинг
             var form = siteLoginFields(r.body);
 
             if (!form.pass || !form.user) {
@@ -1158,25 +1146,27 @@
             // =============================================
             // 2. Вхід
             // =============================================
+            // Тіло форми — точно як у браузері: _token, username, password.
+            // Без дублювання під іншими іменами (у попередній версії це могло плутати сайт).
             var pairs = form.hidden.map(function (h) {
                 return encodeURIComponent(h.name) + '=' + encodeURIComponent(h.value);
             });
-
-            // Логін дублюємо під обома можливими іменами
-            pairs.push('username=' + encodeURIComponent(username));
-            pairs.push('email=' + encodeURIComponent(username));
             pairs.push(encodeURIComponent(form.user) + '=' + encodeURIComponent(username));
             pairs.push(encodeURIComponent(form.pass) + '=' + encodeURIComponent(password));
+            // remember як чекбокс: у браузері відсутність = не відмічено, наявність = "on"
             pairs.push('remember=on');
 
+            // Referer — на ГОЛОВНУ сторінку, як у справжнього браузера,
+            // який прийшов на /login із головної і надсилає форму.
             var postHeaders = {
                 'Origin': SITE_ORIGIN,
-                'Referer': loginUrl,
-                'Content-Type': 'application/x-www-form-urlencoded'
+                'Referer': SITE_ORIGIN + '/',
+                'Content-Type': 'application/x-www-form-urlencoded',
+                'Upgrade-Insecure-Requests': '1'
             };
 
             note('2) POST /login (HTML-форма): Cookie: ' + Object.keys(jar).join(', '));
-            note('   тіло: _token, username, email, ' + form.user + ', ' + form.pass + ', remember');
+            note('   тіло: _token, ' + form.user + ', ' + form.pass + ', remember');
 
             siteNative(loginUrl, pairs.join('&'), headers(postHeaders), function (err2, res2) {
                 if (err2) {
@@ -1197,11 +1187,36 @@
                 }
 
                 var r2 = siteParse(res2);
+
+                // Порівнюємо значення cookie ДО оновлення jar, щоб побачити,
+                // чи змінив Laravel laravel_session (що означає — сесія не прийнята).
+                var sessionAfterHeaders = r2.headers && (r2.headers['set-cookie'] || r2.headers['Set-Cookie']);
+                var sessionNew = '';
+                if (sessionAfterHeaders) {
+                    var lines = typeof sessionAfterHeaders === 'string' ? sessionAfterHeaders.split('\n') : sessionAfterHeaders;
+                    lines.forEach(function (line) {
+                        var part = String(line).split(';')[0];
+                        if (part.indexOf('laravel_session=') === 0) {
+                            sessionNew = part.slice('laravel_session='.length);
+                        }
+                    });
+                }
+
                 var added = siteCollectCookies(jar, r2.headers);
                 var location = (r2.headers && (r2.headers.location || r2.headers.Location)) || '';
-                note('2) POST /login: OK, нові кукі: ' + (added.join(', ') || 'немає') +
+
+                note('2) POST /login: статус ' + (err2 && err2.status ? err2.status : 'OK (200)') +
+                     ', нові кукі: ' + (added.join(', ') || 'немає') +
                      (location ? ', Location: ' + location : '') +
                      ', відповідь: ' + (r2.body.length ? r2.body.length + ' симв.' : 'порожня'));
+
+                note('   laravel_session у відповіді POST: ' + (sessionNew ? siteCookieFingerprint(sessionNew) + ' (довжина: ' + sessionNew.length + ')' : '(не приходив у Set-Cookie)'));
+                note('   laravel_session у jar зараз:       ' + siteCookieFingerprint(jar['laravel_session'] || ''));
+                note('   збігається з початковим? ' + ((jar['laravel_session'] || '') === sessionBefore ? 'ТАК ✔' : 'НІ ✖ — сесію перезаписали!'));
+
+                note('   XSRF-TOKEN після POST: ' + siteCookieFingerprint(jar['XSRF-TOKEN'] || '') +
+                     ' (було: ' + siteCookieFingerprint(xsrfBefore) + ')');
+
                 note('   кукі після входу: ' + siteCookieSizes(jar));
 
                 if (/"two_factor"\s*:\s*true/.test(r2.body)) {
@@ -1241,6 +1256,8 @@
 
                     var r3 = siteParse(res3);
                     siteCollectCookies(jar, r3.headers);
+
+                    note('3) GET apikeys: laravel_session = ' + siteCookieFingerprint(jar['laravel_session'] || ''));
 
                     if (siteHasLoginForm(r3.body)) {
                         fail('3) GET apikeys: не авторизовано (сайт показав форму входу). Причина: невірний логін/пароль або застосунок втратив кукі при перенаправленні');
@@ -1984,7 +2001,7 @@ var moviePanel = $(
                 var ok = document.execCommand('copy');
 
                 if (ok) {
-                    success();
+                    Lampa.Noty.show('UTOPIA: скопійовано');
                 } else {
                     Lampa.Noty.show('UTOPIA: не вдалося скопіювати');
                 }
